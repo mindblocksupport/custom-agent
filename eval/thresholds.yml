@@ -1,0 +1,29 @@
+# Day 14 阈值配置 (L37 §8.5).
+#
+# 两套阈值:
+# - ci   : 每个 PR 跑, hash backend, 验管路存在 + 不规模性回归
+# - nightly : 真模型 (Qwen3 + bge-reranker), 验真实质量
+#
+# 触线行为: eval/run.py --strict 时, hybrid+rerank 列任一指标低于本阈值即 exit 1.
+
+ci:
+  description: |
+    CI 卡口 (hash backend), 仅保证管路通 + 没大规模回归.
+    真实语义质量看 nightly.
+  thresholds:
+    bm25:
+      recall_at_5: 0.30           # BM25 是地板; 50 条不到 0.30 = 切词或索引坏
+    hybrid:
+      recall_at_5: 0.20           # hash + RRF 数字正常在 0.30 上下, 留 buffer
+
+nightly:
+  description: |
+    真模型评测 (Qwen3-Embedding + bge-reranker-v2-m3); 周会前必跑.
+    达不到阈值要 root-cause: chunking / embedding / reranker / KB 覆盖.
+  thresholds:
+    hybrid_rerank:
+      recall_at_5: 0.85
+      mrr_at_10: 0.60
+      precision_at_1: 0.70
+      refusal_tpr: 0.50            # 应拒答时拒答率 (negative set 拦住 ≥ 50%)
+      refusal_fpr: 0.10            # 误拒答率 (gold!=null 但被拒) 上限

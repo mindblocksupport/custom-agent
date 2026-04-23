@@ -1,0 +1,71 @@
+# 基础设施
+# - postgres (业务 DB + 可选给 Langfuse 用)
+# - redis    (缓存 / 限流 / 队列)
+# - langfuse (LLM 观测, 默认注释掉; 启用见下文)
+services:
+  postgres:
+    # pgvector/pgvector 自带 pgvector 扩展; pgroonga (中文 BM25) 留待 Day 10 接入
+    image: pgvector/pgvector:pg16
+    container_name: agent-postgres
+    environment:
+      POSTGRES_USER: agent
+      POSTGRES_PASSWORD: agent
+      POSTGRES_DB: agent
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro  # 启动时自动执行
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: agent-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ============================================================
+  # Langfuse v2 自部署 (启用即可看 LLM trace)
+  # 简化版: 复用上面的 postgres 实例 (无需 ClickHouse)
+  # ------------------------------------------------------------
+  # 启用步骤:
+  #   1. 取消下面注释
+  #   2. docker compose -f infra/docker-compose.yml up -d
+  #   3. 浏览器打开 http://localhost:3001 → 注册管理员 → 建项目 → 拷 keys
+  #   4. 把 keys 填到 workspace 根的 .env:
+  #        LANGFUSE_PUBLIC_KEY=pk-lf-xxxx
+  #        LANGFUSE_SECRET_KEY=sk-lf-xxxx
+  #        LANGFUSE_HOST=http://localhost:3001
+  #   5. make backend  → 后续每次对话自动出现在 trace 里
+  # ============================================================
+  # langfuse:
+  #   image: langfuse/langfuse:2
+  #   container_name: agent-langfuse
+  #   ports:
+  #     - "3001:3000"
+  #   environment:
+  #     DATABASE_URL: postgresql://agent:agent@postgres:5432/langfuse
+  #     NEXTAUTH_SECRET: change-me-32-chars-min-please-rotate
+  #     NEXTAUTH_URL: http://localhost:3001
+  #     SALT: change-me-salt-min-32-chars-please
+  #     TELEMETRY_ENABLED: "false"
+  #     LANGFUSE_INIT_USER_EMAIL: admin@local
+  #     LANGFUSE_INIT_USER_PASSWORD: admin-please-change
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,62 @@
+[project]
+name = "custom-agent"
+version = "0.1.0"
+description = "Enterprise Agent Platform - workspace root"
+requires-python = ">=3.11"
+# 根工程不直接承载代码，只做 workspace
+dependencies = []
+
+[tool.uv.workspace]
+# 显式列出 Python workspace 成员 (packages/sdk-typescript 是 npm 包,不在内)
+members = [
+    "services/api-server",
+    "services/agent-core",
+    "services/gateway",
+    "services/tool-servers/*",
+    "packages/schemas",
+    "packages/sdk-python",
+    "packages/rag-core",
+]
+
+[tool.uv.sources]
+schemas = { workspace = true }
+gateway = { workspace = true }
+agent-core = { workspace = true }
+api-server = { workspace = true }
+time-mcp = { workspace = true }
+calc-mcp = { workspace = true }
+web-search-mcp = { workspace = true }
+rag-mcp = { workspace = true }
+rag-core = { workspace = true }
+custom-agent-sdk = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "httpx>=0.27",  # for ASGI tests
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = [
+    "services/agent-core/tests",
+    "services/gateway/tests",
+    "services/api-server/tests",
+    "services/tool-servers/calc-mcp/tests",
+    "services/tool-servers/time-mcp/tests",
+    "services/tool-servers/web-search-mcp/tests",
+    "packages/sdk-python/tests",
+    "packages/rag-core/tests",
+    "eval/tests",
+]

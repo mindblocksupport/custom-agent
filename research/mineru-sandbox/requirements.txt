@@ -1,0 +1,9 @@
+# 研究沙箱 deps - **不进生产 venv**
+# AGPL 警告: magic-pdf / mineru 调用链均为 AGPL-3.0
+magic-pdf>=2.5
+paddleocr>=3.0
+paddlepaddle>=2.6
+# benchmark 套件
+numpy>=1.26
+pandas>=2.2
+tqdm>=4.66

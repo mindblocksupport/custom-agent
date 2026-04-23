@@ -1,0 +1,38 @@
+[project]
+name = "api-server"
+version = "0.1.0"
+description = "HTTP API server - L9 access layer + L8 auth"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic-settings>=2.6",
+    "sse-starlette>=2.1",
+    "python-dotenv>=1.0",
+    "schemas",
+    "gateway",
+    "agent-core",
+    # MCP servers - 启动时拉起各自的 stdio 子进程
+    "time-mcp",
+    "calc-mcp",
+    "web-search-mcp",
+    "rag-mcp",
+    # 观测 (L7)
+    "langfuse>=2.50,<4",
+]
+
+[tool.uv.sources]
+schemas = { workspace = true }
+gateway = { workspace = true }
+agent-core = { workspace = true }
+time-mcp = { workspace = true }
+calc-mcp = { workspace = true }
+web-search-mcp = { workspace = true }
+rag-mcp = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/api_server"]

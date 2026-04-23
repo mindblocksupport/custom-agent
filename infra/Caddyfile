@@ -1,0 +1,57 @@
+# Caddyfile - 生产部署参考配置
+#
+# 职责拆分:
+#   - Caddy: 静态前端托管 (apps/web-lite/chat.html / 未来 web-console/dist)
+#   - api-server: 仅 /v1/* + /health/* 业务 API
+#
+# 启用步骤:
+#   1. .env 设 SERVE_WEB_LITE=false  (api-server 不再托管静态)
+#   2. caddy run --config infra/Caddyfile
+#   3. 浏览器打开 http://localhost  (Caddy 在 80 端口)
+#      所有 /v1/* 请求自动反代到 api-server:8000
+#
+# 生产环境 (HTTPS 自动签):
+#   - 把 :80 改成你的域名 agent.example.com
+#   - Caddy 自动从 Let's Encrypt 申 cert
+#   - 加 CDN (CloudFlare/Aliyun) 在前面更好
+
+:80 {
+    encode gzip zstd
+
+    # 静态前端
+    root * /Users/mac/Documents/agent/custom_agent/apps/web-lite
+    @static {
+        path / /index.html /chat.html /*.css /*.js /*.svg /*.png /*.jpg /*.ico
+    }
+    handle @static {
+        try_files {path} /chat.html
+        file_server
+        header Cache-Control "public, max-age=300"
+    }
+
+    # 业务 API → api-server
+    handle /v1/* {
+        reverse_proxy localhost:8000 {
+            # SSE 流式不能 buffer
+            flush_interval -1
+            transport http {
+                read_timeout 5m
+            }
+        }
+    }
+    handle /health/* {
+        reverse_proxy localhost:8000
+    }
+    handle /docs* {
+        reverse_proxy localhost:8000
+    }
+    handle /openapi.json {
+        reverse_proxy localhost:8000
+    }
+
+    # 兜底:其他静态文件 fallback 到 chat.html (SPA 用)
+    handle {
+        try_files {path} /chat.html
+        file_server
+    }
+}

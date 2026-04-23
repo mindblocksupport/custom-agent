@@ -1,0 +1,84 @@
+# Prometheus alert rules (L37 §8.6 Day 13)
+#
+# 部署前提:
+# - Prometheus 抓取 /metrics (Day 14+ 加 fastapi-instrumentator)
+# - Grafana 配 alertmanager
+# - 当前文件作为告警规则蓝图; 暂未通线
+#
+# 阈值依据: L37 §8.6 表 + 行业经验
+groups:
+  - name: rag-quality
+    interval: 60s
+    rules:
+      - alert: RagRecallDropped
+        # 日漂移 R@5 > 5pp 触发 (需要 eval job 把 recall 推 push gateway)
+        expr: |
+          (rag_recall_at_5 - rag_recall_at_5 offset 24h) < -0.05
+        for: 10m
+        labels: { severity: warning, team: rag }
+        annotations:
+          summary: "RAG Recall@5 drop > 5pp (24h)"
+          description: "current={{ $value }}, 检查近 24h 文档变化 / embedding 漂移"
+
+      - alert: RagRefusalRateTooHigh
+        # > 30% 拒答率: 库覆盖不够 OR 阈值太严
+        expr: |
+          rate(rag_refused_total[15m]) /
+          rate(rag_search_total[15m]) > 0.30
+        for: 15m
+        labels: { severity: warning, team: rag }
+        annotations:
+          summary: "RAG refusal rate > 30%"
+          description: "调低 refusal_threshold OR 补 KB 文档"
+
+  - name: rag-latency
+    interval: 30s
+    rules:
+      - alert: RagLatencyP95High
+        # search_kb 端到端 P95 > 3s = SLA 破线
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(rag_search_duration_ms_bucket[5m])) by (le)
+          ) > 3000
+        for: 5m
+        labels: { severity: critical, team: rag }
+        annotations:
+          summary: "search_kb P95 > 3s"
+          description: "查 reranker GPU 利用率 / embed 服务 / pgvector HNSW ef_search"
+
+  - name: rag-availability
+    interval: 30s
+    rules:
+      - alert: EmbedService5xx
+        expr: |
+          rate(rag_embed_requests_total{status=~"5.."}[5m]) /
+          rate(rag_embed_requests_total[5m]) > 0.01
+        for: 5m
+        labels: { severity: critical, team: rag }
+        annotations:
+          summary: "Embed service 5xx > 1%"
+
+      - alert: RagCacheHitRateDropped
+        expr: |
+          rate(rag_cache_hits_total[15m]) /
+          rate(rag_cache_lookups_total[15m]) < 0.20
+        for: 30m
+        labels: { severity: info, team: rag }
+        annotations:
+          summary: "RAG semantic cache hit rate < 20%"
+          description: "可能 cache TTL 太短 OR query 模式漂移"
+
+  - name: model-routing
+    interval: 60s
+    rules:
+      - alert: ReasoningModelDominates
+        # 路由到贵模型的比例突增 (cost 风险)
+        expr: |
+          rate(llm_calls_total{route_reason=~"reasoning_keyword|long_query"}[1h]) /
+          rate(llm_calls_total[1h]) > 0.60
+        for: 1h
+        labels: { severity: warning, team: ai-platform }
+        annotations:
+          summary: "Reasoning model > 60% of all calls (1h)"
+          description: "确认是真业务变化还是路由误判 → 校准启发式或上 bandit 学习"

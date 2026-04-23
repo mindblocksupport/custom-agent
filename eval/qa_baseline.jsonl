@@ -1,0 +1,55 @@
+{"query": "这个项目用什么 LLM 作为默认模型", "gold_doc": "docs/00-architecture-overview.md"}
+{"query": "怎么启动后端", "gold_doc": "README.md"}
+{"query": "前端跑在哪个端口", "gold_doc": "README.md"}
+{"query": "工程的目录结构是什么样的", "gold_doc": "README.md"}
+{"query": "RAG 怎么洗数据", "gold_doc": "docs/37-rag-implementation-plan.md"}
+{"query": "如何解决检索脏数据问题", "gold_doc": "docs/37-rag-implementation-plan.md"}
+{"query": "如何解决上下文不够的问题", "gold_doc": "docs/37-rag-implementation-plan.md"}
+{"query": "MinerU 为什么不能直接用", "gold_doc": "docs/37-rag-implementation-plan.md"}
+{"query": "PaddleOCR-VL 是什么", "gold_doc": "docs/37-rag-implementation-plan.md"}
+{"query": "embedding 模型选哪个", "gold_doc": "docs/37-rag-implementation-plan.md"}
+{"query": "什么是 RRF", "gold_doc": "docs/37-rag-implementation-plan.md"}
+{"query": "rerank 用什么模型", "gold_doc": "docs/37-rag-implementation-plan.md"}
+{"query": "Day 9 做了什么", "gold_doc": "docs/37-rag-implementation-plan.md"}
+{"query": "ACL 怎么注入防止越权", "gold_doc": "docs/37-rag-implementation-plan.md"}
+{"query": "拒答阈值是多少", "gold_doc": "docs/37-rag-implementation-plan.md"}
+{"query": "L3 RAG 的 13 个 pipeline 阶段是什么", "gold_doc": "docs/03-rag.md"}
+{"query": "ACL 同步是不是法律风险", "gold_doc": "docs/03-rag.md"}
+{"query": "LLM gateway 怎么设计的", "gold_doc": "docs/02-llm-gateway.md"}
+{"query": "agent-core 包含哪些组件", "gold_doc": "docs/05-agent-core.md"}
+{"query": "MCP 协议是什么", "gold_doc": "docs/12-llm-api-protocols.md"}
+{"query": "如何控制成本", "gold_doc": "docs/21-finops-cost-management.md"}
+{"query": "怎么处理幻觉", "gold_doc": "docs/18-hallucination-handling.md"}
+{"query": "多租户怎么隔离", "gold_doc": "docs/24-multi-tenant-isolation.md"}
+{"query": "上下文工程是什么", "gold_doc": "docs/13-context-engineering.md"}
+{"query": "知识工程怎么做", "gold_doc": "docs/15-knowledge-engineering.md"}
+{"query": "我怎么打开浏览器", "gold_doc": null}
+{"query": "明天天气怎么样", "gold_doc": null}
+{"query": "请帮我写首诗", "gold_doc": null}
+{"query": "今天的股票走势", "gold_doc": null}
+{"query": "1+1 等于几", "gold_doc": null}
+{"query": "L1 基础设施都包含哪些组件", "gold_doc": "docs/01-infrastructure.md"}
+{"query": "L4 工具和 skill 怎么设计", "gold_doc": "docs/04-tools-and-skills.md"}
+{"query": "agent SDLC 流程是什么", "gold_doc": "docs/23-agent-sdlc.md"}
+{"query": "voice agent 怎么实现", "gold_doc": "docs/27-voice-agent.md"}
+{"query": "客户 90 天 onboarding 流程", "gold_doc": "docs/29-customer-onboarding-90day.md"}
+{"query": "垂直行业模板有哪些", "gold_doc": "docs/30-vertical-templates.md"}
+{"query": "边缘和端侧 AI 是什么", "gold_doc": "docs/31-edge-and-on-device-ai.md"}
+{"query": "联邦学习的知识怎么共享", "gold_doc": "docs/32-federated-knowledge.md"}
+{"query": "如何持续微调", "gold_doc": "docs/33-continuous-finetuning-loop.md"}
+{"query": "agent2agent 协作怎么实现", "gold_doc": "docs/34-a2a-agent-collaboration.md"}
+{"query": "agent 仿真环境是什么", "gold_doc": "docs/35-agent-simulation.md"}
+{"query": "信创和主权 AI 怎么落地", "gold_doc": "docs/36-xinchuang-and-sovereign-ai.md"}
+{"query": "灾备 BCM 计划是什么", "gold_doc": "docs/26-disaster-recovery-bcm.md"}
+{"query": "数据合规和数据驻留怎么做", "gold_doc": "docs/25-data-compliance-and-residency.md"}
+{"query": "HITL 人在环设计要点", "gold_doc": "docs/22-hitl-design.md"}
+{"query": "vendor landscape 是什么", "gold_doc": "docs/19-vendor-landscape.md"}
+{"query": "prompt engineering 怎么做", "gold_doc": "docs/17-prompt-engineering.md"}
+{"query": "expert review roadmap 列了哪些事", "gold_doc": "docs/99-expert-review-and-roadmap.md"}
+{"query": "computer/browser use 怎么集成", "gold_doc": "docs/14-computer-and-browser-use.md"}
+{"query": "L0 架构概览写了什么", "gold_doc": "docs/00-architecture-overview.md"}
+{"query": "如何在地球上画一个三角形", "gold_doc": null}
+{"query": "今晚北京几点日落", "gold_doc": null}
+{"query": "推荐一本侦探小说", "gold_doc": null}
+{"query": "黄金价格能预测吗", "gold_doc": null}
+{"query": "我家狗为什么不吃饭", "gold_doc": null}

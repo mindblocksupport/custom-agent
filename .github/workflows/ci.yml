@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      - name: Setup Python
+        run: uv python install 3.11
+      - name: Install workspace
+        run: uv sync --all-packages
+      - name: Lint
+        run: make lint
+      - name: Test
+        run: uv run pytest -q
+
+  license-scan:
+    # L37 §8.9 - 防止 AGPL 包 (如 magic-pdf / MinerU 主包) 进入生产依赖
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - name: Setup Python
+        run: uv python install 3.11
+      - name: Install workspace
+        run: uv sync --all-packages
+      - name: Scan licenses (fail on AGPL)
+        run: make license-scan
+
+  rag-eval:
+    # L37 §8.10 Day 14 - PR 改 rag-core/eval/migrations 必跑 eval, 违阈卡 PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - name: Setup Python
+        run: uv python install 3.11
+      - name: Install workspace
+        run: uv sync --all-packages
+      - name: Install pyyaml (for thresholds.yml)
+        run: uv pip install pyyaml
+      - name: RAG eval (CI profile, hash backend)
+        run: |
+          uv run --package rag-core python eval/run.py \
+            --strict --profile ci --json-out eval/results.json
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rag-eval-report-${{ github.sha }}
+          path: eval/results.json
