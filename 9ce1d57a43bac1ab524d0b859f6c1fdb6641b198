@@ -1,0 +1,218 @@
+apps/web-console/lib/api/workspaces.ts
+  cb73be6825dc0746 1-72
+services/api-server/src/api_server/db/kb.py
+  cb73be6825dc0746 1-207
+apps/web-console/hooks/useKb.ts
+  cb73be6825dc0746 1-139
+apps/web-console/components/KbPanel.tsx
+  cb73be6825dc0746 1-354
+services/api-server/src/api_server/db/chat.py
+  cb73be6825dc0746 1-272
+apps/web-console/lib/types.ts
+  cb73be6825dc0746 49-88,110-111,128-136,154-158,175-204,206-240
+services/api-server/src/api_server/db/api_keys.py
+  cb73be6825dc0746 1-96
+apps/web-console/hooks/useAgent.ts
+  cb73be6825dc0746 21-22,27-28,36,64,67-68,77,97,121-123,133-137,139-140,152-160,182-199,237-245,264-279,313-324,327-353
+services/api-server/pyproject.toml
+  cb73be6825dc0746 22-26,37
+services/agent-core/tests/test_acl_injection.py
+  cb73be6825dc0746 1-128
+infra/migrations/004_chat_persistence.sql
+  cb73be6825dc0746 1-47
+apps/web-console/components/Welcome.tsx
+  cb73be6825dc0746 1-200
+infra/migrations/005_kb_jobs_collection.sql
+  cb73be6825dc0746 1-45
+services/api-server/src/api_server/seed.py
+  cb73be6825dc0746 1-90
+services/api-server/src/api_server/main.py
+  cb73be6825dc0746 14,17,29-44,94-98
+services/agent-core/src/agent_core/runtime/executor.py
+  cb73be6825dc0746 8,17-18,52,54-57,61,66-82,94,105,109,111-112
+services/api-server/tests/test_sessions_routes.py
+  cb73be6825dc0746 1-115
+apps/web-console/components/WorkspaceSwitcher.tsx
+  cb73be6825dc0746 1-217
+apps/web-console/components/SkillSelector.tsx
+  cb73be6825dc0746 1-248
+services/tool-servers/rag-mcp/pyproject.toml
+  cb73be6825dc0746 9
+apps/web-console/components/TraceInspector.tsx
+  cb73be6825dc0746 1-251
+services/api-server/tests/test_acl.py
+  cb73be6825dc0746 1-89
+apps/web-console/app/page.tsx
+  cb73be6825dc0746 3,5-7,10-11,14-16,18-20,22-28,30-34,36,39,41-71,82,86,91,94-98,100-118,125,133-134,136-149,155-158,165-167,176-210,215-220
+apps/web-console/components/ToolCard.tsx
+  cb73be6825dc0746 5,7-43,47-49,52,54,56-57,60-67,69-108,111-120,129,132-134
+infra/migrations/006_workspaces_skills.sql
+  cb73be6825dc0746 1-74
+services/agent-core/src/agent_core/mcp/client.py
+  cb73be6825dc0746 40-41,43-46,52,111
+docs/PROJECT-OVERVIEW.md
+  cb73be6825dc0746 1-34,36-203,205-207,209,211-216,218-236,238-265,268-303
+services/api-server/src/api_server/db/skills.py
+  cb73be6825dc0746 1-270
+services/tool-servers/rag-mcp/src/rag_mcp/acl.py
+  cb73be6825dc0746 1-79
+apps/web-console/hooks/useTheme.ts
+  cb73be6825dc0746 1-47
+apps/web-console/components/CommandPalette.tsx
+  cb73be6825dc0746 1-403
+services/tool-servers/rag-mcp/tests/test_acl_verify.py
+  cb73be6825dc0746 1-118
+packages/rag-core/src/rag_core/parser/plumber_backend.py
+  cb73be6825dc0746 1-56
+packages/rag-core/src/rag_core/parser/pdfium_backend.py
+  cb73be6825dc0746 1-66
+infra/migrations/003_api_keys.sql
+  cb73be6825dc0746 1-19
+apps/web-console/components/StatusBar.tsx
+  cb73be6825dc0746 1-92
+services/api-server/src/api_server/db/workspaces.py
+  cb73be6825dc0746 1-265
+services/api-server/tests/test_skills_routes.py
+  cb73be6825dc0746 1-178
+services/api-server/src/api_server/routes/chat.py
+  cb73be6825dc0746 10,12,15,17,19,33,36-38,40,42,117-321,326,342-349,351,353-356,367-374,378-401,407-410,415,418,420-431,469-487,490-499,507-514,519-520,524,527,531-538,540-548,559
+apps/web-console/components/Sidebar.tsx
+  cb73be6825dc0746 3-11,13,22-23,25-38,46-47,49-62,64-129,131-138,140-189,191-203,205-218,220-248,252-299,302-356,362-485,503-513,517-521,533-536
+apps/web-console/hooks/useSkills.ts
+  cb73be6825dc0746 1-120
+services/api-server/src/api_server/routes/kb.py
+  cb73be6825dc0746 1-310
+apps/web-console/components/SkillsPanel.tsx
+  cb73be6825dc0746 1-604
+services/api-server/src/api_server/ingest_worker.py
+  cb73be6825dc0746 1-105
+apps/web-console/components/UiHost.tsx
+  cb73be6825dc0746 1-176
+services/agent-core/src/agent_core/runtime/loop.py
+  cb73be6825dc0746 9,30,42-43,57
+packages/rag-core/src/rag_core/retrieval/dense.py
+  cb73be6825dc0746 25,36
+apps/web-console/app/api/me/route.ts
+  cb73be6825dc0746 1-18
+apps/web-console/components/ChatPanel.tsx
+  cb73be6825dc0746 3-6,9-12,14-17,23-26,29,33-36,39,43-46,48-50,53-54,58-76,78-82,94,98-108,111-114,116-128,131-143,145-154,159-201,206-217,220-234,236-256,258-259,262-279,282-288,292,294,296,298-365,368-450
+apps/web-console/lib/api/sessions.ts
+  cb73be6825dc0746 1-96
+apps/web-console/lib/api/me.ts
+  cb73be6825dc0746 1-72
+apps/web-console/lib/export.ts
+  cb73be6825dc0746 1-108
+services/api-server/src/api_server/routes/me.py
+  cb73be6825dc0746 1-258
+services/api-server/tests/test_kb_routes.py
+  cb73be6825dc0746 1-132
+packages/rag-core/src/rag_core/retrieval/bm25.py
+  cb73be6825dc0746 25,43
+apps/web-console/components/CitationsCard.tsx
+  cb73be6825dc0746 1-132
+services/api-server/src/api_server/acl.py
+  cb73be6825dc0746 1-77
+apps/web-console/app/layout.tsx
+  cb73be6825dc0746 2,10-20,27-34
+apps/web-console/components/Markdown.tsx
+  cb73be6825dc0746 1-108
+packages/rag-core/tests/test_parser.py
+  cb73be6825dc0746 1-82
+packages/rag-core/src/rag_core/parser/base.py
+  cb73be6825dc0746 1-51
+apps/web-console/app/globals.css
+  cb73be6825dc0746 3-97,99-101,103-104,107,109-133,135-156,158-252
+apps/web-console/hooks/useSessions.ts
+  cb73be6825dc0746 3-11,14,26-29,33-34,37-78,80,82-94,96-114,122,125-133,137-139,143,146-165,191,197
+services/agent-core/src/agent_core/tools/registry.py
+  cb73be6825dc0746 14-32,54-56,58,65
+apps/web-console/components/WorkspaceSettingsDrawer.tsx
+  cb73be6825dc0746 1-526
+services/api-server/src/api_server/routes/sessions.py
+  cb73be6825dc0746 1-202
+services/api-server/src/api_server/routes/skills.py
+  cb73be6825dc0746 1-254
+apps/web-console/components/SettingsDrawer.tsx
+  cb73be6825dc0746 4,30,38-58,61-62,66-70,73-79,82-83,95-100,106,113-118,122,128-133,136,143-156,158-162,166-169,172-176,183,186-187,208-213,216-219
+packages/rag-core/src/rag_core/ingest/pipeline.py
+  cb73be6825dc0746 29-34,37-39,74,88,99,101,115,136,141,176,204,216,226
+services/api-server/src/api_server/dependencies.py
+  cb73be6825dc0746 3-4,7,9,13-14,28-38
+services/api-server/src/api_server/registry_bootstrap.py
+  cb73be6825dc0746 16,19,33-34,54,82-83,86-89,94-97,103-118
+packages/rag-core/src/rag_core/parser/router.py
+  cb73be6825dc0746 1-100
+services/api-server/tests/test_api_keys_hash.py
+  cb73be6825dc0746 1-23
+Makefile
+  cb73be6825dc0746 69-150,165-166
+apps/web-console/hooks/useMe.ts
+  cb73be6825dc0746 1-31
+packages/rag-core/src/rag_core/parser/__init__.py
+  cb73be6825dc0746 1-14
+services/tool-servers/rag-mcp/src/rag_mcp/server.py
+  cb73be6825dc0746 4,6-11,40-41,68,71,82-86,111-119,152
+pyproject.toml
+  cb73be6825dc0746 59
+apps/web-console/components/MessageBubble.tsx
+  cb73be6825dc0746 3-4,6,9-27,31-44,46,52-54,56-65,72-79,81,88-97,100-122,124-206,210-300,302-327
+apps/web-console/app/api/chat/route.ts
+  cb73be6825dc0746 40-44
+packages/rag-core/src/rag_core/storage/pgvector_store.py
+  cb73be6825dc0746 73-74,80,99-100,106,196,202,224-226,244,273-275
+packages/rag-core/pyproject.toml
+  cb73be6825dc0746 26-31
+services/agent-core/src/agent_core/runtime/strategies/react.py
+  cb73be6825dc0746 7,39,44
+services/api-server/src/api_server/auth.py
+  cb73be6825dc0746 1,3-16,20,22-27,29,32-36,43-61
+packages/schemas/src/schemas/chat.py
+  cb73be6825dc0746 4,27-31
+scripts/render_mermaid_local.sh
+  cb73be6825dc0746 1-31
+packages/rag-core/src/rag_core/retrieval/hybrid.py
+  cb73be6825dc0746 76,81,85
+apps/web-console/components/ErrorBoundary.tsx
+  cb73be6825dc0746 1-84
+services/api-server/tests/test_workspaces_routes.py
+  cb73be6825dc0746 1-151
+apps/web-console/hooks/useWorkspaces.ts
+  cb73be6825dc0746 1-70
+services/api-server/tests/test_chat_tool_filter.py
+  cb73be6825dc0746 1-131
+packages/rag-core/src/rag_core/storage/in_memory_store.py
+  cb73be6825dc0746 86,94-95,112,139-140
+services/agent-core/src/agent_core/tools/protocol.py
+  cb73be6825dc0746 22-25,32
+services/api-server/src/api_server/routes/workspaces.py
+  cb73be6825dc0746 1-228
+apps/web-console/lib/ui.ts
+  cb73be6825dc0746 1-111
+services/api-server/src/api_server/title_generator.py
+  cb73be6825dc0746 1-88
+apps/web-console/lib/api/skills.ts
+  cb73be6825dc0746 1-64
+apps/web-console/components/CostDashboardDrawer.tsx
+  cb73be6825dc0746 1-497
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "9ce1d57a43bac1ab524d0b859f6c1fdb6641b198",
+  "prompts": {
+    "cb73be6825dc0746": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "42a1301f-b4b3-460f-be8d-c3dc86d05568",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "shaoqiu <shaoqiu.chen@xinfei.cn>",
+      "messages": [],
+      "total_additions": 14592,
+      "total_deletions": 2392,
+      "accepted_lines": 12625,
+      "overriden_lines": 0,
+      "messages_url": "https://codeaiapi.xinfei-inc.cn/cas/603a27eaf8a74dfcc2a5a510a9bf92e75dfacae1a541c44be5f2c269656e959e"
+    }
+  }
+}
