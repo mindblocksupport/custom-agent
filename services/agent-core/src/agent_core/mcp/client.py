@@ -37,12 +37,19 @@ class MCPSubprocessClient:
         command: list[str],
         cwd: str | None = None,
         env: dict[str, str] | None = None,
+        *,
+        requires_acl: bool = False,
     ) -> None:
+        """Args:
+            requires_acl: 该 server 暴露的所有 tool 都需要 ACL principal token.
+                          Executor 调用前会自动注入 `_principal_token` (LLM 不可见).
+        """
         if not command:
             raise ValueError("command must be a non-empty list")
         self.command = command
         self.cwd = cwd
         self.env = env
+        self.requires_acl = requires_acl
         self._stack = AsyncExitStack()
         self._session: ClientSession | None = None
 
@@ -101,4 +108,5 @@ class MCPSubprocessClient:
             description=description,
             parameters=parameters,
             execute=execute,
+            requires_acl=self.requires_acl,
         )

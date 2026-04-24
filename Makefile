@@ -66,6 +66,88 @@ frontend-typecheck: ## 仅类型检查
 dev: ## 同时启动前后端 (需要 GNU make 4+)
 	@$(MAKE) -j2 backend frontend
 
+# ============================================================
+# 一键启动 (推荐!)
+# ============================================================
+up: ## 一键: 起 docker + infra + 跑迁移 + 装依赖 + 启前后端 (Ctrl-C 全部停)
+	@docker info >/dev/null 2>&1 || { \
+	  echo "==> docker 未启动, 自动拉起..."; \
+	  if [ -d "/Applications/OrbStack.app" ]; then open -a OrbStack; \
+	  elif [ -d "/Applications/Docker.app" ]; then open -a Docker; \
+	  elif command -v colima >/dev/null 2>&1; then colima start; \
+	  else echo "❌ 没找到 Docker Desktop / OrbStack / colima, 装一个再来"; exit 1; \
+	  fi; \
+	  echo "==> 等 docker daemon 就绪 (最多 90s)..."; \
+	  for i in $$(seq 1 90); do docker info >/dev/null 2>&1 && break; sleep 1; printf "."; done; echo ""; \
+	  docker info >/dev/null 2>&1 || { echo "❌ docker 起不来, 手动开一下"; exit 1; }; \
+	  echo "==> docker ready"; \
+	}
+	@$(MAKE) infra
+	@echo "==> waiting for postgres..."
+	@until docker compose -f infra/docker-compose.yml exec -T postgres pg_isready -U agent >/dev/null 2>&1; do sleep 1; done
+	@$(MAKE) migrate
+	@echo "==> syncing python deps..."
+	@uv sync --all-packages --extra pdf >/dev/null
+	@echo "==> installing frontend deps if missing..."
+	@if [ ! -d apps/web-console/node_modules ]; then cd apps/web-console && npm install --silent; fi
+	@echo "==> 清理可能残留的旧进程..."
+	@for port in 8000 3000; do \
+	  pids=$$(lsof -ti:$$port 2>/dev/null); \
+	  if [ -n "$$pids" ]; then \
+	    echo "  killing pid(s) on :$$port: $$pids"; \
+	    kill -9 $$pids 2>/dev/null || true; \
+	  fi; \
+	done
+	-@sleep 1
+	@echo ""
+	@echo "==============================================="
+	@echo "  Backend:  http://localhost:8000  (docs: /docs)"
+	@echo "  Frontend: http://localhost:3000"
+	@echo "  PG:       :5432  Redis: :6379"
+	@echo "  API key:  dev-key-change-me"
+	@echo "==============================================="
+	@$(MAKE) -j2 backend frontend
+
+down: ## 停止整个工程 (前后端进程 + docker)
+	@for port in 8000 3000; do \
+	  pids=$$(lsof -ti:$$port 2>/dev/null); \
+	  if [ -n "$$pids" ]; then \
+	    echo "  killing pid(s) on :$$port: $$pids"; \
+	    kill -9 $$pids 2>/dev/null || true; \
+	  fi; \
+	done
+	@docker compose -f infra/docker-compose.yml down
+	@echo "==> stopped"
+
+migrate: ## 跑所有 migration (幂等, 已存在的表跳过)
+	@for f in infra/migrations/*.sql; do \
+	  echo "  applying $$(basename $$f)"; \
+	  docker compose -f infra/docker-compose.yml exec -T postgres \
+	    psql -U agent -d agent -q -f /docker-entrypoint-initdb.d/$$(basename $$f) >/dev/null 2>&1 || true; \
+	done
+	@echo "==> migrations applied"
+
+smoke: ## 端到端 smoke: 上传 README + 检索 + 打印 hits (要 backend 跑着)
+	@echo "==> uploading README.md..."
+	@JOB=$$(curl -sS -X POST http://localhost:8000/v1/kb/upload \
+	  -H "Authorization: Bearer dev-key-change-me" \
+	  -F "file=@README.md" -F "collection=default" | jq -r '.job_id') && \
+	  echo "  job: $$JOB" && \
+	  echo "==> waiting for ingest..." && \
+	  for i in 1 2 3 4 5 6 7 8 9 10; do \
+	    S=$$(curl -sS http://localhost:8000/v1/kb/jobs/$$JOB \
+	      -H "Authorization: Bearer dev-key-change-me" | jq -r '.status'); \
+	    echo "  status: $$S"; [ "$$S" = "done" ] && break; sleep 2; \
+	  done
+	@echo "==> test-search:"
+	@curl -sS -X POST http://localhost:8000/v1/kb/test-search \
+	  -H "Authorization: Bearer dev-key-change-me" \
+	  -H "Content-Type: application/json" \
+	  -d '{"query":"this project default LLM","k":3}' | jq
+
+# ============================================================
+# 拆开来用 (调试时用)
+# ============================================================
 infra: ## 启动基础设施 (Postgres + Redis), 首次自动跑 RAG 迁移
 	docker compose -f infra/docker-compose.yml up -d
 	@echo "==> Postgres on :5432 (pgvector), Redis on :6379"
@@ -80,9 +162,8 @@ infra-reset: ## ⚠️ 删除 PG 数据卷 + 重启 (会重新跑迁移)
 	@echo "==> volumes wiped, migrations re-applied"
 
 # ===== RAG (Day 9) =====
-rag-init: ## 手动重跑 RAG 迁移 (PG 已起着时用)
-	docker compose -f infra/docker-compose.yml exec -T postgres \
-		psql -U agent -d agent -f /docker-entrypoint-initdb.d/001_rag.sql
+rag-init: ## 手动重跑 RAG 迁移 (PG 已起着时用) — 等价 make migrate
+	@$(MAKE) migrate
 
 rag-status: ## 显示 rag-core 配置
 	uv run --package rag-core rag status

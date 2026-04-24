@@ -73,15 +73,16 @@ class HybridRetriever:
         principals: list[str],
         k: int = 5,
         filters: dict | None = None,
+        collection: str | None = None,         # v1.5: workspace/skill 默认 KB
     ) -> HybridSearchResult:
         # 1. 三路并行召回 (Day 10 串行, Day 12 改 asyncio.gather)
         dense_hits = self.dense.search(
             query=query, tenant_id=tenant_id, principals=principals,
-            k=self.candidate_pool, filters=filters,
+            k=self.candidate_pool, filters=filters, collection=collection,
         )
         bm25_hits = self.bm25.search(
             query=query, tenant_id=tenant_id, principals=principals,
-            k=self.candidate_pool, filters=filters,
+            k=self.candidate_pool, filters=filters, collection=collection,
         )
 
         # 2. RRF 融合

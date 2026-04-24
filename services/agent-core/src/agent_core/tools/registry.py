@@ -11,6 +11,25 @@ from typing import Any
 
 from agent_core.tools.protocol import Tool
 
+# 系统注入的字段, 永不在 LLM 可见的 schema 中暴露 (防 prompt injection 偷传)
+_SYSTEM_ARG_KEYS = frozenset({"principal_token"})
+
+
+def _strip_system_args(schema: dict[str, Any]) -> dict[str, Any]:
+    """从 JSON Schema 的 properties / required 里剥掉系统字段."""
+    if not isinstance(schema, dict):
+        return schema
+    props = schema.get("properties")
+    required = schema.get("required")
+    out = dict(schema)
+    if isinstance(props, dict):
+        out["properties"] = {
+            k: v for k, v in props.items() if k not in _SYSTEM_ARG_KEYS
+        }
+    if isinstance(required, list):
+        out["required"] = [r for r in required if r not in _SYSTEM_ARG_KEYS]
+    return out
+
 
 class ToolRegistry:
     """工具注册中心 —— 一个 Agent 一份。"""
@@ -32,15 +51,18 @@ class ToolRegistry:
     def names(self) -> list[str]:
         return list(self._tools.keys())
 
+    def get(self, name: str) -> Tool:
+        return self._tools[name]
+
     def get_schemas(self) -> list[dict[str, Any]]:
-        """返回 OpenAI / Anthropic 兼容的 tool schemas。"""
+        """返回 OpenAI / Anthropic 兼容的 tool schemas (剥系统字段, Day 2 P0 #3)."""
         return [
             {
                 "type": "function",
                 "function": {
                     "name": t.name,
                     "description": t.description,
-                    "parameters": t.parameters,
+                    "parameters": _strip_system_args(t.parameters),
                 },
             }
             for t in self._tools.values()

@@ -56,6 +56,7 @@ testpaths = [
     "services/tool-servers/calc-mcp/tests",
     "services/tool-servers/time-mcp/tests",
     "services/tool-servers/web-search-mcp/tests",
+    "services/tool-servers/rag-mcp/tests",
     "packages/sdk-python/tests",
     "packages/rag-core/tests",
     "eval/tests",

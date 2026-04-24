@@ -1,16 +1,14 @@
 """rag-mcp · MCP server (stdio)
 
 暴露工具:
-    - search_kb(query, k=5, filters?) -> list[Citation]
+    - search_kb(query, k=5, filters?, principal_token) -> wrapped text + citations
 
-★ ACL 铁律 (L37 §8.2) ★
-tenant_id / actor_id / principals 必须由 **api-server 在 spawn 子进程时**
-通过环境变量 (RAG_MCP_TENANT_ID / RAG_MCP_PRINCIPALS) 注入,
-agent **不允许** 在工具参数中传这些字段。本 server 显式 strip 系统字段。
-
-Day 9 简化:
-- 单租户/单 principals (从 env 读, 默认开发租户)
-- Day 11 之后改成 per-call 从 MCP context 注入 (需要 api-server 配合)
+★ ACL 铁律 (L37 §8.2 + Day 2 P0 #3 重构) ★
+tenant_id / principals 通过 **api-server 现签现给的 short-lived JWT** 注入,
+agent / LLM **永远看不到** principal_token (Executor 注入, schema 已剥).
+密钥来自 env: RAG_MCP_JWT_SECRET (+ RAG_MCP_JWT_SECRET_PREV 支持轮换).
+失败行为: token 缺失/过期/签错 → 工具调用报 PermissionError, 不退化 dev 租户
+(除非显式 ENV=dev + RAG_MCP_DEV_FALLBACK=1).
 
 启动:
     uv run --package rag-mcp rag-mcp
@@ -22,7 +20,6 @@ from __future__ import annotations
 import logging
 import os
 import time
-from uuid import UUID
 
 from mcp.server.fastmcp import FastMCP
 
@@ -32,8 +29,6 @@ from rag_core.cache.semantic_cache import (
     make_cache_key,
 )
 from rag_core.config import (
-    DEFAULT_PRINCIPALS,
-    DEFAULT_TENANT_ID,
     Settings,
     make_embedder,
     make_reranker,
@@ -41,6 +36,8 @@ from rag_core.config import (
 from rag_core.prompts import wrap_for_llm
 from rag_core.retrieval.hybrid import HybridRetriever
 from rag_core.storage.pgvector_store import PgVectorStore
+
+from rag_mcp.acl import resolve_acl
 
 logger = logging.getLogger(__name__)
 mcp = FastMCP("rag-mcp")
@@ -68,20 +65,10 @@ _cache = (
     if _cache_enabled else None
 )
 
-
-def _resolve_tenant_id() -> UUID:
-    """Day 11 单租户: 从 spawn-time env 读. Day 12+ 改为 per-call MCP context 注入."""
-    raw = os.environ.get("RAG_MCP_TENANT_ID")
-    return UUID(raw) if raw else DEFAULT_TENANT_ID
-
-
-def _resolve_principals() -> list[str]:
-    raw = os.environ.get("RAG_MCP_PRINCIPALS")
-    return [p.strip() for p in raw.split(",") if p.strip()] if raw else DEFAULT_PRINCIPALS
-
-
+# 业务 filter 不允许的系统字段 (LLM 通过 filters 偷传也会被 strip)
 _SYSTEM_FILTER_KEYS = {
     "tenant_id", "acl", "actor_id", "is_deleted", "is_quarantined",
+    "principal_token",                  # 防 LLM 经 filters 走私 token
 }
 
 
@@ -92,7 +79,12 @@ def _strip_system_fields(filters: dict | None) -> dict | None:
 
 
 @mcp.tool()
-def search_kb(query: str, k: int = 5, filters: dict | None = None) -> str:
+def search_kb(
+    query: str,
+    k: int = 5,
+    filters: dict | None = None,
+    principal_token: str | None = None,
+) -> str:
     """Search the internal knowledge base for relevant passages.
 
     Call whenever the user asks something that may be answered by company docs,
@@ -116,8 +108,15 @@ def search_kb(query: str, k: int = 5, filters: dict | None = None) -> str:
     k = max(1, min(int(k), 10))
     safe_filters = _strip_system_fields(filters)
 
-    tenant_id = _resolve_tenant_id()
-    principals = _resolve_principals()
+    # Day 2 P0 #3 + v1.5: per-call ACL — JWT 验签
+    tenant_id, principals, default_collections = resolve_acl(principal_token)
+
+    # v1.5: 显式 filters.collection > workspace/skill default_collections > 全部
+    collection: str | None = None
+    if safe_filters and isinstance(safe_filters.get("collection"), str):
+        collection = safe_filters.pop("collection")
+    elif default_collections:
+        collection = default_collections[0]  # 取第一个 (skill 可配多个, 选最优先)
 
     t0 = time.perf_counter()
     cache_hit = False
@@ -150,6 +149,7 @@ def search_kb(query: str, k: int = 5, filters: dict | None = None) -> str:
         principals=principals,
         k=k,
         filters=safe_filters,
+        collection=collection,
     )
     answer = wrap_for_llm(result.hits)
     elapsed_ms = int((time.perf_counter() - t0) * 1000)

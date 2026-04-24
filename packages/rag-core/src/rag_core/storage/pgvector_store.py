@@ -70,13 +70,14 @@ class PgVectorStore:
                     """
                     UPDATE rag_docs
                     SET checksum = %s, current_version = %s, title = %s,
-                        metadata = %s, acl = %s, status = %s, updated_at = now()
+                        metadata = %s, acl = %s, status = %s,
+                        collection = %s, updated_at = now()
                     WHERE id = %s
                     """,
                     (
                         doc.checksum, new_version, doc.title,
                         json.dumps(doc.metadata), doc.acl, doc.status,
-                        existing["id"],
+                        doc.collection, existing["id"],
                     ),
                 )
                 cur.execute(
@@ -95,13 +96,14 @@ class PgVectorStore:
                 """
                 INSERT INTO rag_docs
                   (tenant_id, source_uri, source_type, title, checksum,
-                   current_version, status, acl, metadata)
-                VALUES (%s, %s, %s, %s, %s, 1, %s, %s, %s)
+                   current_version, status, acl, metadata, collection)
+                VALUES (%s, %s, %s, %s, %s, 1, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
                     str(doc.tenant_id), doc.source_uri, doc.source_type, doc.title,
                     doc.checksum, doc.status, doc.acl, json.dumps(doc.metadata),
+                    doc.collection,
                 ),
             )
             new_id = cur.fetchone()["id"]
@@ -191,15 +193,14 @@ class PgVectorStore:
         principals: list[str],
         k: int = 5,
         filters: dict | None = None,
+        collection: str | None = None,           # v1.5: workspace/skill 默认 KB
     ) -> list[SearchHit]:
         """ACL-aware dense 检索 (cosine).
 
         principals: 用户 + 组 + 角色展开后的字符串集合, e.g. ['user:U1', 'group:G2']
         filters: metadata JSONB 上的过滤 (业务字段, 已 strip 系统字段)
+        collection: 限定 KB 命名空间 (v1.5)
         """
-        # cosine distance: <=> 操作符; 距离越小越相似
-        # 强制 acl && principals (与用户 principal 集合有交集)
-        # embedding_v1 IS NOT NULL → 自动排除父块 (parent-child 模式下父不 embed)
         sql = """
             SELECT
               c.id, c.doc_id, c.tenant_id, c.parent_id, c.chunk_seq, c.doc_version,
@@ -220,6 +221,9 @@ class PgVectorStore:
         """
         params: list = [query_embedding, str(tenant_id), principals]
 
+        if collection:
+            sql += " AND d.collection = %s"
+            params.append(collection)
         if filters:
             sql += " AND c.metadata @> %s::jsonb"
             params.append(json.dumps(filters))
@@ -237,6 +241,7 @@ class PgVectorStore:
         principals: list[str],
         k: int = 5,
         filters: dict | None = None,
+        collection: str | None = None,       # v1.5: workspace/skill 默认 KB
     ) -> list[SearchHit]:
         """ACL-aware BM25 检索 (ts_rank).
 
@@ -265,6 +270,9 @@ class PgVectorStore:
         """
         params: list = [query_tokens, str(tenant_id), principals, query_tokens]
 
+        if collection:
+            sql += " AND d.collection = %s"
+            params.append(collection)
         if filters:
             sql += " AND c.metadata @> %s::jsonb"
             params.append(json.dumps(filters))

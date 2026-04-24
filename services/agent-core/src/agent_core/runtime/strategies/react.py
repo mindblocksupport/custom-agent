@@ -4,7 +4,7 @@
 """
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 from schemas import (
@@ -36,11 +36,12 @@ class ReActStrategy:
         registry: ToolRegistry,
         config: AgentConfig,
         metadata: dict[str, Any] | None = None,
+        token_provider: Callable[[], str] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         history = list(messages)
         guard = RuntimeGuard(config)
         planner = Planner()
-        executor = Executor(registry)
+        executor = Executor(registry, token_provider=token_provider)
         tools_schema = registry.get_schemas()
 
         yield StartEvent(data=StartData(model=model, max_steps=config.max_steps))

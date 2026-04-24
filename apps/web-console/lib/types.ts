@@ -46,6 +46,46 @@ export interface ToolResultEvent {
   data: ToolResultData;
 }
 
+// ============================================================
+// Day 11/8 新增: retrieval 事件 (搜索过程可视化)
+// ============================================================
+export interface CitationData {
+  doc_id: string;
+  chunk_id: string;
+  source_uri: string;
+  title?: string | null;
+  page?: number | null;
+  char_offset_start?: number | null;
+  char_offset_end?: number | null;
+  score: number;
+  snippet: string;
+}
+
+export interface RetrievalStartData {
+  tool_call_id?: string | null;
+  query: string;
+  k: number;
+}
+export interface RetrievalStartEvent {
+  type: "retrieval.start";
+  data: RetrievalStartData;
+}
+
+export interface RetrievalDoneData {
+  tool_call_id?: string | null;
+  citations: CitationData[];
+  refused: boolean;
+  refusal_reason?: string | null;
+  n_dense: number;
+  n_bm25: number;
+  n_rerank_in: number;
+  elapsed_ms?: number | null;
+}
+export interface RetrievalDoneEvent {
+  type: "retrieval.done";
+  data: RetrievalDoneData;
+}
+
 export interface DoneData {
   steps: number;
   cost_usd: number;
@@ -67,6 +107,8 @@ export type StreamEvent =
   | TokenEvent
   | ToolCallEvent
   | ToolResultEvent
+  | RetrievalStartEvent
+  | RetrievalDoneEvent
   | DoneEvent
   | ErrorEvent;
 
@@ -83,6 +125,15 @@ export interface ToolInvocation {
   status: "running" | "ok" | "error";
   result?: string;
   error?: string;
+  // Day 8: search_kb 富化字段 (来自 retrieval.start / retrieval.done)
+  retrievalQuery?: string;
+  citations?: CitationData[];
+  refused?: boolean;
+  refusalReason?: string | null;
+  elapsedMs?: number | null;
+  nDense?: number;
+  nBm25?: number;
+  nRerankIn?: number;
 }
 
 export interface UiMessage {
@@ -100,6 +151,11 @@ export interface UiMessage {
   /** error 信息 */
   error?: string;
   createdAt: number;
+  // Day 8: chat 路由元信息 (来自响应头)
+  traceId?: string;
+  routeReason?: string;
+  model?: string;
+  sessionId?: string;
 }
 
 export interface Session {
@@ -115,4 +171,70 @@ export interface Settings {
   apiKey: string;
   baseUrl: string;
   model: string;
+}
+
+// ============================================================
+// Day 8: KB 类型
+// ============================================================
+export interface KbDoc {
+  id: string;
+  source_uri: string;
+  source_type: string;
+  title?: string | null;
+  collection: string;
+  status: string;
+  current_version: number;
+  chunk_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KbJob {
+  id: string;
+  doc_id?: string | null;
+  collection: string;
+  source_uri: string;
+  status: "pending" | "parsing" | "chunking" | "embedding" | "done" | "failed";
+  progress: number;
+  stage?: string | null;
+  error?: string | null;
+  chunks_created: number;
+  chunks_reused: number;
+  created_at: string;
+  finished_at?: string | null;
+}
+
+// ============================================================
+// v1.5 沉淀层: Workspace + Skill
+// ============================================================
+export interface Workspace {
+  id: string;
+  name: string;
+  description: string;
+  default_model: string;
+  allowed_tools: string[];
+  default_collection: string;
+  allowed_collections: string[];
+  budget_daily_usd: number | null;
+  budget_monthly_usd: number | null;
+  features: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Skill {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  version: number;
+  system_prompt: string;
+  allowed_tools: string[];
+  default_collections: string[];
+  starter_examples: string[];
+  visibility: "private" | "workspace" | "public";
+  budget_per_call_usd: number | null;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
 }

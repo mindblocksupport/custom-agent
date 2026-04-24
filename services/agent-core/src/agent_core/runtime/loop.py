@@ -6,7 +6,7 @@
 - 后续接 LangGraph: 把 strategy 实现替成 LangGraph compile().astream(),其余不变
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 from schemas import StreamEvent
@@ -27,6 +27,7 @@ async def run_agent(
     config: AgentConfig | None = None,
     strategy: AgentStrategy | None = None,
     metadata: dict[str, Any] | None = None,
+    token_provider: Callable[[], str] | None = None,
 ) -> AsyncIterator[StreamEvent]:
     """跑 Agent。
 
@@ -38,6 +39,8 @@ async def run_agent(
         strategy: 推理策略 (None=ReAct);可换 PlanExecute/Reflexion/...
         metadata: 观测/计费/审计 透传 (trace_id/session_id/user_id/tags),
                   下传到 gateway → LiteLLM → Langfuse callback。
+        token_provider: () -> JWT, 给 requires_acl=True 的工具注入. Day 2 P0 #3.
+                        api-server 用 Principal 现签现给.
 
     Yields:
         类型化 StreamEvent (start/token/tool_call/tool_result/done/error)
@@ -51,5 +54,6 @@ async def run_agent(
         registry=registry,
         config=cfg,
         metadata=metadata,
+        token_provider=token_provider,
     ):
         yield event

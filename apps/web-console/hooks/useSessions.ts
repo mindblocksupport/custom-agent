@@ -1,14 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import {
-  deleteSession as deleteSessionStorage,
-  loadSessions,
-  saveSessions,
-} from "../lib/storage";
+/**
+ * useSessions: 多浏览器/多终端可见 (Day 8 完成).
+ *
+ * 后端 /v1/sessions 是 source of truth, localStorage 离线 fallback.
+ */
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { SessionsApi } from "../lib/api/sessions";
+import { loadSessions, saveSessions } from "../lib/storage";
 import type { Session } from "../lib/types";
 
-function newSession(): Session {
+function newLocalSession(): Session {
   const ts = Date.now();
   return {
     id: crypto.randomUUID(),
@@ -20,41 +23,95 @@ function newSession(): Session {
   };
 }
 
-export function useSessions(): {
-  sessions: Session[];
-  activeId: string | null;
-  ready: boolean;
-  setActive: (id: string) => void;
-  create: () => string;
-  remove: (id: string) => void;
-  rename: (id: string, title: string) => void;
-  bumpStats: (id: string, addedMessages: number, addedCostUsd: number) => void;
-} {
+export function useSessions({
+  apiKey,
+  workspaceId,
+}: { apiKey: string; workspaceId?: string | null } = { apiKey: "" }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [online, setOnline] = useState(false);
+  const apiRef = useRef<SessionsApi | null>(null);
 
   useEffect(() => {
-    const loaded = loadSessions();
-    if (loaded.length === 0) {
-      const s = newSession();
-      setSessions([s]);
-      setActiveId(s.id);
-      saveSessions([s]);
-    } else {
-      setSessions(loaded);
-      setActiveId(loaded[0]!.id);
+    apiRef.current = apiKey ? new SessionsApi(apiKey) : null;
+  }, [apiKey]);
+
+  const refresh = useCallback(async () => {
+    const api = apiRef.current;
+    if (!api) {
+      const local = loadSessions();
+      if (local.length === 0) {
+        const s = newLocalSession();
+        setSessions([s]);
+        setActiveId(s.id);
+        saveSessions([s]);
+      } else {
+        setSessions(local);
+        setActiveId((cur) => cur ?? local[0]!.id);
+      }
+      setOnline(false);
+      return;
     }
-    setReady(true);
-  }, []);
+    try {
+      // v1.5: 按 workspace 过滤
+      const remote = await api.list(workspaceId ?? null, 50);
+      setSessions(remote);
+      setOnline(true);
+      saveSessions(remote);
+      // 切 workspace 时, 旧 active 不在新列表 → 自动选第一个
+      setActiveId((cur) =>
+        cur && remote.some((s) => s.id === cur) ? cur : remote[0]?.id ?? null,
+      );
+    } catch (e) {
+      console.warn("[useSessions] remote list failed, fallback to local:", e);
+      setOnline(false);
+      const local = loadSessions();
+      if (local.length === 0) {
+        const s = newLocalSession();
+        setSessions([s]);
+        setActiveId(s.id);
+        saveSessions([s]);
+      } else {
+        setSessions(local);
+        setActiveId((cur) => cur ?? local[0]!.id);
+      }
+    }
+  }, [workspaceId]);
 
-  const persist = useCallback((next: Session[]) => {
-    setSessions(next);
-    saveSessions(next);
-  }, []);
+  // workspace 切换 → 仅清空 sidebar 局部数据 (不动 ready, 不让整页进 Loading)
+  useEffect(() => {
+    setSessions([]);
+    setActiveId(null);
+    // 不要 setReady(false), 否则 page.tsx 会显示整屏 Loading 闪一下
+  }, [workspaceId]);
 
-  const create = useCallback(() => {
-    const s = newSession();
+  useEffect(() => {
+    (async () => {
+      await refresh();
+      setReady(true);
+    })();
+  }, [refresh, apiKey]);
+
+  const create = useCallback(async (): Promise<string | null> => {
+    const api = apiRef.current;
+    if (api && online) {
+      try {
+        // v1.5: 创建时绑定当前 workspace
+        const s = await api.create("新会话", workspaceId ?? null);
+        setSessions((prev) => {
+          const next = [s, ...prev];
+          saveSessions(next);
+          return next;
+        });
+        setActiveId(s.id);
+        return s.id;
+      } catch (e) {
+        console.warn("[useSessions] create remote failed:", e);
+        setOnline(false);
+      }
+    }
+    const s = newLocalSession();
     setSessions((prev) => {
       const next = [s, ...prev];
       saveSessions(next);
@@ -62,36 +119,50 @@ export function useSessions(): {
     });
     setActiveId(s.id);
     return s.id;
-  }, []);
+  }, [online, workspaceId]);
 
   const remove = useCallback(
-    (id: string) => {
-      deleteSessionStorage(id);
+    async (id: string) => {
+      const api = apiRef.current;
+      if (api && online) {
+        try {
+          await api.delete(id);
+        } catch (e) {
+          console.warn("[useSessions] delete remote failed:", e);
+        }
+      }
       setSessions((prev) => {
         const next = prev.filter((s) => s.id !== id);
-        if (next.length === 0) {
-          const s = newSession();
-          saveSessions([s]);
-          setActiveId(s.id);
-          return [s];
-        }
         saveSessions(next);
-        if (activeId === id) setActiveId(next[0]!.id);
+        if (activeId === id) {
+          setActiveId(next[0]?.id ?? null);
+        }
         return next;
       });
     },
-    [activeId],
+    [activeId, online],
   );
 
-  const rename = useCallback((id: string, title: string) => {
-    setSessions((prev) => {
-      const next = prev.map((s) =>
-        s.id === id ? { ...s, title, updatedAt: Date.now() } : s,
-      );
-      saveSessions(next);
-      return next;
-    });
-  }, []);
+  const rename = useCallback(
+    async (id: string, title: string) => {
+      const api = apiRef.current;
+      setSessions((prev) => {
+        const next = prev.map((s) =>
+          s.id === id ? { ...s, title, updatedAt: Date.now() } : s,
+        );
+        saveSessions(next);
+        return next;
+      });
+      if (api && online) {
+        try {
+          await api.rename(id, title);
+        } catch (e) {
+          console.warn("[useSessions] rename remote failed:", e);
+        }
+      }
+    },
+    [online],
+  );
 
   const bumpStats = useCallback(
     (id: string, addedMessages: number, addedCostUsd: number) => {
@@ -117,10 +188,12 @@ export function useSessions(): {
     sessions,
     activeId,
     ready,
+    online,
     setActive: setActiveId,
     create,
     remove,
     rename,
     bumpStats,
+    refresh,
   };
 }

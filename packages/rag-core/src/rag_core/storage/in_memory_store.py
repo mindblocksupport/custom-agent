@@ -83,6 +83,7 @@ class InMemoryStore:
     def dense_search(
         self, *, tenant_id: UUID, query_embedding: list[float],
         principals: list[str], k: int = 5, filters: dict | None = None,
+        collection: str | None = None,
     ) -> list[SearchHit]:
         results: list[tuple[float, Chunk]] = []
         for c in self.chunks:
@@ -90,6 +91,8 @@ class InMemoryStore:
                 continue
             if c.embedding is None:
                 continue                            # 父块没 embed, 不参与 dense 召回
+            if collection and c.collection != collection:
+                continue
             score = sum(a * b for a, b in zip(query_embedding, c.embedding))
             results.append((score, c))
         results.sort(key=lambda x: x[0], reverse=True)
@@ -106,6 +109,7 @@ class InMemoryStore:
     def bm25_search(
         self, *, tenant_id: UUID, query_tokens: str,
         principals: list[str], k: int = 5, filters: dict | None = None,
+        collection: str | None = None,
     ) -> list[SearchHit]:
         if not query_tokens.strip():
             return []
@@ -131,6 +135,8 @@ class InMemoryStore:
         results: list[tuple[float, Chunk]] = []
         for i, c in enumerate(self.chunks):
             if not self._visible(c, principals, tenant_id):
+                continue
+            if collection and c.collection != collection:
                 continue
             tf = self._doc_token_freq[i]
             doc_len = sum(tf.values()) or 1

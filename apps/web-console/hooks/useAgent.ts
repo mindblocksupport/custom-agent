@@ -18,10 +18,14 @@ interface SendResult {
 export function useAgent({
   sessionId,
   settings,
+  workspaceId,
+  skillId,
   onSessionStats,
 }: {
   sessionId: string | null;
   settings: Settings;
+  workspaceId?: string | null;
+  skillId?: string | null;
   onSessionStats?: (r: SendResult) => void;
 }): {
   messages: UiMessage[];
@@ -29,12 +33,12 @@ export function useAgent({
   send: (text: string) => Promise<void>;
   stop: () => void;
   reset: () => void;
+  regenerate: () => Promise<void>;
 } {
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  // 加载持久化消息
   useEffect(() => {
     if (sessionId) setMessages(loadMessages(sessionId));
   }, [sessionId]);
@@ -57,8 +61,10 @@ export function useAgent({
   }, []);
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, historyOverride?: UiMessage[]) => {
       if (!sessionId || !text.trim() || streaming) return;
+
+      const baseHistory = historyOverride ?? messages;
 
       const userMsg: UiMessage = {
         id: crypto.randomUUID(),
@@ -68,14 +74,12 @@ export function useAgent({
         createdAt: Date.now(),
       };
 
-      // 构造发往后端的 OpenAI 兼容消息(只取 user/assistant/tool 真正对话内容)
-      const apiMessages: ApiMessage[] = messages
+      const apiMessages: ApiMessage[] = baseHistory
         .filter((m) => m.role === "user" || m.role === "assistant")
         .map((m): ApiMessage => {
           if (m.role === "user") {
             return { role: "user", content: m.text ?? "" };
           }
-          // assistant: 拼接所有 text block
           const txt = m.blocks
             .filter((b) => b.kind === "text")
             .map((b) => (b.kind === "text" ? b.text : ""))
@@ -84,14 +88,13 @@ export function useAgent({
         });
       apiMessages.push({ role: "user", content: text.trim() });
 
-      // UI: append user + 空 assistant 占位
       const assistantMsg: UiMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
         blocks: [],
         createdAt: Date.now(),
       };
-      const initial = [...messages, userMsg, assistantMsg];
+      const initial = [...baseHistory, userMsg, assistantMsg];
       setMessages(initial);
       persist(initial);
       setStreaming(true);
@@ -104,7 +107,6 @@ export function useAgent({
           "Content-Type": "application/json",
           Authorization: `Bearer ${settings.apiKey}`,
         };
-        // 同源走 /api/chat 代理(Next route),否则直连 settings.baseUrl
         const url = settings.baseUrl
           ? `${settings.baseUrl.replace(/\/$/, "")}/v1/chat/completions`
           : "/api/chat";
@@ -116,6 +118,9 @@ export function useAgent({
             messages: apiMessages,
             model: settings.model,
             stream: true,
+            // v1.5: 让后端按 workspace + skill 路由 (system_prompt + 默认模型)
+            ...(workspaceId ? { workspace_id: workspaceId } : {}),
+            ...(skillId ? { skill_id: skillId } : {}),
           }),
           signal: ctrl.signal,
         });
@@ -125,10 +130,14 @@ export function useAgent({
           throw new Error(`HTTP ${res.status}: ${txt.slice(0, 120)}`);
         }
 
-        // 局部可变状态(引用 assistantMsg.id)
-        const tools = new Map<string, ToolInvocation>(); // tool_call_id → invocation
-        let activeAssistantId = assistantMsg.id;
-        let activeText = "";
+        // Day 8: 从响应头吃 chat 元信息
+        const traceId = res.headers.get("x-trace-id") || undefined;
+        const routeReason = res.headers.get("x-route-reason") || undefined;
+        const model = res.headers.get("x-model") || undefined;
+        const sessionIdResp = res.headers.get("x-session-id") || undefined;
+
+        const tools = new Map<string, ToolInvocation>();
+        const activeAssistantId = assistantMsg.id;
 
         const updateAssistant = (mutator: (m: UiMessage) => UiMessage) => {
           setMessages((prev) => {
@@ -140,6 +149,15 @@ export function useAgent({
           });
         };
 
+        // 把 header 元信息塞 assistant msg
+        updateAssistant((m) => ({
+          ...m,
+          traceId,
+          routeReason,
+          model,
+          sessionId: sessionIdResp,
+        }));
+
         const ensureTextBlock = () => {
           updateAssistant((m) => {
             const last = m.blocks[m.blocks.length - 1];
@@ -149,7 +167,6 @@ export function useAgent({
         };
 
         const appendToken = (t: string) => {
-          activeText += t;
           updateAssistant((m) => {
             const blocks = [...m.blocks];
             const last = blocks[blocks.length - 1];
@@ -162,20 +179,38 @@ export function useAgent({
           });
         };
 
+        // Day 8: 把 retrieval 富化字段 patch 到对应 invocation
+        const updateInvocation = (
+          callId: string | null | undefined,
+          patch: Partial<ToolInvocation>,
+        ) => {
+          if (!callId) return;
+          const inv = tools.get(callId);
+          if (!inv) return;
+          const merged = { ...inv, ...patch };
+          tools.set(callId, merged);
+          updateAssistant((m) => ({
+            ...m,
+            blocks: m.blocks.map((b) =>
+              b.kind === "tool" && b.invocation.id === inv.id
+                ? { kind: "tool", invocation: merged }
+                : b,
+            ),
+          }));
+        };
+
         let totalCostUsd = 0;
 
         await parseSseStream(res.body, {
           onEvent: (ev) => {
             switch (ev.type) {
               case "start":
-                // could emit notice
                 break;
               case "token":
                 ensureTextBlock();
                 appendToken(ev.text);
                 break;
               case "tool_call": {
-                activeText = "";
                 const invId = crypto.randomUUID();
                 const inv: ToolInvocation = {
                   id: invId,
@@ -199,6 +234,15 @@ export function useAgent({
                   name: ev.data.name,
                   argumentsRaw: found?.argumentsRaw ?? "",
                   status: ev.data.error ? "error" : "ok",
+                  // 保留 retrieval 富化字段 (retrieval.done 已先到)
+                  retrievalQuery: found?.retrievalQuery,
+                  citations: found?.citations,
+                  refused: found?.refused,
+                  refusalReason: found?.refusalReason,
+                  elapsedMs: found?.elapsedMs,
+                  nDense: found?.nDense,
+                  nBm25: found?.nBm25,
+                  nRerankIn: found?.nRerankIn,
                   ...(ev.data.result !== null && ev.data.result !== undefined
                     ? { result: ev.data.result }
                     : {}),
@@ -217,6 +261,22 @@ export function useAgent({
                 }));
                 break;
               }
+              case "retrieval.start":
+                updateInvocation(ev.data.tool_call_id, {
+                  retrievalQuery: ev.data.query,
+                });
+                break;
+              case "retrieval.done":
+                updateInvocation(ev.data.tool_call_id, {
+                  citations: ev.data.citations,
+                  refused: ev.data.refused,
+                  refusalReason: ev.data.refusal_reason ?? null,
+                  elapsedMs: ev.data.elapsed_ms ?? null,
+                  nDense: ev.data.n_dense,
+                  nBm25: ev.data.n_bm25,
+                  nRerankIn: ev.data.n_rerank_in,
+                });
+                break;
               case "done":
                 totalCostUsd = ev.data.cost_usd;
                 updateAssistant((m) => ({ ...m, done: ev.data }));
@@ -250,8 +310,45 @@ export function useAgent({
         abortRef.current = null;
       }
     },
-    [messages, persist, sessionId, settings.apiKey, settings.baseUrl, settings.model, streaming, onSessionStats],
+    [
+      messages,
+      persist,
+      sessionId,
+      settings.apiKey,
+      settings.baseUrl,
+      settings.model,
+      workspaceId,
+      skillId,
+      streaming,
+      onSessionStats,
+    ],
   );
 
-  return { messages, streaming, send, stop, reset };
+  /**
+   * regenerate: 把最后一条 assistant 删掉, 用倒数第二条 user 重新发送一次.
+   * 适合"答案不满意"场景.
+   */
+  const regenerate = useCallback(async () => {
+    if (streaming) return;
+    let lastUserIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m && m.role === "user") {
+        lastUserIdx = i;
+        break;
+      }
+    }
+    if (lastUserIdx === -1) return;
+    const lastUserMsg = messages[lastUserIdx];
+    if (!lastUserMsg) return;
+    const lastUserText = lastUserMsg.text ?? "";
+    if (!lastUserText.trim()) return;
+    // 截断: 把 lastUser 及之后全部移除 (send 会把 user 重新加上)
+    const truncated = messages.slice(0, lastUserIdx);
+    setMessages(truncated);
+    persist(truncated);
+    await send(lastUserText, truncated);
+  }, [messages, persist, send, streaming]);
+
+  return { messages, streaming, send, stop, reset, regenerate };
 }

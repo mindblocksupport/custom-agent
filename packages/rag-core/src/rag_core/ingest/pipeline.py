@@ -26,10 +26,17 @@ def _sha256(data: bytes) -> str:
 
 
 def parse_file(path: Path) -> tuple[str, str]:
-    """返回 (text, title). PDF 走占位; .md/.txt 原样读."""
+    """返回 (text, title).
+
+    Day 3 P0 #2 Stage 1:
+    - .md / .txt: 直接读 + 第一个 # 行做标题
+    - .pdf: 数字 PDF → pypdfium2 (默认); 扫描件 → 抛 ScannedPdfNotSupported (待 Stage 2)
+    """
     suffix = path.suffix.lower()
     if suffix == ".pdf":
-        raise NotImplementedError("PDF 解析将在 Day 11 通过 PaddleOCR-VL 接入")
+        from rag_core.parser import parse_pdf
+        text, title = parse_pdf(path)
+        return text, title or path.stem
     text = path.read_text(encoding="utf-8", errors="replace")
     # 标题: 用第一行 # 标题 / 文件名兜底
     title = path.stem
@@ -64,6 +71,7 @@ class IngestPipeline:
         title: str | None = None,
         source_type: str = "file",
         metadata: dict | None = None,
+        collection: str = "default",          # v1.5: KB 命名空间
     ) -> IngestReport:
         if not text.strip():
             raise ValueError("empty text")
@@ -77,6 +85,7 @@ class IngestPipeline:
             checksum=_sha256(text.encode("utf-8")),
             acl=acl,
             metadata=metadata or {},
+            collection=collection,
         )
         doc_id, version, changed = self.store.upsert_doc(doc)
         if not changed:
@@ -87,9 +96,9 @@ class IngestPipeline:
 
         # 2. chunk
         if self.parent_child_chunker is not None:
-            chunks = self._chunks_parent_child(doc_id, tenant_id, version, text)
+            chunks = self._chunks_parent_child(doc_id, tenant_id, version, text, collection)
         else:
-            chunks = self._chunks_flat(doc_id, tenant_id, version, text)
+            chunks = self._chunks_flat(doc_id, tenant_id, version, text, collection)
 
         if not chunks:
             return IngestReport(
@@ -103,7 +112,7 @@ class IngestPipeline:
             chunks_created=created, chunks_reused=reused, version=version,
         )
 
-    def _chunks_flat(self, doc_id, tenant_id, version, text):
+    def _chunks_flat(self, doc_id, tenant_id, version, text, collection="default"):
         spans = self.chunker.split(text)
         if not spans:
             return []
@@ -124,11 +133,12 @@ class IngestPipeline:
                     char_offset_end=span.char_offset_end,
                     bm25_tokens=tokenize_for_bm25(span.content),
                     is_quarantined=quarantined,
+                    collection=collection,
                 )
             )
         return out
 
-    def _chunks_parent_child(self, doc_id, tenant_id, version, text):
+    def _chunks_parent_child(self, doc_id, tenant_id, version, text, collection="default"):
         """父子两层 chunks. 父块不 embed (只做引用容器), 子块 embed.
 
         chunk_seq 编排:
@@ -163,6 +173,7 @@ class IngestPipeline:
                     char_offset_end=parent.char_offset_end,
                     bm25_tokens=None,                  # 父不参与 BM25
                     is_quarantined=quarantined,
+                    collection=collection,
                 )
             )
         # children — embed + parent_id 指向 parent
@@ -190,6 +201,7 @@ class IngestPipeline:
                     char_offset_end=child.char_offset_end,
                     bm25_tokens=tokenize_for_bm25(child.content),
                     is_quarantined=quarantined,
+                    collection=collection,
                 )
             )
         return out
@@ -201,6 +213,7 @@ def ingest_file(
     *,
     tenant_id: UUID,
     acl: list[str],
+    collection: str = "default",
 ) -> IngestReport:
     text, title = parse_file(path)
     return pipeline.ingest_text(
@@ -210,4 +223,5 @@ def ingest_file(
         acl=acl,
         title=title,
         source_type="file",
+        collection=collection,
     )

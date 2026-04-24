@@ -37,8 +37,10 @@ export async function POST(req: NextRequest) {
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
   });
-  const traceId = upstream.headers.get("x-trace-id");
-  if (traceId) headers.set("X-Trace-Id", traceId);
-
+  // Day 8: 透传 chat 元信息 (trace_id / route_reason / model / session_id)
+  for (const k of ["x-trace-id", "x-route-reason", "x-model", "x-session-id"]) {
+    const v = upstream.headers.get(k);
+    if (v) headers.set(k, v);
+  }
   return new Response(upstream.body, { headers });
 }

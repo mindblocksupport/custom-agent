@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "mcp>=1.0",
     "rag-core",
+    "pyjwt>=2.8",
 ]
 
 [project.scripts]

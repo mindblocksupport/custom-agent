@@ -11,9 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 
 from api_server.config import settings
+from api_server.db.api_keys import seed_dev_key
 from api_server.observability import setup_tracing
 from api_server.registry_bootstrap import ToolBootstrap
-from api_server.routes import chat, feedback, health
+from api_server.routes import chat, feedback, health, kb, me, sessions, skills, workspaces
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,22 @@ async def lifespan(app: FastAPI):
     - 关闭:teardown bootstrap (杀子进程)
     """
     setup_tracing()
+    # Day 1-2 P0 #3:
+    # - dev 模式: 自动播种 dev-key 让 frontend "dev-key-change-me" 仍能用
+    # - dev 模式: RAG_MCP_JWT_SECRET 未设时生成临时密钥 (生产环境必须显式 set)
+    if settings.env == "dev":
+        seed_dev_key()
+        # v1.5: dev seed default workspace + 2 demo skills (幂等)
+        from api_server.seed import seed_default_workspace_and_skills
+        seed_default_workspace_and_skills()
+        import os as _os
+        import secrets as _secrets
+        if not _os.environ.get("RAG_MCP_JWT_SECRET"):
+            _os.environ["RAG_MCP_JWT_SECRET"] = _secrets.token_urlsafe(32)
+            logger.warning(
+                "RAG_MCP_JWT_SECRET unset → generated ephemeral dev secret. "
+                "Set explicitly in prod (rotate-aware: use _PREV for old secret)."
+            )
     bootstrap = ToolBootstrap()
     try:
         await bootstrap.setup()
@@ -74,6 +91,11 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/health", tags=["health"])
     app.include_router(chat.router, prefix="/v1", tags=["chat"])
     app.include_router(feedback.router, prefix="/v1", tags=["feedback"])
+    app.include_router(sessions.router, prefix="/v1", tags=["sessions"])
+    app.include_router(kb.router, prefix="/v1", tags=["kb"])
+    app.include_router(workspaces.router, prefix="/v1", tags=["workspaces (v1.5)"])
+    app.include_router(skills.router, prefix="/v1", tags=["skills (v1.5)"])
+    app.include_router(me.router, prefix="/v1", tags=["me / usage"])
 
     # 静态前端托管 - 默认 dev 模式开启;生产置 SERVE_WEB_LITE=false 改用 Caddy/CDN
     # 详见 infra/Caddyfile

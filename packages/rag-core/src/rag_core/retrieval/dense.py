@@ -22,6 +22,7 @@ class DenseRetriever:
         principals: list[str],
         k: int = 5,
         filters: dict | None = None,
+        collection: str | None = None,
     ) -> list[SearchHit]:
         if not query.strip():
             return []
@@ -32,4 +33,5 @@ class DenseRetriever:
             principals=principals,
             k=k,
             filters=filters,
+            collection=collection,
         )

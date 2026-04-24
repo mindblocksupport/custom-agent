@@ -1,6 +1,7 @@
 """Chat 请求 / 响应 schema (OpenAI 兼容)。"""
 
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -23,3 +24,8 @@ class ChatRequest(BaseModel):
     temperature: float | None = None
     max_tokens: int | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # Day 4 P0 #7: 关联 session, 服务器自动持久化每轮
+    session_id: UUID | None = None
+    # v1.5 沉淀层: 指定 workspace + skill (二选一)
+    workspace_id: UUID | None = None
+    skill_id: UUID | None = None

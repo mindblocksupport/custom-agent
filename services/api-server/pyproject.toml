@@ -19,6 +19,11 @@ dependencies = [
     "rag-mcp",
     # 观测 (L7)
     "langfuse>=2.50,<4",
+    # ACL JWT 签名 (Day 1 P0 #3)
+    "pyjwt>=2.8",
+    # Day 6 P0 #4: KB upload + 直接 ingest (复用 rag-core)
+    "python-multipart>=0.0.9",
+    "rag-core",
 ]
 
 [tool.uv.sources]
@@ -29,6 +34,7 @@ time-mcp = { workspace = true }
 calc-mcp = { workspace = true }
 web-search-mcp = { workspace = true }
 rag-mcp = { workspace = true }
+rag-core = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -23,6 +23,12 @@ embed = [
 llm = [
     "litellm>=1.50",
 ]
+# PDF 解析 Stage 1 (Day 3): 数字 PDF (pypdfium2 Apache, pdfplumber MIT)
+# 严格回避 PyMuPDF (AGPL!) / Marker (GPL)
+pdf = [
+    "pypdfium2>=4.30",
+    "pdfplumber>=0.11",
+]
 
 [project.scripts]
 rag = "rag_core.cli.main:cli"

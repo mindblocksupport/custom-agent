@@ -1,9 +1,252 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Design tokens (CSS custom properties)
+   - 切换深色: <html data-theme="dark">
+   ============================================================ */
+:root {
+  /* surfaces */
+  --bg: #fafafa;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #f4f4f5;
+  --bg-overlay: rgba(0, 0, 0, 0.45);
+  --surface-hover: #f4f4f5;
+  --surface-pressed: #e4e4e7;
+
+  /* text */
+  --fg: #18181b;
+  --fg-muted: #52525b;
+  --fg-subtle: #a1a1aa;
+  --fg-on-primary: #ffffff;
+
+  /* borders */
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --ring: rgba(99, 102, 241, 0.45);
+
+  /* brand */
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --primary-soft: #eef2ff;
+  --primary-soft-fg: #4338ca;
+  --accent: #8b5cf6;
+  --accent-soft: #f5f3ff;
+  --accent-soft-fg: #6d28d9;
+
+  /* semantic */
+  --success: #10b981;
+  --success-soft: #ecfdf5;
+  --success-soft-fg: #047857;
+  --warning: #f59e0b;
+  --warning-soft: #fffbeb;
+  --warning-soft-fg: #b45309;
+  --danger: #ef4444;
+  --danger-soft: #fef2f2;
+  --danger-soft-fg: #b91c1c;
+  --info-soft: #eff6ff;
+  --info-soft-fg: #1d4ed8;
+
+  /* shadows */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+
+  /* radii */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+
+  --header-h: 48px;
+  --sidebar-w: 248px;
+  --sidebar-w-collapsed: 56px;
+}
+
+html[data-theme="dark"] {
+  --bg: #09090b;
+  --bg-elev: #18181b;
+  --bg-elev-2: #27272a;
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+  --surface-hover: #27272a;
+  --surface-pressed: #3f3f46;
+  --fg: #fafafa;
+  --fg-muted: #a1a1aa;
+  --fg-subtle: #71717a;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --ring: rgba(129, 140, 248, 0.55);
+  --primary: #818cf8;
+  --primary-hover: #6366f1;
+  --primary-soft: #1e1b4b;
+  --primary-soft-fg: #c7d2fe;
+  --accent: #a78bfa;
+  --accent-soft: #2e1065;
+  --accent-soft-fg: #ddd6fe;
+  --success-soft: #022c22;
+  --success-soft-fg: #6ee7b7;
+  --warning-soft: #2c1605;
+  --warning-soft-fg: #fcd34d;
+  --danger-soft: #2f0a0a;
+  --danger-soft-fg: #fca5a5;
+  --info-soft: #0c1f3f;
+  --info-soft-fg: #93c5fd;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.65);
+}
+
 html, body { height: 100%; }
+html { color-scheme: light dark; }
+html[data-theme="dark"] { color-scheme: dark; }
+
 body {
+  background: var(--bg);
+  color: var(--fg);
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01", "ss03";
 }
+
+/* Utility classes mapping to CSS vars (Tailwind v4 — used as `bg-[var(--bg)]` style) */
+.surface { background: var(--bg); color: var(--fg); }
+.surface-elev { background: var(--bg-elev); color: var(--fg); }
+.surface-elev-2 { background: var(--bg-elev-2); color: var(--fg); }
+.text-fg { color: var(--fg); }
+.text-muted { color: var(--fg-muted); }
+.text-subtle { color: var(--fg-subtle); }
+.border-default { border-color: var(--border); }
+.border-strong { border-color: var(--border-strong); }
+
+/* Focus ring */
+*:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Custom scrollbar */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--fg-subtle); }
+
+/* ============================================================
+   Markdown body (assistant 消息里的富文本)
+   ============================================================ */
+.md-body > *:first-child { margin-top: 0 !important; }
+.md-body > *:last-child { margin-bottom: 0 !important; }
+.md-body pre code.hljs {
+  background: transparent !important;
+  padding: 0 !important;
+}
+.md-body strong { font-weight: 600; }
+.md-body em { font-style: italic; }
+.md-body del { text-decoration: line-through; opacity: 0.6; }
+.md-body input[type="checkbox"] {
+  margin-right: 0.4em;
+  vertical-align: middle;
+}
+
+html[data-theme="dark"] .md-body pre {
+  background: #0a0a0a !important;
+  border: 1px solid var(--border);
+}
+html[data-theme="dark"] .md-body code:not(.hljs) {
+  background: var(--bg-elev-2) !important;
+  color: var(--accent-soft-fg) !important;
+}
+
+/* ============================================================
+   Animations
+   ============================================================ */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-in { animation: fadeIn 180ms ease-out both; }
+.animate-toast { animation: slideInRight 220ms cubic-bezier(0.2, 0.9, 0.2, 1) both; }
+.animate-modal { animation: slideInUp 200ms cubic-bezier(0.2, 0.9, 0.2, 1) both; }
+.animate-pulse-soft { animation: pulse-soft 1.6s ease-in-out infinite; }
+.animate-spin-slow { animation: spin 1.2s linear infinite; }
+
+/* Shimmer skeleton */
+.skeleton {
+  background:
+    linear-gradient(90deg,
+      var(--bg-elev-2) 0%,
+      var(--surface-hover) 50%,
+      var(--bg-elev-2) 100%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: var(--r-sm);
+}
+
+/* Typing dots (streaming) */
+.typing-dots::after {
+  content: "";
+  display: inline-block;
+  width: 4ch;
+  text-align: left;
+  animation: typing 1.2s steps(4, end) infinite;
+}
+@keyframes typing {
+  0% { content: ""; }
+  25% { content: "·"; }
+  50% { content: "··"; }
+  75% { content: "···"; }
+  100% { content: ""; }
+}
+
+/* Subtle gradient borders for cards */
+.gradient-border {
+  position: relative;
+  background: var(--bg-elev);
+}
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  border-radius: inherit;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* No-flash background for body during theme switch */
+html.theme-loading body { visibility: hidden; }
