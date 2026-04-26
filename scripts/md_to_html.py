@@ -1874,6 +1874,216 @@ MERMAID_DIAGRAMS: dict[str, tuple[str, str]] = {
     class A,B,C,D,E,F,G,H cat
     class A1,A2,A3,B1,B2,B3,B4,B5,C1,C2,C3,C4,C5,D1,D2,D3,D4,D5,D6,D7,E1,E2,E3,E4,E5,F1,F2,F3,F4,F5,F6,G1,G2,G3,G4,H1,H2,H3,H4,H5 leaf"""
     ),
+
+    # ===== Agentic RAG 专题文档思维导图 (5 个核心节, §0-§4) =====
+    "Agentic RAG 速览思维导图": (
+        "🤖 §0 Agentic RAG 速览全景: 核心概念 / 4 个核心决策 / 14 章地图 / 6 角色路径.",
+        """flowchart LR
+    R(("Agentic RAG"))
+    R --> A["核心概念"]
+    R --> B["4 个核心决策"]
+    R --> C["14 章地图"]
+    R --> D["6 角色路径"]
+
+    A --> A1["定义 (LLM 在循环里自主决策)"]
+    A --> A2["vs 普通 RAG (路径动态 vs 固定)"]
+    A --> A3["Anthropic 三层模型"]
+    A --> A4["5 形态 + 7 层架构"]
+    A --> A5["跟通用 RAG 文档关系"]
+
+    B --> B1["决策 1 — 选哪一层 (Augmented 90% / Workflow 8-15% / Agent 2-5%)"]
+    B --> B2["决策 2 — 选哪种 Workflow Pattern (5 选 1)"]
+    B --> B3["决策 3 — 选哪种 Agent 形态 (5 选 1)"]
+    B --> B4["决策 4 — 选哪个 Agent 框架 (LangGraph/AutoGen/CrewAI...)"]
+
+    C --> C1["§1-§4 基础认知 (三层模型 / 形态 / 架构 / Pattern)"]
+    C --> C2["§5-§9 部件深度 (Tool Calling/Memory/Multi-Agent/模式/框架)"]
+    C --> C3["§10-§14 落地 (评估 / 案例 / 安全 / 路径 / 趋势)"]
+
+    D --> D1["新手 (§0/1/3/4/13)"]
+    D --> D2["架构师 (§0/1/3/5/6/7/10/11)"]
+    D --> D3["工程师 (全文)"]
+    D --> D4["算法研究 (§0/2/8/14)"]
+    D --> D5["PM 业务 (§0/1/11/13/14)"]
+    D --> D6["面试准备 (§0/1/2/3/11/12)"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D cat
+    class A1,A2,A3,A4,A5,B1,B2,B3,B4,C1,C2,C3,D1,D2,D3,D4,D5,D6 leaf"""
+    ),
+
+    "Anthropic 三层模型思维导图": (
+        "🏗️ §1 Anthropic 三层模型全景: 来源 / 三层定义 / 决策树 / 误区 / 跟其它框架关系 / 金句.",
+        """flowchart LR
+    R(("三层模型"))
+    R --> A["来源"]
+    R --> B["三层定义"]
+    R --> C["决策树"]
+    R --> D["三大误区"]
+    R --> E["跟其它框架关系"]
+
+    A --> A1["Anthropic Building Effective Agents (2024.12)"]
+    A --> A2["Anthropic 团队 + 数十个客户"]
+    A --> A3["业界共识 (OpenAI / Google / 国内大厂接受)"]
+
+    B --> B1["层次 1 Augmented LLM (单 LLM + 检索 + 工具, 80-95%)"]
+    B --> B2["层次 2 Workflow (5 Pattern 固定路径, 8-15%)"]
+    B --> B3["层次 3 Agent (LLM 自主决策循环, 2-5%)"]
+
+    C --> C1["Q1 单次 RAG 能解? → 层 1"]
+    C --> C2["Q2 步骤可固定脚本? → 层 2"]
+    C --> C3["Q3 步骤需 LLM 决定? → 层 3"]
+
+    D --> D1["误区 1 Agent 替代 RAG (实际 Agent 内部 80-90% 调 RAG)"]
+    D --> D2["误区 2 多步 LLM = Agent (实际固定脚本是 Workflow)"]
+    D --> D3["误区 3 Agent 解决质量 (实际只解决一次性管道解不了)"]
+
+    E --> E1["OpenAI Function Calling / Agents SDK ≈ Workflow + Agent"]
+    E --> E2["LangChain Chain ≈ Workflow / Agent ≈ Agent"]
+    E --> E3["LangGraph 跨两层"]
+    E --> E4["Modular RAG = 层次 1 工程化"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E cat
+    class A1,A2,A3,B1,B2,B3,C1,C2,C3,D1,D2,D3,E1,E2,E3,E4 leaf"""
+    ),
+
+    "Agent 5 大形态思维导图": (
+        "🎭 §2 Agent 5 大形态全景: Plan-and-Execute / ReAct / Multi-Agent / Self-Reflection / Iterative.",
+        """flowchart LR
+    R(("5 大形态"))
+    R --> A["Plan-and-Execute"]
+    R --> B["ReAct"]
+    R --> C["Multi-Agent"]
+    R --> D["Self-Reflection"]
+    R --> E["Iterative"]
+    R --> F["选型决策"]
+
+    A --> A1["开局全规划 (1 Sonnet plan + N Haiku exec)"]
+    A --> A2["适合可预测任务 (退款诊断)"]
+    A --> A3["真实: Klarna / Anthropic Computer Use / Copilot Workspace"]
+
+    B --> B1["每步 Thought → Action → Observation 循环"]
+    B --> B2["适合不可预测 (Coding 探索)"]
+    B --> B3["真实: Cursor / Devin / Claude Code"]
+
+    C --> C1["多角色协作 (Researcher/Writer/Critic)"]
+    C --> C2["Orchestrator+Workers / Conversable / Sequential / Hierarchical"]
+    C --> C3["真实: Magentic-One / Copilot Workspace / AutoGen"]
+
+    D --> D1["输出后自评不满意重做"]
+    D --> D2["跟 Pattern 5 区别 (LLM 决定停 vs 写死轮数)"]
+    D --> D3["真实: Self-RAG (Asai 2023) / Reflexion (Shinn 2023)"]
+
+    E --> E1["检索→评估→不够则重检"]
+    E --> E2["跟 Self-Reflection 区别 (评检索完整性 vs 输出质量)"]
+    E --> E3["真实: CRAG (Yan 2024) / Self-Ask / IRCoT"]
+
+    F --> F1["Coding/探索 → ReAct"]
+    F --> F2["可预先分解 → Plan-and-Execute"]
+    F --> F3["多角色 → Multi-Agent"]
+    F --> F4["输出质量评估 → Self-Reflection"]
+    F --> F5["检索不全 → Iterative"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F cat
+    class A1,A2,A3,B1,B2,B3,C1,C2,C3,D1,D2,D3,E1,E2,E3,F1,F2,F3,F4,F5 leaf"""
+    ),
+
+    "Agentic 7 层架构思维导图": (
+        "🏛️ §3 Agentic RAG 7 层架构全景: Layer 1-7 + Cost Controller 横切 + 决策循环 + 跟 5 层架构关系.",
+        """flowchart LR
+    R(("7 层架构"))
+    R --> A["Layer 1-7 职责"]
+    R --> B["决策循环"]
+    R --> C["接口契约"]
+    R --> D["跟 5 层企业架构关系"]
+
+    A --> A1["L1 Query Understanding (入口理解)"]
+    A --> A2["L2 Router (路由分流)"]
+    A --> A3["L3 Planner (Agent 大脑)"]
+    A --> A4["L4 Tool Loop (双手循环)"]
+    A --> A5["L5 Memory (脊髓三层)"]
+    A --> A6["L6 Synthesizer (综合答案)"]
+    A --> A7["L7 Validator (校验闸门)"]
+    A --> A8["⊥ Cost Controller (横切监控)"]
+
+    B --> B1["简单路径 (80-95% 流量) → 单次 RAG → Validator → 答案"]
+    B --> B2["Agent 路径 (5-20% 流量) → Planner → Tool Loop → Memory → Synthesizer → Validator"]
+    B --> B3["全程 Cost Controller 监控 + 4 终止条件熔断"]
+
+    C --> C1["User → L1 (raw query → enriched)"]
+    C --> C2["L1 → L2 (path_label)"]
+    C --> C3["L3 → L4 (Plan → tool_call)"]
+    C --> C4["L7 → User (validated answer + trace)"]
+
+    D --> D1["7 层 = 5 层企业架构 L5 zoom-in"]
+    D --> D2["L4 Tool Loop 内的 RAG 工具 = 5 层 L1+L2+L3 完整管道"]
+    D --> D3["L2 Router = 5 层 L4 Router (同一概念)"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D cat
+    class A1,A2,A3,A4,A5,A6,A7,A8,B1,B2,B3,C1,C2,C3,C4,D1,D2,D3 leaf"""
+    ),
+
+    "Workflow 5 Pattern 思维导图": (
+        "🔧 §4 Workflow 5 Pattern 全景 (Anthropic 2024.12 框架): 5 种 Pattern + 选型决策 + 真实采用.",
+        """flowchart LR
+    R(("5 Pattern"))
+    R --> A["Prompt Chaining"]
+    R --> B["Routing"]
+    R --> C["Parallelization"]
+    R --> D["Orchestrator-Workers"]
+    R --> E["Evaluator-Optimizer"]
+    R --> F["选型决策"]
+
+    A --> A1["任务拆线性 N 步, 每步上一步输出做输入"]
+    A --> A2["真实: Anthropic 文档 pipeline / LangChain SequentialChain"]
+    A --> A3["反模式: 拆太碎 10+ step / 每步都用 Sonnet"]
+
+    B --> B1["分类输入后转发不同分支"]
+    B --> B2["三层混合 (规则 70% / 语义 20% / LLM 兜底 10%)"]
+    B --> B3["真实: Klarna 80/15/5 / Glean 多源路由"]
+    B --> B4["反模式: 全 LLM 路由 / 准确率 < 0.95 上线"]
+
+    C --> C1["同时跑独立 LLM 任务后聚合"]
+    C --> C2["子变体 A: Sectioning (10 文档并行)"]
+    C --> C3["子变体 B: Voting (3 LLM 投票)"]
+    C --> C4["真实: Constitutional AI / Multi-Query"]
+
+    D --> D1["中枢 LLM 动态拆任务给 Worker LLM"]
+    D --> D2["跟 Multi-Agent 区别 (Worker 内部不是 Agent)"]
+    D --> D3["真实: 写竞品分析 / 多视角生成"]
+
+    E --> E1["Generator → Evaluator → Optimizer 循环 N 轮"]
+    E --> E2["跟 Self-Reflection 区别 (轮数写死 vs LLM 决定)"]
+    E --> E3["真实: Anthropic 翻译 / CodeT5"]
+
+    F --> F1["能拆串行 → Pattern 1"]
+    F --> F2["有类别 → Pattern 2"]
+    F --> F3["子任务独立 → Pattern 3/4"]
+    F --> F4["质量评估 → Pattern 5"]
+    F --> F5["都不够 → 升级 Agent"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F cat
+    class A1,A2,A3,B1,B2,B3,B4,C1,C2,C3,C4,D1,D2,D3,E1,E2,E3,F1,F2,F3,F4,F5 leaf"""
+    ),
 }
 
 
