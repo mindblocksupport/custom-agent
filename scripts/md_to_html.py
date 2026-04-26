@@ -1486,6 +1486,354 @@ MERMAID_DIAGRAMS: dict[str, tuple[str, str]] = {
     style Cost fill:#EF4444,color:#fff
     style Answer fill:#10B981,color:#fff"""
     ),
+
+    # ===== 章节开头思维导图 (Mermaid mindmap, v9.3+) =====
+    "§0 速览思维导图": (
+        "🗺️ §0 速览章全景: 9 个核心概念 + 5 层架构 + 4 代演进 + 业务流程 + 60+ 术语 + 决策原则.",
+        """mindmap
+  root((§0 速览))
+    9 核心概念
+      RAG 定义
+      Dense/Sparse/Hybrid
+      3 阶段架构
+      离线索引构建
+      在线检索生成
+      喂 LLM 真相
+      数据生成
+      chunk_id 关联
+      向量为何不喂
+    5 层架构
+      L1 数据治理
+      L2 索引
+      L3 检索
+      L4 Router
+      L5 Agent
+    4 代演进
+      Naive 2020-22
+      Advanced 2023
+      Modular 2024
+      Agent 2024-25
+    Anthropic 三层
+      Augmented LLM 90%
+      Workflow 8-15%
+      Agent 2-5%
+    业务决策
+      80/15/5 分流
+      6 道治理
+      Hybrid 必要性
+    术语速查
+      60+ 概念
+      Workflow 5 Pattern"""
+    ),
+
+    "§4 L1 数据治理思维导图": (
+        "🛡️ §4 L1 数据治理全景: 7 大职责 + 7 种脏数据 + 12 类工具栈 + 5 大指标 + 实战 SOP.",
+        """mindmap
+  root((§4 L1 数据治理))
+    7 大职责
+      Ingestion 多源接入
+      Parser 解析
+      Boilerplate 噪声过滤
+      PII 检测脱敏
+      Dedup 去重
+      Quality 质量评估
+      元数据丰富化
+    7 种脏数据
+      重复 20-40%
+      过时未删 15-30%
+      格式破坏 30-60%
+      噪声 5-15%
+      多语言 100%
+      PII 5-20%
+      版本爆炸 90%
+    工具栈
+      Parser
+        LlamaParse
+        Reducto
+        pypdfium2
+        GPT-5 Vision
+      PII
+        Presidio
+        spaCy NER
+        AWS Comprehend
+      Dedup
+        datasketch MinHash
+        SHA256
+      Quality
+        Haiku LLM-as-judge
+      Pipeline
+        Spark + Airflow
+    5 大指标
+      Recall@10
+      Faithfulness
+      重复率
+      PII 漏检率
+      平均质量分
+    实战 SOP
+      §4.16 端到端 walkthrough
+      Spark Pipeline
+      KB Health 监控
+      Bad case 闭环"""
+    ),
+
+    "§5 L2 索引思维导图": (
+        "📚 §5 L2 索引全景: 8 种 Chunking 策略 + 12+ Embedder 选型 + 3 种 ANN 索引 + Contextual/Late Chunking.",
+        """mindmap
+  root((§5 L2 索引))
+    Chunking 8 策略
+      固定窗口 NDCG 0.55
+      递归字符 0.62
+      句子窗口 0.68
+      父子分块 0.72
+      语义分块 0.74
+      Late Chunking 0.82
+      Contextual Retrieval 0.83
+      AST-aware 代码专用
+    Embedder
+      BGE-M3 1024 维
+      Voyage-3 1024 维
+      OpenAI text-3 3072 维
+      Cohere v3 1024 维
+      Qwen3 1024-2048
+      NV-Embed v2 4096
+    ANN 索引
+      HNSW 主流
+      IVF 大规模
+      DiskANN 极大规模
+    多模态
+      CLIP
+      BLIP
+      ColPali
+    Embedder fine-tune
+      Triple loss
+      InfoNCE
+      Multiple Negatives
+    决策
+      中文选 BGE-M3
+      英文选 Voyage-3
+      全球选 OpenAI"""
+    ),
+
+    "§6 L3 检索思维导图": (
+        "🔍 §6 L3 检索全景: Hybrid 三通道 + RRF 融合 + Reranker 精排 + 6 种 Query Transformation + Lost in the Middle.",
+        """mindmap
+  root((§6 L3 检索))
+    Hybrid 三通道
+      Dense ANN
+        HNSW
+        cosine
+      Sparse BM25
+        倒排索引
+        Robertson 1994
+      SPLADE 神经稀疏
+    RRF 融合
+      公式 1/(k+rank)
+      k=60 论文最优
+      rank-based 兼容两路
+    Reranker 8 种
+      BGE-Reranker
+      Cohere Rerank-3.5
+      Cross-Encoder
+      ColBERT-v2
+      mxbai
+      Jina Reranker
+      RankGPT
+      LLM Cascade
+    Query Transformation
+      HyDE 假设文档
+      Multi-Query 多变体
+      Step-Back 抽象
+      Decomposition 拆解
+      RAG-Fusion
+      Sub-Question
+    Post-Retrieval
+      MMR 多样性
+      Lost in the Middle
+      LongContextReorder
+      Adaptive K
+    CRAG 兜底
+      Web Search
+      Self-RAG"""
+    ),
+
+    "§7 L4 Router 思维导图": (
+        "🚦 §7 L4 Router 全景: 三层混合路由 + 5 类 Query 分流 + Text2SQL + 80/15/5 决策.",
+        """mindmap
+  root((§7 L4 Router))
+    三层混合
+      规则路由 70%
+        关键词正则
+        长度判断
+      语义路由 20%
+        kNN on intent
+        embedding cosine
+      LLM 兜底 10%
+        Haiku judge
+        复杂度评分
+    5 类 Query
+      FAQ 简单
+      编号查询
+      复杂诊断
+      实时状态
+      跨系统
+    路径输出
+      simple_rag
+      enhanced_rag
+      agent
+      text2sql
+      clarification
+      refusal
+    Text2SQL
+      RAGFlow 三模块
+      Schema 注入
+      Few-shot
+      Validator 兜底
+    80/15/5 分流
+      简单 RAG 80%
+      增强 RAG 15%
+      Agent 5%
+    监控
+      path_distribution
+      准确率 0.95+
+      延迟 50ms"""
+    ),
+
+    "§8 L5 Agent 思维导图": (
+        "🤖 §8 L5 Agent 全景: 6 框架 + Tool Calling + Memory 三层 + 5 高级 RAG-Agent 模式.",
+        """mindmap
+  root((§8 L5 Agent))
+    6 框架
+      LangGraph
+      LlamaIndex Agents
+      AutoGen
+      CrewAI
+      OpenAI Agents SDK
+      Anthropic Claude SDK
+    Tool Calling 6 步
+      定义 schema
+      传给 LLM
+      LLM 输出 tool_call
+      执行
+      结果回传
+      LLM 决定下一步
+    Memory 三层
+      L1 Session Redis
+      L2 User Pref Postgres
+      L3 Business Vector DB
+    5 高级模式
+      Self-RAG
+      CRAG
+      GraphRAG
+      LightRAG
+      Adaptive RAG
+    Agent 代价
+      慢 5-30s
+      贵 $0.05-1
+      难调试
+      死循环
+    详见 §20
+      Agent RAG 完整讲透"""
+    ),
+
+    "§9 横切思维导图": (
+        "🛠️ §9 横切关注点全景: ACL 三层 + Audit + 5 层缓存 + Refusal + Observability + Guardrail + 5 部署模式.",
+        """mindmap
+  root((§9 横切关注点))
+    ACL 三层
+      Doc 级权限
+      Chunk 级 metadata
+      Output 级二次过滤
+    Audit Log
+      15+ 字段
+      query/answer/sources
+      user/timestamp
+    5 层缓存
+      HTTP 30-60%
+      Embedding 70-90%
+      Retrieval 20-40%
+      Generation 10-25%
+      Semantic 5-15%
+    Refusal
+      不知道说不知道
+      阈值调优
+      Air Canada 教训
+    Observability
+      LangSmith
+      Phoenix Arize
+      Langfuse
+      LangSmith 追踪
+    Guardrail
+      LlamaGuard
+      NeMo Guardrails
+      Constitutional AI
+      OpenAI Moderation
+    部署模式
+      SaaS 托管
+      私有云
+      混合云
+      端侧 Local
+      边缘 Edge
+    合规
+      GDPR
+      EU AI Act
+      个保法
+      HIPAA"""
+    ),
+
+    "§20 Agent RAG 思维导图": (
+        "🎯 §20 Agent RAG (Gen 4) 全景: Anthropic 三层模型 + Workflow 5 Pattern + Agent 5 部件 + 7 层架构 + 5 形态 + 6 框架.",
+        """mindmap
+  root((§20 Agent RAG))
+    Anthropic 三层
+      Augmented LLM 90%
+      Workflow 8-15%
+      Agent 2-5%
+    Workflow 5 Pattern
+      Prompt Chaining
+      Routing
+      Parallelization
+      Orchestrator-Workers
+      Evaluator-Optimizer
+    Agent 5 部件
+      Modular RAG 基座
+      Planner 大脑
+      Tool Calling 双手
+      Memory 脊髓
+      多步推理 心跳
+    7 层架构
+      L1 Query Understanding
+      L2 Router
+      L3 Planner
+      L4 Tool Loop
+      L5 Memory
+      L6 Synthesizer
+      L7 Validator
+    5 大形态
+      Plan-and-Execute
+      ReAct
+      Multi-Agent
+      Self-Reflection
+      Iterative
+    6 大框架
+      LangGraph
+      LlamaIndex
+      AutoGen
+      CrewAI
+      OpenAI Agents SDK
+      Anthropic Claude SDK
+    死循环防御
+      max_steps
+      timeout
+      budget cap
+      重复检测
+      告警
+    FinOps 5 杠杆
+      选对层次
+      Router 80/15/5
+      模型分级
+      Prompt Caching
+      Batch API"""
+    ),
 }
 
 
