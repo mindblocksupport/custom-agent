@@ -1489,13 +1489,14 @@ MERMAID_DIAGRAMS: dict[str, tuple[str, str]] = {
 
     # ===== 章节开头思维导图 (flowchart LR 树状从左到右, 取代散状 mindmap) =====
     "§0 速览思维导图": (
-        "🗺️ §0 速览全景: 核心概念 / 架构层级 / 演进史 / 决策原则 四大类.",
+        "🗺️ §0 速览全景: 核心概念 / 架构层级 / 演进四代 / 4 个核心决策 (架构/流量/检索/模型) / 参考资源.",
         """flowchart LR
     R(("速览"))
     R --> A["核心概念"]
     R --> B["架构层级"]
     R --> C["演进四代"]
-    R --> D["决策原则"]
+    R --> D["4 个核心决策"]
+    R --> E["参考资源"]
 
     A --> A1["RAG 定义 (Retrieval-Augmented Generation)"]
     A --> A2["Dense / Sparse / Hybrid 三类检索"]
@@ -1509,22 +1510,26 @@ MERMAID_DIAGRAMS: dict[str, tuple[str, str]] = {
     B --> B4["L4 Router 路由分流"]
     B --> B5["L5 Agent 智能体"]
 
-    C --> C1["Naive 朴素 (Gen 1)"]
-    C --> C2["Advanced 增强 (Gen 2)"]
-    C --> C3["Modular 模块化 (Gen 3)"]
-    C --> C4["Agent"]
+    C --> C1["Naive 朴素 (Gen 1, 2020)"]
+    C --> C2["Advanced 增强 (Gen 2, 2023)"]
+    C --> C3["Modular 模块化 (Gen 3, 2024)"]
+    C --> C4["Agent 智能体 (Gen 4, 2024-25)"]
 
-    D --> D1["Anthropic 三层模型"]
-    D --> D2["80/15/5 流量分流"]
-    D --> D3["Hybrid 必选原则"]
-    D --> D4["60+ 术语速查"]
+    D --> D1["决策 1 — 架构选哪层 (Anthropic 三层: 90% Augmented LLM / 10% Workflow / 5% Agent)"]
+    D --> D2["决策 2 — 流量怎么分流 (Router: 80% 简单 RAG / 15% 增强 / 5% Agent)"]
+    D --> D3["决策 3 — 检索 Dense 还是 Hybrid (字面命中场景必须 Hybrid)"]
+    D --> D4["决策 4 — LLM 选哪个 (Planner 用 Sonnet 4.5/o3, Synthesizer 用 Haiku 4.5)"]
+
+    E --> E1["60+ 术语速查 (§0.7)"]
+    E --> E2["读者地图按角色 (§0.6)"]
+    E --> E3["何时不用 RAG (§0.8)"]
 
     classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
     classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
     classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
     class R root
-    class A,B,C,D cat
-    class A1,A2,A3,A4,A5,B1,B2,B3,B4,B5,C1,C2,C3,C4,D1,D2,D3,D4 leaf"""
+    class A,B,C,D,E cat
+    class A1,A2,A3,A4,A5,B1,B2,B3,B4,B5,C1,C2,C3,C4,D1,D2,D3,D4,E1,E2,E3 leaf"""
     ),
 
     "§4 L1 数据治理思维导图": (
