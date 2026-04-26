@@ -1436,6 +1436,56 @@ MERMAID_DIAGRAMS: dict[str, tuple[str, str]] = {
 
     style Eval fill:#6366F1,color:#fff"""
     ),
+    "Agent RAG 架构体系总图": (
+        "🎯 Agent RAG 7 层立体架构 + 横切 Cost Controller. 简单 query (80-95%) 走左侧 Modular RAG 单次管道; 复杂 query (5-20%) 走右侧 Agent 路径 (Planner → Tool Loop → Memory → Synthesizer). 全部经 Validator 闸门 + 全程 Cost Controller 监控.",
+        """graph TB
+    User["👤 用户 query"]
+    QU["Layer 1 — Query Understanding<br/>意图分类 + 复杂度评估"]
+    Router{"Layer 2 — Router<br/>规则 → 语义 → LLM 兜底"}
+
+    RAG["Modular RAG<br/>单次完整管道<br/>L1+L2+L3 see §3"]
+
+    Plan["Layer 3 — Planner<br/>Sonnet 4.5 / o3<br/>生成执行 Plan"]
+
+    subgraph Loop["Layer 4 — Tool Execution Loop (max_steps=8)"]
+      direction LR
+      Decide["LLM 决定下一步"]
+      Exec["Executor 调真实 API"]
+      Check{"4 终止条件<br/>满足?"}
+      Decide --> Exec --> Check
+      Check -->|否| Decide
+    end
+
+    Tools[("Tool Registry<br/>5-12 工具池")]
+    Mem[("Layer 5 — Memory<br/>L1 Session / L2 User / L3 Biz")]
+    Synth["Layer 6 — Synthesizer<br/>Haiku 综合 + 引用"]
+    Validator{"Layer 7 — Validator<br/>Faithfulness + Citation<br/>+ PII + Guardrail"}
+    Cost(["Cost Controller<br/>cost / steps / repeat / timeout<br/>超预算硬熔断"])
+    Answer["💬 答案 + 引用 + trace"]
+
+    User --> QU --> Router
+    Router -->|simple 80-95%| RAG
+    Router -->|complex 5-20%| Plan
+    Plan --> Loop
+    Loop <--> Tools
+    Loop <--> Mem
+    Check -->|是| Synth
+    RAG --> Validator
+    Synth --> Validator
+    Validator -->|通过| Answer
+    Validator -.->|不通过| Plan
+    Cost -.->|监控| Plan
+    Cost -.->|监控| Loop
+    Cost -.->|监控| Synth
+
+    style User fill:#3B82F6,color:#fff
+    style RAG fill:#10B981,color:#fff
+    style Plan fill:#A855F7,color:#fff
+    style Synth fill:#A855F7,color:#fff
+    style Validator fill:#F59E0B,color:#fff
+    style Cost fill:#EF4444,color:#fff
+    style Answer fill:#10B981,color:#fff"""
+    ),
 }
 
 
