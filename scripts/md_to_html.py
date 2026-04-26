@@ -2028,7 +2028,25 @@ PRONUNCIATION: dict[str, str] = {
 
 
 def inject_pronunciation(html: str) -> str:
-    """给 body 中关键英文术语注入 🔊 发音按钮 + 音标."""
+    """给 body 中关键英文术语注入 🔊 发音按钮 + 音标.
+
+    会保护 <pre class="mermaid">, <pre>, <code> 块不被注入 (否则破坏 Mermaid 渲染 / 代码可读性).
+    """
+    # ---- 1. 抽出受保护块, 占位符替换 ----
+    protected: list[str] = []
+
+    def _save(m: re.Match) -> str:
+        protected.append(m.group(0))
+        return f"___PROTECTED_BLOCK_{len(protected) - 1}___"
+
+    # 顺序: 先 mermaid (最具体), 再 pre (含其它代码块), 最后 inline code
+    # mermaid 用 div (md_to_html 注入后) 或 pre 包装, 都需保护
+    html = re.sub(r'<div class="mermaid">.*?</div>', _save, html, flags=re.DOTALL)
+    html = re.sub(r'<pre class="mermaid">.*?</pre>', _save, html, flags=re.DOTALL)
+    html = re.sub(r"<pre[^>]*>.*?</pre>", _save, html, flags=re.DOTALL)
+    html = re.sub(r"<code[^>]*>.*?</code>", _save, html, flags=re.DOTALL)
+
+    # ---- 2. 在剩余 HTML 上做发音注入 ----
     injected = 0
     seen: dict[str, int] = {}  # 每个词已注入次数
     max_per_term = 2  # 每个术语最多注入 N 次 (避免满屏喇叭)
@@ -2055,7 +2073,11 @@ def inject_pronunciation(html: str) -> str:
         html = pattern.sub(_replacer, html)
         injected += seen[term]
 
-    print(f"  注入发音按钮: {injected} 个 ({len(PRONUNCIATION)} 术语)")
+    # ---- 3. 恢复受保护块 ----
+    for i, block in enumerate(protected):
+        html = html.replace(f"___PROTECTED_BLOCK_{i}___", block)
+
+    print(f"  注入发音按钮: {injected} 个 ({len(PRONUNCIATION)} 术语), 保护代码块: {len(protected)}")
     return html
 
 
