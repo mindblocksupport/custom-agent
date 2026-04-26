@@ -1,0 +1,40 @@
+scripts/md_to_html.py
+  cb73be6825dc0746 2031-2049,2076-2078,2080
+docs/rag-knowledge-map.md
+  cb73be6825dc0746 650,761-793,2279-2286,4340,5245,5276-5315,5322,5328,5330,5333-5334,5337,7020-7021,7023-7027,7901-7905,8108-8109,8905-8908,8919-8922,8931-8933,8977-8979,8988,9076-9079,9091-9094,9122,9145,9169,9171-9172,9174,9178-9179,9181,9183,9188,9190,13966-13967,13969,14177,14183-14186,14188,14190,14192,14194,14201,14203,14404,17113,17116,17118,17126-17127,17136-17137,17146,17154,17163,17166,17168-17169,17190-17191,17193,17214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "87ce0d660f73eba66c587774cae32e017636b430",
+  "prompts": {
+    "cb73be6825dc0746": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "42a1301f-b4b3-460f-be8d-c3dc86d05568",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "shaoqiu <shaoqiu.chen@xinfei.cn>",
+      "messages": [],
+      "total_additions": 197,
+      "total_deletions": 115,
+      "accepted_lines": 8233,
+      "overriden_lines": 0,
+      "messages_url": "https://codeaiapi.xinfei-inc.cn/cas/5343c4a8e075f92c47667867945255ee5f80a32da831e80dee5eef88af3b96f3"
+    },
+    "d6a1a62b71d69249": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bad26ecc-2391-4d99-bd18-dc4389aa7e1c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "RAG KMap <rag@mindblock.support>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2170,
+      "overriden_lines": 0,
+      "messages_url": "https://codeaiapi.xinfei-inc.cn/cas/b8a463d1e8153934c03c04fbb976252ea10a7944d0be5553fc71e4dda02dd90e"
+    }
+  }
+}
