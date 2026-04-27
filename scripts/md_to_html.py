@@ -2333,6 +2333,250 @@ MERMAID_DIAGRAMS: dict[str, tuple[str, str]] = {
     class A,B,C,D,E,F,G,H cat
     class A1,A2,A3,B1,B2,B3,C1,C2,C3,D1,D2,D3,E1,E2,E3,F1,F2,F3,G1,G2,G3,H1,H2,H3,H4,H5,H6 leaf"""
     ),
+    "死循环防御 + FinOps + 评估 思维导图": (
+        "💰 §10 Agent 死循环防御 + FinOps 成本控制 + 评估 4 维度全景.",
+        """flowchart LR
+    R(("死循环+FinOps+评估"))
+    R --> A["死循环 6 触发"]
+    R --> B["死循环 8 防御"]
+    R --> C["FinOps 5 成本来源"]
+    R --> D["FinOps 12 优化手段"]
+    R --> E["评估 4 维度"]
+    R --> F["RAGAS 4 指标"]
+
+    A --> A1["工具结果歧义反复调"]
+    A --> A2["多 Agent 互推 handoff"]
+    A --> A3["工具失败 LLM 重试"]
+    A --> A4["Self-Reflection 不收敛"]
+    A --> A5["Plan→Execute→Fail 循环"]
+    A --> A6["工具内调 LLM 嵌套"]
+
+    B --> B1["max_iterations (10-25)"]
+    B --> B2["budget_per_query ($0.5)"]
+    B --> B3["wallclock timeout (30s-5min)"]
+    B --> B4["工具调用频次上限"]
+    B --> B5["状态指纹检测"]
+    B --> B6["输出多样性检测"]
+    B --> B7["handoff_count_limit"]
+    B --> B8["嵌套深度 ≤ 3"]
+
+    C --> C1["LLM token 60-80%"]
+    C --> C2["Embedding 5-15%"]
+    C --> C3["Vector DB 5-10%"]
+    C --> C4["Reranker / WebSearch 5-15%"]
+    C --> C5["基础设施 5-10%"]
+
+    D --> D1["Prompt Caching (35-49%)"]
+    D --> D2["模型 Cascade (Haiku→Sonnet→Opus)"]
+    D --> D3["Reranker 替代 LLM judge"]
+    D --> D4["Semantic Cache (20-40% hit)"]
+    D --> D5["Output 长度限制"]
+    D --> D6["Tool 结果缓存"]
+    D --> D7["Memory 摘要"]
+    D --> D8["Batch API (50% 折扣)"]
+    D --> D9["自托管开源模型"]
+    D --> D10["Async Tool Calling"]
+    D --> D11["Stream 早停"]
+    D --> D12["周期性 cleanup"]
+
+    E --> E1["Accuracy (准)"]
+    E --> E2["Latency (快)"]
+    E --> E3["Cost (省)"]
+    E --> E4["Safety (安)"]
+
+    F --> F1["Faithfulness (忠实度)"]
+    F --> F2["Answer Relevance"]
+    F --> F3["Context Precision"]
+    F --> F4["Context Recall"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F cat
+    class A1,A2,A3,A4,A5,A6,B1,B2,B3,B4,B5,B6,B7,B8,C1,C2,C3,C4,C5,D1,D2,D3,D4,D5,D6,D7,D8,D9,D10,D11,D12,E1,E2,E3,E4,F1,F2,F3,F4 leaf"""
+    ),
+    "真实案例思维导图": (
+        "🏢 §11 12 真实落地案例: Klarna / Cursor / Devin / Manus / Glean / Notion 等.",
+        """flowchart LR
+    R(("12 真实案例"))
+    R --> A["客服类"]
+    R --> B["Code Agent"]
+    R --> C["GUI Agent"]
+    R --> D["通用 Agent"]
+    R --> E["企业 KB"]
+    R --> F["写作 + RAG"]
+    R --> G["招聘"]
+
+    A --> A1["Klarna (节省 $40M/年)"]
+
+    B --> B1["Anthropic Claude Code (CLI)"]
+    B --> B2["Cursor (估值 $9B 2025)"]
+    B --> B3["Devin (Cognition $4B 2024.12)"]
+    B --> B4["Replit Agent (LangGraph)"]
+
+    C --> C1["Anthropic Computer Use (2024.10)"]
+    C --> C2["OpenAI Operator (2025.01)"]
+
+    D --> D1["Microsoft Magentic-One (5 角色)"]
+    D --> D2["Manus (Monica.im 2025.02)"]
+
+    E --> E1["Glean (估值 $4.6B)"]
+
+    F --> F1["Notion AI ($10/月 add-on)"]
+
+    G --> G1["LinkedIn Recruiter AI"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F,G cat
+    class A1,B1,B2,B3,B4,C1,C2,D1,D2,E1,F1,G1 leaf"""
+    ),
+    "失败模式 + 安全 思维导图": (
+        "🛡️ §12 Agent 失败 8 大类 + 安全 6 层防御 + 各国合规.",
+        """flowchart LR
+    R(("失败模式+安全"))
+    R --> A["失败 8 大类"]
+    R --> B["安全 6 层"]
+    R --> C["合规"]
+    R --> D["真实事故"]
+
+    A --> A1["死循环 (烧 $)"]
+    A --> A2["幻觉 (Air Canada)"]
+    A --> A3["越权操作 (Replit 删文件)"]
+    A --> A4["Prompt 注入 (3 路径)"]
+    A --> A5["PII 泄漏 (Samsung 禁 ChatGPT)"]
+    A --> A6["跨用户串 (OpenAI Redis)"]
+    A --> A7["超预算"]
+    A --> A8["不可重现 (temperature)"]
+
+    B --> B1["L1 Input (PII / 注入检测)"]
+    B --> B2["L2 Auth (OAuth/JWT/MFA)"]
+    B --> B3["L3 ACL (RBAC/ABAC/OPA)"]
+    B --> B4["L4 Data (加密/RLS/驻留)"]
+    B --> B5["L5 Output (LlamaGuard/NeMo)"]
+    B --> B6["L6 Audit (SIEM)"]
+
+    C --> C1["GDPR (€20M/4% 罚款)"]
+    C --> C2["中国个保法 (5000 万元)"]
+    C --> C3["EU AI Act (2026.08 全生效)"]
+    C --> C4["HIPAA / SOC2 / FedRAMP"]
+
+    D --> D1["Air Canada 幻觉退款"]
+    D --> D2["Bing Sydney 暴露"]
+    D --> D3["Samsung 禁 ChatGPT"]
+    D --> D4["OpenAI Redis 跨用户"]
+    D --> D5["律所编案例罚 $5K"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D cat
+    class A1,A2,A3,A4,A5,A6,A7,A8,B1,B2,B3,B4,B5,B6,C1,C2,C3,C4,D1,D2,D3,D4,D5 leaf"""
+    ),
+    "落地路径思维导图": (
+        "🚀 §13 Agent 6 阶段落地: 立项→PoC→MVP→扩展→生产化→运营.",
+        """flowchart LR
+    R(("Agent 落地 6 阶段"))
+    R --> A["阶段 0 立项 (1-2 周)"]
+    R --> B["阶段 1 PoC (2-4 周)"]
+    R --> C["阶段 2 MVP (4-8 周)"]
+    R --> D["阶段 3 扩展 (2-4 月)"]
+    R --> E["阶段 4 生产化 (4-8 月)"]
+    R --> F["阶段 5 运营 (长期)"]
+    R --> G["反模式"]
+
+    A --> A1["业务场景 5 维度筛选"]
+    A --> A2["ROI 估算 (写下来)"]
+    A --> A3["1-3 人, 主 PM + ML"]
+
+    B --> B1["跑通 1 happy path"]
+    B --> B2["Anthropic SDK / 不用框架"]
+    B --> B3["7 天速成: query→搭→调→demo"]
+
+    C --> C1["内部 10-100 用户"]
+    C --> C2["LangGraph / LlamaIndex"]
+    C --> C3["监控 + 反馈机制"]
+
+    D --> D1["用户 / 场景 / 模型 三维扩展"]
+    D --> D2["平台化 (统一 LLM 网关)"]
+    D --> D3["FinOps 全套"]
+
+    E --> E1["SLA 99.9%"]
+    E --> E2["6 层安全防御"]
+    E --> E3["7×24 on-call"]
+
+    F --> F1["月度 review + A/B"]
+    F --> F2["季度安全审计"]
+    F --> F3["年度战略 review"]
+
+    G --> G1["跳过 PoC 直接 MVP"]
+    G --> G2["PoC 用合成数据"]
+    G --> G3["没监控就上线"]
+    G --> G4["Multi-Agent 早期"]
+    G --> G5["框架沉迷"]
+    G --> G6["不留扩展空间"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F,G cat
+    class A1,A2,A3,B1,B2,B3,C1,C2,C3,D1,D2,D3,E1,E2,E3,F1,F2,F3,G1,G2,G3,G4,G5,G6 leaf"""
+    ),
+    "未来趋势思维导图": (
+        "🔮 §14 2026-2027 Agent 8 大趋势 + 学习路径 + 数字预测.",
+        """flowchart LR
+    R(("2026-2027 趋势"))
+    R --> A["多模态 Agent"]
+    R --> B["Agent OS"]
+    R --> C["MCP/A2A 协议标准化"]
+    R --> D["Long Memory + 个性化"]
+    R --> E["小模型 + Edge"]
+    R --> F["Multi-Agent 框架收敛"]
+    R --> G["Agent 经济 (A2A)"]
+    R --> H["监管 + 标准"]
+
+    A --> A1["图/视频/音频处理普及"]
+    A --> A2["Apple Intelligence / Copilot Vision"]
+
+    B --> B1["Apple Intelligence (iOS 18)"]
+    B --> B2["Microsoft Copilot for Windows"]
+    B --> B3["华为鸿蒙 + 盘古"]
+
+    C --> C1["MCP 成事实标准"]
+    C --> C2["Server 数 1 万+"]
+    C --> C3["W3C/IETF 启动标准化"]
+
+    D --> D1["Agent 真'记得你'多年"]
+    D --> D2["主 Memory 在用户端"]
+    D --> D3["AI 助理订阅 $20-100/月"]
+
+    E --> E1["7B 小模型接近 GPT-4"]
+    E --> E2["手机/笔记本 on-device"]
+    E --> E3["隐私 + 低延迟 + 离线"]
+
+    F --> F1["三足: LangGraph / OpenAI / Anthropic"]
+    F --> F2["小框架被收购 / 关停"]
+
+    G --> G1["Agent 帮你买东西"]
+    G --> G2["B2B Agent 谈判"]
+    G --> G3["A2A 协议 + 加密支付"]
+
+    H --> H1["EU AI Act 2026.08 全生效"]
+    H --> H2["ISO 42001 (AI 管理体系)"]
+    H --> H3["Chief AI Officer 普及"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F,G,H cat
+    class A1,A2,B1,B2,B3,C1,C2,C3,D1,D2,D3,E1,E2,E3,F1,F2,G1,G2,G3,H1,H2,H3 leaf"""
+    ),
 }
 
 
