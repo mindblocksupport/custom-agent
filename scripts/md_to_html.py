@@ -2577,6 +2577,274 @@ MERMAID_DIAGRAMS: dict[str, tuple[str, str]] = {
     class A,B,C,D,E,F,G,H cat
     class A1,A2,B1,B2,B3,C1,C2,C3,D1,D2,D3,E1,E2,E3,F1,F2,G1,G2,G3,H1,H2,H3 leaf"""
     ),
+    "面试题专题思维导图": (
+        "🎯 §15 Agent 面试题 50+ 题: 基础 / 进阶 / 系统设计 / 算法 / 真实事故 5 类.",
+        """flowchart LR
+    R(("Agent 面试题 50+"))
+    R --> A["基础概念 12 题"]
+    R --> B["进阶设计 15 题"]
+    R --> C["系统设计 10 题"]
+    R --> D["算法原理 8 题"]
+    R --> E["真实事故 7 题"]
+    R --> F["答题技巧"]
+
+    A --> A1["Agent vs Workflow vs Augmented LLM"]
+    A --> A2["ReAct vs Plan-and-Execute"]
+    A --> A3["Tool Calling 6 步流程"]
+    A --> A4["Memory 三层架构"]
+    A --> A5["RAG vs Agent 关系"]
+    A --> A6["框架选型 (LangGraph/CrewAI/AutoGen)"]
+
+    B --> B1["Multi-Agent 何时上"]
+    B --> B2["死循环 8 防御"]
+    B --> B3["FinOps 12 优化"]
+    B --> B4["RAGAS 4 指标"]
+    B --> B5["Prompt Injection 防御"]
+
+    C --> C1["设计客服 Agent (Klarna)"]
+    C --> C2["设计 Code Agent (Cursor)"]
+    C --> C3["设计企业 KB (Glean)"]
+    C --> C4["设计 Multi-tenant SaaS"]
+    C --> C5["设计高并发 Agent (10K QPS)"]
+
+    D --> D1["Embedding 训练 (InfoNCE)"]
+    D --> D2["BM25 公式 + k1/b"]
+    D --> D3["HNSW 算法"]
+    D --> D4["RRF k=60 推导"]
+    D --> D5["Reranker 训练 (Cross-Encoder)"]
+    D --> D6["Lost in the Middle"]
+    D --> D7["Anthropic Contextual Retrieval"]
+
+    E --> E1["Air Canada 退票 (法律)"]
+    E --> E2["Cursor 工具内 LLM 嵌套 (烧 $200)"]
+    E --> E3["Replit 删文件"]
+    E --> E4["Klarna 49% 节省"]
+    E --> E5["Bing Sydney 暴露"]
+    E --> E6["Samsung 禁 ChatGPT"]
+    E --> E7["OpenAI Redis 跨用户"]
+
+    F --> F1["6 步答题模板"]
+    F --> F2["加分项 (论文 + 公司 + 数字)"]
+    F --> F3["反例 (空谈 / 过度自信)"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F cat
+    class A1,A2,A3,A4,A5,A6,B1,B2,B3,B4,B5,C1,C2,C3,C4,C5,D1,D2,D3,D4,D5,D6,D7,E1,E2,E3,E4,E5,E6,E7,F1,F2,F3 leaf"""
+    ),
+    "模型选型思维导图": (
+        "💎 §16 LLM 模型选型 + 2026 Pricing: 15 家主流 + 决策树 + Cascade + Reasoning.",
+        """flowchart LR
+    R(("LLM 选型 + Pricing"))
+    R --> A["国际闭源 (8 家)"]
+    R --> B["国际开源 (3 家)"]
+    R --> C["国产 (10 家)"]
+    R --> D["选型决策"]
+    R --> E["Cascade 配方"]
+    R --> F["Prompt Caching"]
+    R --> G["Reasoning Models"]
+
+    A --> A1["Claude 4.5 Sonnet/Opus/Haiku"]
+    A --> A2["GPT-5 / GPT-5 mini / nano"]
+    A --> A3["o3 / o1 (Reasoning)"]
+    A --> A4["Gemini 2.5 Pro/Flash/Lite"]
+
+    B --> B1["Llama 4 (8B-405B)"]
+    B --> B2["Mistral Large 3"]
+    B --> B3["Mixtral 8×22B"]
+
+    C --> C1["Qwen 3 (Alibaba 235B/72B/...)"]
+    C --> C2["DeepSeek V3.2 / R1 (极致便宜)"]
+    C --> C3["Kimi K2 (200万 长上下文)"]
+    C --> C4["GLM 4.6 / Z1 (智谱)"]
+    C --> C5["文心 5.0 (百度)"]
+    C --> C6["MiniMax abab 7"]
+
+    D --> D1["主语言: 中文 → 国产 / 英文 → Claude/GPT/Gemini"]
+    D --> D2["Reasoning: o3 / DeepSeek-R1"]
+    D --> D3["长上下文: Gemini 2.5 / Kimi K2"]
+    D --> D4["Code: Sonnet / o3"]
+    D --> D5["极致便宜: Haiku / GPT-5 nano / DeepSeek-V3.2"]
+
+    E --> E1["客服: Haiku 70% + Sonnet 25% + Opus 5%"]
+    E --> E2["Code: 自训 7B (Tab) + Sonnet (Composer) + o3 (Refactor)"]
+    E --> E3["RAG: Haiku 路由 + Sonnet 综合"]
+
+    F --> F1["Anthropic: cache_control 显式, 35-49% 省"]
+    F --> F2["OpenAI: 自动 cache, 50% 省"]
+    F --> F3["Gemini: CachedContent, 75% 省"]
+
+    G --> G1["o3: $60/$240, AIME 92%"]
+    G --> G2["DeepSeek-R1: ¥4/¥16 (低 27×)"]
+    G --> G3["Sonnet Extended Thinking"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F,G cat
+    class A1,A2,A3,A4,B1,B2,B3,C1,C2,C3,C4,C5,C6,D1,D2,D3,D4,D5,E1,E2,E3,F1,F2,F3,G1,G2,G3 leaf"""
+    ),
+    "三组件深度思维导图": (
+        "🔍 §17 Vector DB / Embedding / Reranker 8/12/8 家深度对比.",
+        """flowchart LR
+    R(("RAG 三组件"))
+    R --> A["Vector DB 8 家"]
+    R --> B["Embedding 12 家"]
+    R --> C["Reranker 8 家"]
+    R --> D["选型决策"]
+    R --> E["最佳配方"]
+
+    A --> A1["Pinecone (Managed 标杆)"]
+    A --> A2["Qdrant (Rust + OSS)"]
+    A --> A3["Weaviate (多模态)"]
+    A --> A4["Milvus (大规模)"]
+    A --> A5["Chroma (PoC)"]
+    A --> A6["pgvector (Postgres)"]
+    A --> A7["LanceDB (嵌入式)"]
+    A --> A8["Turbopuffer (S3 极致便宜)"]
+
+    B --> B1["OpenAI text-embed-3"]
+    B --> B2["Voyage-3 (Anthropic 推荐)"]
+    B --> B3["Cohere embed-v4 (128K)"]
+    B --> B4["Jina v3"]
+    B --> B5["BGE-M3 (中文 SOTA OSS)"]
+    B --> B6["Qwen3-Embedding-8B"]
+    B --> B7["NV-Embed-v2 (MTEB 72.3)"]
+    B --> B8["Nomic / mxbai 等"]
+
+    C --> C1["Cohere Rerank 3.5 (业界标杆)"]
+    C --> C2["Voyage Rerank-2.5"]
+    C --> C3["Jina Reranker v2"]
+    C --> C4["BGE Reranker v2-m3 (中文 SOTA)"]
+    C --> C5["mixedbread Rerank"]
+    C --> C6["ColBERT-v2 (Late Interaction)"]
+    C --> C7["RankGPT (LLM-as-judge)"]
+    C --> C8["RankLLM (OSS)"]
+
+    D --> D1["规模 < 1M: Chroma/pgvector"]
+    D --> D2["1M-100M: Qdrant/Pinecone"]
+    D --> D3["100M+: Milvus/Pinecone Pod"]
+    D --> D4["中文重 → BGE-M3 + BGE Reranker"]
+    D --> D5["英文 SOTA → Voyage-3 + Cohere"]
+
+    E --> E1["通用英文: Voyage-3 + Qdrant + Cohere"]
+    E --> E2["中文国产: BGE-M3 + Qdrant + BGE Reranker (全自托管)"]
+    E --> E3["极致便宜: Jina + Turbopuffer + Jina Rerank"]
+    E --> E4["多模态: Cohere + Weaviate + Cohere"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E cat
+    class A1,A2,A3,A4,A5,A6,A7,A8,B1,B2,B3,B4,B5,B6,B7,B8,C1,C2,C3,C4,C5,C6,C7,C8,D1,D2,D3,D4,D5,E1,E2,E3,E4 leaf"""
+    ),
+    "Observability 思维导图": (
+        "🔭 §18 Agent Observability 完整体系: Tracing / Metrics / Logs / Evaluations.",
+        """flowchart LR
+    R(("Observability"))
+    R --> A["Tracing 工具 7 家"]
+    R --> B["Metrics 15 个核心"]
+    R --> C["Logs 结构化"]
+    R --> D["Evaluations 3 类"]
+    R --> E["Dashboard 10 面板"]
+    R --> F["Alerts 4 级"]
+
+    A --> A1["LangSmith (LangChain 配套)"]
+    A --> A2["Phoenix (开源 + OTel)"]
+    A --> A3["Langfuse (开源全功能)"]
+    A --> A4["Logfire (Pydantic)"]
+    A --> A5["Helicone (LLM 代理)"]
+    A --> A6["Traceloop (OpenLLMetry)"]
+    A --> A7["Datadog APM (传统)"]
+
+    B --> B1["Quality 5 (Faithfulness/Relevance/Precision/Recall/CSAT)"]
+    B --> B2["Performance 4 (P50/P95/P99/QPS)"]
+    B --> B3["Cost 3 (per query/user/total)"]
+    B --> B4["Safety 3 (PII/Guardrail/Injection)"]
+
+    C --> C1["JSON 结构化 + trace_id"]
+    C --> C2["分级 (DEBUG/INFO/WARN/ERROR)"]
+    C --> C3["PII 入 trace 前脱敏"]
+    C --> C4["分级 retention (1d-永久)"]
+
+    D --> D1["Offline (Golden Set + CI)"]
+    D --> D2["Online (1% sample LLM-judge)"]
+    D --> D3["Human (周抽 50 case)"]
+
+    E --> E1["总览 / Quality / Latency"]
+    E --> E2["Cost / Token / Errors"]
+    E --> E3["Traffic / Tool Usage / Safety / User"]
+
+    F --> F1["P0 (灾难) → PagerDuty + 电话"]
+    F --> F2["P1 (严重) → PagerDuty + Slack"]
+    F --> F3["P2 (警告) → Slack"]
+    F --> F4["P3 (信息) → Email"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F cat
+    class A1,A2,A3,A4,A5,A6,A7,B1,B2,B3,B4,C1,C2,C3,C4,D1,D2,D3,E1,E2,E3,F1,F2,F3,F4 leaf"""
+    ),
+    "国产化 Agent 思维导图": (
+        "🇨🇳 §19 国产化 Agent + 中国 LLM 生态: 大厂派 / 创业派 / 开源派 + 合规.",
+        """flowchart LR
+    R(("国产化 Agent"))
+    R --> A["大厂派 LLM"]
+    R --> B["创业派 LLM"]
+    R --> C["开源派 LLM"]
+    R --> D["国产 Agent 框架"]
+    R --> E["国产三组件"]
+    R --> F["合规 + 信创"]
+    R --> G["真实采用"]
+
+    A --> A1["阿里 Qwen 3 (Max/72B/32B)"]
+    A --> A2["百度 文心 5.0"]
+    A --> A3["腾讯 混元"]
+    A --> A4["字节 豆包 + Coze"]
+    A --> A5["华为 盘古 (鸿蒙集成)"]
+
+    B --> B1["月之暗面 Kimi K2 (200万 上下文)"]
+    B --> B2["智谱 GLM 4.6 / Z1"]
+    B --> B3["MiniMax abab 7"]
+    B --> B4["百川 / 阶跃 / 零一万物"]
+
+    C --> C1["DeepSeek V3.2 / R1 (开源 reasoning)"]
+    C --> C2["Qwen 3 OSS (1.7B-235B 全开源)"]
+    C --> C3["MiniMax M2 OSS"]
+    C --> C4["书生·浦语 (上海 AI Lab)"]
+
+    D --> D1["AgentScope (阿里)"]
+    D --> D2["MetaGPT (Software 团队)"]
+    D --> D3["Coze (字节扣子)"]
+    D --> D4["百度文心智能体 / 腾讯元器"]
+
+    E --> E1["Vector DB: Milvus / Vearch / 腾讯/阿里云"]
+    E --> E2["Embedding: BGE-M3 / Qwen3-Embedding"]
+    E --> E3["Reranker: BGE Reranker / 阿里 GTE"]
+
+    F --> F1["个保法 (5000 万元罚款)"]
+    F --> F2["大模型备案 (网信办)"]
+    F --> F3["数据驻留 (中国境内)"]
+    F --> F4["国产硬件 (鲲鹏/昇腾/寒武纪)"]
+    F --> F5["国产 OS / DB (麒麟/TDSQL)"]
+
+    G --> G1["阿里通义 (淘宝/钉钉/高德)"]
+    G --> G2["DeepSeek 国际轰动"]
+    G --> G3["Kimi 学术/法律 数千万用户"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F,G cat
+    class A1,A2,A3,A4,A5,B1,B2,B3,B4,C1,C2,C3,C4,D1,D2,D3,D4,E1,E2,E3,F1,F2,F3,F4,F5,G1,G2,G3 leaf"""
+    ),
 }
 
 
