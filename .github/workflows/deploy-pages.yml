@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'docs/rag-knowledge-map.md'
+      - 'docs/agentic-rag-knowledge-map.md'
+      - 'docs/index.html'
       - 'scripts/md_to_html.py'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:  # 允许手动触发
@@ -36,6 +38,7 @@ jobs:
       - name: Generate HTML
         run: |
           python3 scripts/md_to_html.py docs/rag-knowledge-map.md docs/rag-knowledge-map.html
+          python3 scripts/md_to_html.py docs/agentic-rag-knowledge-map.md docs/agentic-rag-knowledge-map.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
