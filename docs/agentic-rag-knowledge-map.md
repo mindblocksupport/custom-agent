@@ -10413,6 +10413,3077 @@ if state_history.count(state_hash) >= 2: break
 
 
 
+## 二十. MCP 实战 + 完整 Server 生态深度
+
+### 20.0 MCP 实战思维导图 ⭐
+
+> 进入本章前先看这张思维导图建立全章认知.
+
+### 20.1 MCP 协议细节深度 (Anthropic 2024.11)
+
+#### 20.1.1 协议栈完整图
+- **应用层**: Tools / Resources / Prompts / Sampling / Roots / Logging
+- **会话层**: initialize / capabilities / progress / cancel
+- **消息层**: JSON-RPC 2.0 (request / response / notification)
+- **传输层**: stdio (本地) / Streamable HTTP / SSE (deprecated)
+
+#### 20.1.2 三角色完整 (Host / Client / Server)
+
+##### Host (用户应用)
+- 跑用户对话 + LLM 调用
+- 含 N 个 Client (1:1 跟 Server 对应)
+- 例: Claude Desktop / Cursor / Continue.dev / Cline / Zed
+
+##### Client (Host 内 SDK)
+- 跟单一 Server 通信
+- 协议握手 + capability 协商
+- 转换 LLM tool_use → MCP tool/call
+- 转换 tool result → LLM tool_result
+
+##### Server (工具提供方)
+- 独立进程
+- 暴露 Tools / Resources / Prompts
+- 不知 LLM 在哪 (协议解耦)
+
+#### 20.1.3 Capabilities (能力协商)
+
+##### Server capabilities (Server 声明能力)
+- tools (是否支持 tool 列表)
+- resources (是否支持 resource 列表)
+- prompts (是否支持 prompt 模板)
+- logging (是否支持服务端日志)
+
+##### Client capabilities (Client 声明能力)
+- sampling (是否允许 Server 主动调 LLM, 即 reverse direction)
+- roots (是否提供文件系统 root)
+- experimental
+
+#### 20.1.4 协议消息流 (典型握手 + tool 调用)
+
+##### Step 1 — Host 启动 Server
+- Host 启动 Server 进程 (e.g. `npx @modelcontextprotocol/server-filesystem /path`)
+- 通过 stdio 通信
+
+##### Step 2 — initialize 握手
+- Client → Server: `{"method": "initialize", "params": {"protocolVersion": "2025-03-26", "capabilities": {...}, "clientInfo": {...}}}`
+- Server → Client: `{"result": {"protocolVersion": "2025-03-26", "capabilities": {"tools": {}, "resources": {}}, "serverInfo": {"name": "filesystem", "version": "1.0"}}}`
+- Client → Server: notification `{"method": "notifications/initialized"}`
+
+##### Step 3 — 列工具
+- Client → Server: `{"method": "tools/list"}`
+- Server → Client: `{"result": {"tools": [{"name": "read_file", "description": "...", "inputSchema": {...}}, ...]}}`
+
+##### Step 4 — LLM 决定调用
+- Client 把 tools 转给 LLM (Anthropic tool_use 格式)
+- LLM 输出 tool_use {"name": "read_file", "input": {"path": "/foo/bar.txt"}}
+
+##### Step 5 — 调用工具
+- Client → Server: `{"method": "tools/call", "params": {"name": "read_file", "arguments": {"path": "/foo/bar.txt"}}}`
+- Server → Client: `{"result": {"content": [{"type": "text", "text": "file content..."}], "isError": false}}`
+
+##### Step 6 — 结果回灌 LLM
+- Client 把结果转 LLM tool_result 格式
+- LLM 看结果继续推理
+
+#### 20.1.5 Resources vs Tools 区别
+
+| 维度 | Resources | Tools |
+|---|---|---|
+| 用途 | 数据读取 (read-only) | 函数调用 (可副作用) |
+| 触发 | LLM 决定读 | LLM 决定调 |
+| 例子 | 文件 / DB row / API endpoint | search / send_email / write_file |
+| URI | resource://path | N/A (用 name) |
+| 订阅 | 支持 (resource changed 通知) | 不支持 |
+
+#### 20.1.6 Prompts (Server 提供 prompt 模板)
+- Server 暴露 prompt 模板, 用户在 Host 里选用
+- e.g. GitHub MCP Server 暴露"summarize_pr" prompt, 用户选完填参数, 转 LLM
+- 适合: 常用任务的 prompt 标准化
+
+#### 20.1.7 Sampling (Reverse direction — 实验性)
+- Server 主动请 Client 调 LLM
+- 用于: Server 内部需要 LLM 推理 (e.g. 复杂任务拆分)
+- 安全: Client 必须显式允许 (capability)
+- 实验性, 大部分 Host 不支持
+
+### 20.2 写一个 MCP Server (Python 完整教程)
+
+#### 20.2.1 环境准备
+- Python 3.10+
+- pip install mcp (官方 SDK)
+
+#### 20.2.2 最简 Server (echo tool)
+
+##### 文件结构
+- echo_server/
+  - server.py
+  - pyproject.toml
+
+##### server.py 伪代码 (描述, 不用 fence 因 md_to_xmind 跳过)
+- 导入: from mcp.server.fastmcp import FastMCP
+- 创建 server: mcp = FastMCP("echo-server")
+- 装饰器加 tool:
+  - @mcp.tool() def echo(text: str) -> str: return f"Echo: {text}"
+- 启动: if __name__ == "__main__": mcp.run()
+
+#### 20.2.3 Tool 完整定义
+
+##### 装饰器
+- @mcp.tool() — 自动生成 schema (用 type hint + docstring)
+- 函数签名 → input schema
+- docstring → description
+
+##### 高级: 自定义 schema
+- @mcp.tool() def my_tool(text: str, count: int = 10) -> dict:
+  - """描述. Args: text: ..., count: ... Returns: ..."""
+
+##### 异步 tool
+- @mcp.tool() async def fetch_url(url: str) -> str: async with aiohttp.ClientSession() as session: ...
+
+##### 错误处理
+- raise ValueError("Invalid input") → MCP 自动转 isError=true 响应
+
+#### 20.2.4 Resource 定义
+
+##### 静态 resource
+- @mcp.resource("config://app") def get_config() -> str: return "config content"
+
+##### 模板 resource (URI 含变量)
+- @mcp.resource("file://{path}") def read_file(path: str) -> str: return open(path).read()
+
+##### 列举 resources
+- @mcp.list_resources() def list_resources() -> list[Resource]: return [...]
+
+#### 20.2.5 Prompt 定义
+
+##### Prompt 模板
+- @mcp.prompt() def summarize(topic: str) -> str: return f"Summarize {topic} in 3 bullets"
+
+##### Prompt 含 args
+- 装饰器自动从函数签名生成 prompt 参数
+
+#### 20.2.6 测试 Server
+
+##### MCP Inspector (官方测试工具)
+- npx @modelcontextprotocol/inspector python server.py
+- 浏览器 UI 测试 tool / resource / prompt
+
+##### 跟 Claude Desktop 集成
+- 编辑 ~/Library/Application Support/Claude/claude_desktop_config.json:
+  - {"mcpServers": {"echo": {"command": "python", "args": ["/path/to/server.py"]}}}
+- 重启 Claude Desktop, 看到 hammer 图标 = 已连
+- 直接对话调用 tool
+
+#### 20.2.7 部署
+
+##### stdio (本地, 推荐)
+- Server 跟 Host 同机
+- mcp.run() 默认 stdio
+- 适合: 本地工具 (filesystem / git / 等)
+
+##### Streamable HTTP (远程)
+- mcp.run(transport="streamable-http", host="0.0.0.0", port=8000)
+- 跨机访问
+- 加 auth (OAuth / API key)
+
+##### Docker 部署
+- Dockerfile: FROM python:3.11 + COPY + RUN pip + CMD python server.py
+- 适合: 跨平台分发
+
+#### 20.2.8 Best Practices
+
+##### 安全
+- 永远 validate input (path traversal / SQL injection / 等)
+- 工具权限最小化 (filesystem 只能读特定 path)
+- 敏感操作加 confirmation
+
+##### 性能
+- I/O 用 async (避免阻塞)
+- 长操作返 progress
+- cache 重复 query
+
+##### 文档
+- tool description 写清: 何时用 / 何时不用 / 例子
+- 参数 description 完整
+- 加 example_invocations
+
+### 20.3 主流 Server 深度解析 (官方 7 个)
+
+#### 20.3.1 filesystem Server
+
+##### 功能
+- read_file (path) → 读文件
+- write_file (path, content) → 写文件
+- list_directory (path) → 列目录
+- create_directory (path) → 创目录
+- move_file (source, destination) → 移动
+- search_files (path, pattern) → 搜文件
+- get_file_info (path) → 文件元数据
+
+##### 配置
+- npx @modelcontextprotocol/server-filesystem /allowed/path
+- 多 path: /path1 /path2 /path3
+- 必限 path (否则可读 /etc/passwd)
+
+##### 真实采用
+- Cursor 内置
+- Claude Desktop 用户大量
+- 任何 Code Agent 都用
+
+##### 反模式
+- ❌ 允许 root path / (危险)
+- ❌ 不限文件大小 (内存爆)
+- ❌ 不过滤 binary (LLM 看不懂)
+
+#### 20.3.2 github Server
+
+##### 功能
+- list_repositories
+- get_repository
+- search_code
+- get_issue / list_issues / create_issue
+- get_pull_request / create_pull_request
+- get_file_contents
+- create_or_update_file
+- create_branch
+- list_commits
+- search_users
+
+##### 配置
+- npx @modelcontextprotocol/server-github
+- 环境变量: GITHUB_PERSONAL_ACCESS_TOKEN
+
+##### 真实采用
+- Cursor / Claude Code (都常用)
+- 自动化 PR / Issue 管理
+- 跨仓库代码搜索
+
+#### 20.3.3 postgres Server
+
+##### 功能
+- query (sql) → 执行 SQL
+- get_schema → 表结构 introspection
+- list_tables → 列表
+
+##### 配置
+- npx @modelcontextprotocol/server-postgres "postgresql://user:pass@host/db"
+
+##### 安全注意
+- read-only 模式 (默认)
+- 不要给 write 权限给 LLM (除非 HITL)
+- 限制 schema 访问
+
+##### 真实场景
+- BI 自助查询
+- 数据探索
+- 不替代 ETL (LLM 偶尔 SQL 编错)
+
+#### 20.3.4 brave-search / google-search Server
+
+##### 功能
+- web_search (query) → 搜索结果
+- local_search (query, location) → 本地结果
+
+##### 配置
+- npx @modelcontextprotocol/server-brave-search
+- API key: BRAVE_API_KEY (Brave 提供)
+
+##### 价格
+- Brave: 免费 2000 query/月, 之后 $5/1K
+- Google Custom Search: $5/1K
+- Tavily: $0.005/search
+
+##### 真实采用
+- 几乎所有 Agent 都用 web search
+- Claude Desktop / Cursor 常配
+
+#### 20.3.5 slack Server
+
+##### 功能
+- list_channels
+- list_users
+- list_messages (channel)
+- post_message (channel, text)
+- search_messages
+- add_reaction
+
+##### 配置
+- npx @modelcontextprotocol/server-slack
+- 环境变量: SLACK_BOT_TOKEN / SLACK_TEAM_ID
+
+##### 真实场景
+- Agent 监控 Slack 关键词
+- 自动回复
+- 总结频道
+
+#### 20.3.6 memory Server (KV Persistent)
+
+##### 功能
+- create_entities → 创实体
+- create_relations → 关系
+- add_observations → 加观察
+- delete_entities / delete_observations / delete_relations
+- read_graph → 读全图
+- search_nodes
+- open_nodes
+
+##### 用途
+- Agent 跨会话 Memory (Knowledge Graph 形式)
+- 持久化用户偏好
+
+#### 20.3.7 puppeteer Server
+
+##### 功能
+- navigate (url)
+- screenshot
+- click (selector)
+- fill (selector, value)
+- evaluate (script)
+
+##### 真实采用
+- Claude Desktop 浏览器自动化
+- 替代部分 Browser Use 场景
+
+### 20.4 社区 Server 分类速查 (60+ 主流)
+
+#### 20.4.1 云服务 (10+)
+- aws (AWS 多服务)
+- gcp / google-cloud
+- azure
+- cloudflare (DNS / Workers)
+- digitalocean
+- linode
+- vercel
+- netlify
+- supabase (DB + Auth)
+- firebase
+
+#### 20.4.2 SaaS 工具 (15+)
+- notion (笔记)
+- linear (issue tracker)
+- jira (Atlassian)
+- asana (任务)
+- monday
+- airtable
+- clickup
+- todoist
+- discord
+- telegram
+- whatsapp
+- gmail
+- google-calendar
+- google-drive
+- microsoft-teams
+
+#### 20.4.3 数据库 (8+)
+- postgres (官方)
+- mysql
+- sqlite
+- mongodb
+- redis
+- elasticsearch
+- snowflake
+- bigquery
+- clickhouse
+
+#### 20.4.4 开发工具 (10+)
+- github (官方)
+- gitlab
+- bitbucket
+- docker
+- kubernetes
+- terraform
+- jenkins
+- circleci
+- sentry
+- datadog
+
+#### 20.4.5 支付 / 金融 (5+)
+- stripe
+- shopify
+- square
+- paypal
+- coinbase
+
+#### 20.4.6 监控 / 运维 (5+)
+- datadog
+- grafana
+- prometheus
+- pagerduty
+- opsgenie
+
+#### 20.4.7 媒体 / 内容 (5+)
+- youtube
+- spotify
+- twitter (X)
+- reddit
+- hackernews
+
+#### 20.4.8 中国生态 (10+)
+- 阿里云 (多服务)
+- 腾讯云 (多服务)
+- 钉钉
+- 飞书
+- 微信公众号 / 企业微信
+- 高德地图
+- 百度地图
+- 新浪微博
+- 知乎
+
+### 20.5 MCP 安全模型深度
+
+#### 20.5.1 安全威胁分析
+
+##### 威胁 1 — 恶意 Server
+- 用户安装第三方 MCP Server (npm / PyPI)
+- Server 可能含恶意代码 (读敏感文件 / 上传外部)
+- 跟普通 npm 包风险一致
+
+##### 威胁 2 — Prompt Injection 通过 MCP
+- Server 返回 tool_result 含 injection 文本
+- LLM 把这文本当指令执行
+- 见 §12.1.5 间接注入
+
+##### 威胁 3 — 权限过大
+- filesystem Server 给整 / 路径
+- LLM 误调读 /etc/passwd / ~/.ssh
+
+##### 威胁 4 — 跨 Server 信息泄漏
+- Server A 读到敏感数据
+- LLM 把数据通过 Server B 上传
+
+#### 20.5.2 安全防御
+
+##### 防御 1 — Server 来源验证
+- 只用官方 / 验证过的 Server
+- npm package 签名验证
+- 自审 source code
+
+##### 防御 2 — 路径 / 范围限制
+- filesystem 限定 path
+- DB 限定 table / schema
+- 网络 限定 domain whitelist
+
+##### 防御 3 — Tool 白名单
+- 默认所有 tool 禁用
+- 用户显式启用每个 tool
+- 副作用 tool 加 HITL
+
+##### 防御 4 — Prompt Injection 检测
+- Server 输出过 LlamaGuard
+- LLM 输出过审计
+
+##### 防御 5 — Audit Log
+- 所有 MCP call 记录 (tool_name + args + result)
+- 异常告警
+
+#### 20.5.3 真实事故
+
+##### 事故 1 — 早期 filesystem MCP CVE (推测)
+- 不限路径, 可读 /etc/passwd
+- 修复: 强制 path whitelist
+
+##### 事故 2 — 某第三方 Server 含恶意代码 (推测)
+- npm publish 后被拉
+- 教训: 只用官方 + 自审
+
+##### 事故 3 — 30+ Server 同连导致工具池太大
+- LLM 选错率塌到 60%
+- 修复: 工具数 ≤ 12, 拆 hierarchical
+
+### 20.6 MCP 跨语言 SDK
+
+#### 20.6.1 官方 SDK (Anthropic 维护)
+
+| 语言 | Repo | 状态 |
+|---|---|---|
+| Python | modelcontextprotocol/python-sdk | GA |
+| TypeScript | modelcontextprotocol/typescript-sdk | GA |
+| Java | (社区, Spring AI 集成) | 在做 |
+| Kotlin | modelcontextprotocol/kotlin-sdk | GA |
+| C# | modelcontextprotocol/csharp-sdk | GA |
+| Swift | (社区) | 在做 |
+| Rust | (社区) | 在做 |
+
+#### 20.6.2 跨平台 Host
+
+##### Claude Desktop
+- 官方 (Anthropic)
+- macOS / Windows
+- 配置: claude_desktop_config.json
+
+##### Cursor
+- 内置 MCP support (2025.01)
+- 50+ 内置 Server
+- Settings → MCP Servers 加自定义
+
+##### Continue.dev
+- VSCode + JetBrains 插件
+- 类似 Cursor 但开源
+- MCP 一等公民
+
+##### Cline
+- VSCode 插件
+- 自主 Agent + MCP
+- 替代 Cursor 部分场景
+
+##### Zed
+- 现代 IDE (Rust 写)
+- MCP 集成
+
+##### Goose (Block 出品)
+- CLI Agent
+- MCP 深度集成
+- Block 内部 1000+ 员工用
+
+##### Anthropic Claude Agent SDK
+- Python / TS
+- Subagent + MCP 内置
+- Claude Code 用
+
+### 20.7 MCP vs OpenAI Tools / Functions API 对比
+
+#### 20.7.1 协议层对比
+
+| 维度 | MCP | OpenAI Functions |
+|---|---|---|
+| 协议 | JSON-RPC 2.0 | OpenAI 自定义 |
+| 跨 LLM | 是 (协议无关 LLM) | 否 (绑 OpenAI) |
+| Tool 定义 | inputSchema (JSON Schema) | parameters (JSON Schema) |
+| 部署 | 独立 Server 进程 | 嵌入应用代码 |
+| 生态 | 1000+ 社区 Server | 自己写 |
+
+#### 20.7.2 工程实践对比
+
+| 维度 | MCP | OpenAI Functions |
+|---|---|---|
+| 安装新工具 | 改 config + 重启 | 改代码 + 重部署 |
+| 跨应用复用 | 易 (Server 独立) | 难 (复制代码) |
+| 安全隔离 | 强 (独立进程) | 弱 (同进程) |
+| 调试 | 中 (跨进程) | 简单 (同进程) |
+
+#### 20.7.3 何时选哪个
+- **MCP**: Anthropic 生态 / 多应用复用 / 跨 LLM / 工具数多
+- **OpenAI Functions**: OpenAI 单一应用 / 简单场景 / 团队熟 OpenAI
+
+### 20.8 MCP 真实采用案例
+
+#### 20.8.1 Block (Square 母公司, 2025.02 公开)
+- 1000+ 员工每天用 Goose CLI Agent + 自研 MCP Server
+- 替代部分内部工具
+- 节省 30% 工程时间 (Jack Dorsey 公开)
+- 自研 Server: 内部 KB / 监控 / 部署 / 等
+
+#### 20.8.2 Anthropic 内部
+- Claude Code (CLI) 内置 filesystem / bash / git / web 等
+- 客服 Agent 内部用 MCP 连 Salesforce / Zendesk
+- 工程师 Agent 用 filesystem / github / playwright
+
+#### 20.8.3 Cursor (2025.01 集成)
+- 内置 50+ MCP Server
+- 用户可加任何 npm/PyPI MCP Server
+- 月活几百万开发者用 MCP 连企业系统
+
+#### 20.8.4 Continue.dev / Cline / Zed
+- 全部 MCP 支持
+- 跟 Cursor 竞争 (开源)
+
+#### 20.8.5 国内采用 (推测)
+- 阿里云 / 腾讯云有提供 MCP Server (国内通义 / 元宝)
+- 国内 IDE (CodeGeeX / 通义灵码 / 智码) 跟进 MCP
+
+### 20.9 MCP 演进 + 未来趋势
+
+#### 20.9.1 协议演进
+- 2024.11: MCP v1.0 发布 (Anthropic)
+- 2025.03: Streamable HTTP (替代 SSE)
+- 2025.06: GA + 生态成熟
+- 2026+: W3C 标准化讨论
+
+#### 20.9.2 生态扩张预测
+- 2026: 1 万+ MCP Server
+- 主流 SaaS / 云服务 都有官方 Server
+- IDE / Editor 全部支持
+- 企业内部系统标配 MCP 接口
+
+#### 20.9.3 跟 A2A 的关系
+- MCP: Tool ↔ Agent (单向)
+- A2A: Agent ↔ Agent (双向)
+- 2027 可能合并到统一 Agent Protocol
+
+#### 20.9.4 风险
+- Server 质量参差
+- 安全事故 (类比 npm supply chain)
+- 标准化进度 (W3C 慢)
+
+### 20.10 MCP 反模式 + 真实事故汇总
+
+#### 20.10.1 反模式 1 — 工具池过大
+- 现象: 30+ MCP Server 同时连
+- 后果: tool list 300+, LLM 选错率 60%
+- 修复: 工具数 ≤ 12, 用 Tool Retrieval / Hierarchical
+
+#### 20.10.2 反模式 2 — Server 不限路径
+- 现象: filesystem MCP 给 / 路径
+- 后果: 可读 /etc/passwd
+- 修复: path whitelist 严格
+
+#### 20.10.3 反模式 3 — 无 ACL 多用户
+- 现象: 共享 Server, 用户 A 通过 MCP 看用户 B 数据
+- 修复: Server 内部 user_id filter
+
+#### 20.10.4 反模式 4 — Server 死循环
+- 现象: Server 内部触发 LLM, LLM 又调 Server
+- 后果: Cursor 早期 1h $200
+- 修复: Server 不调 LLM, 单纯函数
+
+#### 20.10.5 反模式 5 — 直接用第三方 Server
+- 现象: 不审 source 直接 npm install
+- 后果: 恶意代码 / 数据泄漏
+- 修复: 只用官方 + 自审
+
+#### 20.10.6 反模式 6 — 跨 Server 数据泄漏
+- 现象: Server A 读敏感, Server B 上传外部
+- 修复: LLM 输出审计 + Server 间隔离
+
+#### 20.10.7 反模式 7 — 副作用 Server 不加 HITL
+- 现象: send_email / delete / transfer 自动执行
+- 修复: 副作用必 HITL
+
+
+## 二十一. Code Agent 全栈深度 — 12 主流 + 特殊技术
+
+### 21.0 Code Agent 思维导图 ⭐
+
+> 进入本章前先看这张思维导图建立全章认知.
+
+### 21.1 Code Agent 12 主流速记
+
+#### 21.1.1 总览表 (2026 Q2)
+
+| Code Agent | 公司 | 形态 | LLM | 估值 / 用户 | 主打 |
+|---|---|---|---|---|---|
+| **GitHub Copilot** | Microsoft / GitHub | IDE 插件 | GPT-5 / o3 / Claude (用户选) | 数千万付费 | 老牌 + 微软生态 |
+| **Cursor** | Anysphere | IDE (fork VSCode) | 多 LLM + 自训 | $9B (2025) | Tab + Composer + Agent |
+| **Claude Code** | Anthropic | CLI | Claude 4.5 Sonnet/Opus | (官方) | 终端 + Anthropic SDK + MCP |
+| **Devin** | Cognition | 远程 + Web | Claude / GPT / o3 | $4B (2024.12) | 无监督 SWE Agent |
+| **Aider** | Paul Gauthier | CLI (开源) | Claude / GPT (任选) | OSS, GitHub 25k+ | git-aware + map |
+| **Cline** | Saoud Rizwan | VSCode 插件 | Anthropic / OpenAI | OSS, GitHub 30k+ | 自主 Agent + MCP |
+| **Continue.dev** | Continue Inc | VSCode + JetBrains | 多家 | OSS | 替代 Copilot 开源 |
+| **OpenHands** | All Hands AI | Web + Local (开源) | 多家 | OSS, GitHub 35k+ | OpenDevin 改名, 完整 SWE |
+| **Codex (CLI)** | OpenAI | CLI | GPT-5 / o3 | (OpenAI) | OpenAI 官方 CLI |
+| **Sourcegraph Cody** | Sourcegraph | IDE 插件 | 多家 | $2.6B | 大规模 codebase 强 |
+| **Tabnine** | Tabnine | IDE 插件 | 多家 + 自训 | (老牌) | 隐私 + 企业级 |
+| **Replit Agent** | Replit | Online IDE | Claude | (Replit 内) | 零代码生成 web app |
+
+#### 21.1.2 国内 Code Agent
+
+| Code Agent | 公司 | 主打 |
+|---|---|---|
+| **通义灵码** | 阿里 | 通义千问 Code, 国产首选 |
+| **智码** | 腾讯 | 腾讯混元 Code |
+| **CodeGeeX** | 智谱 | 开源 + 商业 |
+| **百度 Comate** | 百度 | 文心 Code |
+| **MarsCode** | 字节 | 豆包 Code |
+
+### 21.2 主流 Code Agent 深度对比
+
+#### 21.2.1 GitHub Copilot 深度
+
+##### 历史
+- 2021.06 alpha, 2022.06 GA
+- 老牌, 数千万用户
+- 2024 加 Workspace (Multi-File Edit) + Chat
+- 2025 加 Agent mode + 多 LLM 选择
+
+##### 核心 Feature
+- **Tab Completion**: 老牌强项
+- **Copilot Chat**: 对话 + 引用代码
+- **Workspace** (2024): 跨多文件编辑
+- **Agent Mode** (2025): Cursor / Claude Code 跟进
+
+##### 价格
+- Individual: $10/月
+- Business: $19/seat/月
+- Enterprise: $39/seat/月
+
+##### 优劣
+- ✅ 老牌 + 微软生态 + 团队管理强
+- ✅ 多 LLM (GPT-5 / o3 / Claude / Gemini)
+- ❌ Tab quality 落后 Cursor (业界共识)
+- ❌ Agent 模式跟进慢
+
+##### 真实采用
+- 大量企业 (含 Microsoft 自家)
+- 老牌团队默认选
+
+#### 21.2.2 Cursor 深度
+
+##### 已在 §11.4 详述, 这里补 Code 特定
+
+##### Tab autocomplete 技术
+- 自训 small model 7-13B (针对代码)
+- KV cache + Speculative decoding
+- 单 token < 100ms (业界最快之一)
+- 上下文理解强 (跨文件 / 项目)
+
+##### Composer (多文件编辑)
+- ⌘+K 触发, 描述需求
+- AI 跨文件改 (用 diff 模式)
+- 原子提交 + 一键回滚
+- 适合: 中等改造 (50-500 行)
+
+##### Cursor Agent (full Agent)
+- 完整 ReAct + Tool Use
+- 跑 bash / 读 file / 用 MCP
+- 适合: 大改造 (新 feature / 重构)
+
+##### .cursorrules 文件
+- 项目根目录, 类似 CLAUDE.md
+- 写项目背景 / 编码风格 / 重要规则
+- Cursor 启动自动加载
+
+##### 隐私
+- Privacy Mode 选项
+- 默认: 数据可能用作 fine-tune
+- Privacy Mode: 完全不送 (但部分功能受限)
+
+#### 21.2.3 Claude Code (CLI) 深度
+
+##### 已在 §11.3 详述
+
+##### CLI 特色
+- 在终端跑, 没 GUI 干扰
+- 适合: 工程师 + 远程 SSH + 服务器
+- Subagent 嵌套 (大任务派 subagent)
+
+##### CLAUDE.md (Project Memory)
+- 每项目根目录
+- Claude 启动自动加载
+- 类似 .cursorrules 但更结构化 (含 commands)
+
+##### MCP 内置
+- 用户可加任何 MCP Server
+- filesystem / github / postgres / playwright 等
+- 比 Cursor 灵活
+
+##### Hooks (生命周期钩子)
+- pre_tool / post_tool / pre_llm
+- 用户可注入自定义逻辑
+- 适合: 审计 / 自动备份 / 拦截
+
+#### 21.2.4 Devin 深度
+
+##### 已在 §11.5 详述
+
+##### 远程沙盒
+- AWS / Azure 远程 VM
+- 完整 Linux 环境
+- 浏览器 + 编辑器 + 终端
+
+##### 完全自主
+- 用户描述任务 → Devin 跑几小时
+- 中间不打断 (可选打断)
+- 完成后给 PR / 报告
+
+##### 适合任务
+- ✅ 大型 greenfield (新建项目)
+- ✅ 已知重构 (Python 2→3 / Java 8→17)
+- ✅ 调研型 (实现某 paper / 加 feature)
+- ❌ 复杂 codebase (上手慢, 没 IDE 上下文)
+
+##### 价格
+- $500/月 (个人)
+- 企业版定制
+
+#### 21.2.5 Aider 深度
+
+##### 特色
+- 开源 (Apache 2.0)
+- CLI, 跟 Claude Code 类似
+- **git-aware** (每改自动 commit, 易回滚)
+- **Repository Map** (用 Tree-sitter 抽 codebase 结构)
+
+##### 工作流
+- aider 启动, 加文件: /add file1.py file2.py
+- 描述需求: "加一个 logger"
+- Aider 提议 diff
+- 用户 yes/no
+- 接受 → 自动 commit
+- 拒绝 → 重新
+
+##### Repository Map
+- 用 Tree-sitter 解析所有代码
+- 抽出: 类 / 函数 / 调用关系
+- 浓缩为 ~1000 tokens 给 LLM
+- 让 LLM 知道整 codebase 不只看到的几文件
+
+##### 真实采用
+- 个人开发者多
+- 开源贡献者
+- GitHub 25k+ stars
+
+##### 何时选
+- ✅ CLI + 开源偏好
+- ✅ Git workflow 重
+- ✅ 不想花钱 (用自己 API key)
+
+#### 21.2.6 Cline 深度
+
+##### 特色
+- VSCode 插件 (开源)
+- 完整 Agent 模式
+- 跟 MCP 深度集成
+
+##### 工作流
+- VSCode 安装 Cline
+- 配置 Anthropic / OpenAI API key
+- Sidebar 跟 Cline 对话
+- Cline 自主跑: 读文件 / 改 / 跑命令
+
+##### Plan / Act 双模式
+- Plan: Cline 先 plan 给用户 review
+- Act: 直接执行
+
+##### 真实采用
+- VSCode 用户中流行 (替代 Cursor)
+- 开源 + 免费
+
+#### 21.2.7 Continue.dev 深度
+
+##### 特色
+- VSCode + JetBrains 插件
+- 完全开源 (Apache 2.0)
+- 支持任何 LLM (本地 / API)
+- MCP 一等公民
+
+##### 类似 Copilot 但开源
+- Tab autocomplete
+- Chat
+- Slash commands
+- /edit / /comment / /test 等
+
+##### 配置文件 (config.json)
+- 模型 / 工具 / prompts / context provider
+- 用户完全控制
+
+##### 真实采用
+- 开源偏好用户
+- 自托管 LLM (Ollama)
+- 替代 Copilot
+
+#### 21.2.8 OpenHands (原 OpenDevin) 深度
+
+##### 历史
+- 2024.03 OpenDevin 项目启动 (Devin 开源版)
+- 2024.10 改名 OpenHands
+- All Hands AI 商业化 (融资)
+- GitHub 35k+ stars
+
+##### 形态
+- Web UI + Local (Docker 跑)
+- 完整 SWE Agent
+- Browser + Editor + Terminal
+
+##### LLM 支持
+- 任何 LLM (Anthropic / OpenAI / Gemini / 本地)
+- 默认 Claude
+
+##### 真实采用
+- 学术 + 自托管
+- 替代 Devin (开源 + 免费)
+
+#### 21.2.9 Codex (CLI, OpenAI) 深度
+
+##### 历史
+- OpenAI 2025.04 推出 (新版)
+- 跟早期 GitHub Copilot 同名 (Codex 模型) 不一样
+- 是 OpenAI 官方 CLI Code Agent
+
+##### 特色
+- 跟 Cursor / Claude Code 类似 CLI
+- 用 OpenAI Responses API + Computer-Using-Agent
+- 紧绑 OpenAI 生态
+
+##### 真实采用
+- OpenAI 用户
+- ChatGPT Pro 包含
+
+#### 21.2.10 Sourcegraph Cody 深度
+
+##### 特色
+- Sourcegraph 出品 (大规模代码搜索)
+- 主打"知道你整 codebase"
+- 适合: 巨型 monorepo (Google / Stripe 类)
+- 多 LLM 选择
+
+##### 真实采用
+- Stripe / Lyft / Reddit / Yelp 等大厂
+- 主打企业级
+
+#### 21.2.11 Replit Agent 深度
+
+##### 已在 §11.10 详述
+
+##### 零代码生成 web app
+- 业务方描述需求
+- Agent 写 + 跑 + 部署
+- 一键得到 live URL
+
+##### 完整集成
+- 代码 + DB + 部署 一体
+- Replit Database 内置
+- 用户无需配置
+
+#### 21.2.12 Tabnine 深度
+
+##### 特色
+- 老牌 (2018), 早于 Copilot
+- 主打企业 + 隐私
+- 自训模型 + 多家 LLM
+- 完全 air-gap 部署支持
+
+##### 真实采用
+- 金融 / 政府 / 国防 (privacy 极致)
+- 老牌团队
+
+### 21.3 国内 Code Agent
+
+#### 21.3.1 通义灵码 (阿里)
+
+##### 特色
+- 阿里通义千问 Code 系列
+- VSCode / JetBrains 插件
+- 国产首选
+- 免费 (个人版) / 企业版
+
+##### 真实采用
+- 阿里集团内部
+- 国内大量企业 (国产化)
+
+#### 21.3.2 CodeGeeX (智谱)
+
+##### 特色
+- 清华 + 智谱开源
+- 多语言 Code 模型
+- 自研 + 智谱 GLM
+
+##### 真实采用
+- 学术研究
+- 国内开源用户
+
+#### 21.3.3 智码 / 元宝代码 (腾讯)
+
+##### 特色
+- 腾讯混元 Code
+- 跟微信 / QQ / 腾讯文档融合
+
+#### 21.3.4 百度 Comate
+
+##### 特色
+- 文心一言 Code
+- 跟百度生态融合
+
+#### 21.3.5 MarsCode (字节)
+
+##### 特色
+- 字节豆包 Code
+- 跟 Coze / 飞书融合
+
+### 21.4 Code Agent 特殊技术
+
+#### 21.4.1 Tree-sitter (代码解析)
+
+##### 是什么
+- GitHub 主推, 通用语法解析器
+- 支持 100+ 语言
+- 增量 parsing (改一行不重 parse 全文件)
+- 输出 AST (抽象语法树)
+
+##### Code Agent 用途
+- 抽 codebase 结构 (类 / 函数 / 调用关系)
+- 生成 Repository Map (Aider 风)
+- 精确定位编辑点 (不用 string match)
+- Symbol 重命名 / 引用查找
+
+#### 21.4.2 LSP (Language Server Protocol)
+
+##### 是什么
+- VSCode 等 IDE 用的标准协议
+- Editor ↔ Language Server 通信
+- 提供: 自动补全 / 错误检查 / 重命名 / 跳转
+
+##### Code Agent 用途
+- 用 LSP 做精确编辑
+- 检查 LLM 改完是否还能 compile
+- 替代单纯 LLM 改 (易错)
+
+#### 21.4.3 Repository Map (Aider 创新)
+
+##### 算法
+- Step 1 — 用 Tree-sitter 解析所有源代码
+- Step 2 — 抽出 symbols (class / function / variable)
+- Step 3 — 计算 import / call 关系
+- Step 4 — PageRank 算每个 symbol 重要性
+- Step 5 — 按重要性 + token budget 选 ~1000 tokens 摘要
+- Step 6 — 注入 LLM context
+
+##### 效果
+- LLM 知道整 codebase 不只可见文件
+- 跨文件理解强
+- 适合: 中大型 codebase
+
+#### 21.4.4 Diff-based Editing
+
+##### 不直接重写文件
+- LLM 输出 diff (unified diff format)
+- 应用 diff (类似 git apply)
+- 失败 → 重试 / fallback 整文件重写
+
+##### 优势
+- 节省 token (不重写整文件)
+- 易 review (用户看 diff)
+- 易回滚
+
+##### 主流 Code Agent 都用
+- Cursor Composer
+- Aider
+- Cline
+- Claude Code
+
+#### 21.4.5 SEARCH/REPLACE Block (Aider 格式)
+
+##### 格式
+```
+file.py
+<<<<<<< SEARCH
+old code
+=======
+new code
+>>>>>>> REPLACE
+```
+
+##### 优势
+- 比 unified diff 简单
+- LLM 输出准确率高
+- Aider / Cline 都用
+
+#### 21.4.6 Tool Use for Code
+
+##### 必备 Tools
+- read_file (path) → 读
+- write_file (path, content) → 写整文件
+- edit_file (path, old, new) → SEARCH/REPLACE
+- run_bash (command) → 跑 shell
+- run_test (path) → 跑测试 (PHP / Python / etc)
+- search_code (query) → 搜代码
+- list_files (path) → 列文件
+- get_diagnostics (path) → LSP 错误
+
+##### 高级 Tools
+- create_subagent (task) → 派 subagent 做大任务
+- ask_user (question) → HITL
+- read_url (url) → 看 docs
+
+#### 21.4.7 Agent Loop for Code
+
+##### Plan-and-Execute
+- Step 1 — 用户描述任务
+- Step 2 — Agent plan (5-10 步)
+- Step 3 — 用户 review plan
+- Step 4 — Agent execute step by step
+- Step 5 — 失败 → re-plan / 重试
+- Step 6 — 完成 → 跑 test → commit
+
+##### ReAct
+- 每步 LLM 决定下一动作
+- 适合: 不确定的探索
+
+##### 实际多用 Plan + ReAct 混合
+- Plan: 先大致规划
+- 内部每步用 ReAct (具体动作)
+
+### 21.5 Code Benchmark 深度
+
+#### 21.5.1 SWE-Bench Verified (主流标准)
+
+##### 是什么
+- Princeton 2023 推出, 2024 改进版
+- 来自 12 个 Python repo 的 2294 个真实 issue
+- Verified: 人工筛 500 个 (排除歧义)
+- Agent 修 bug → 测 → pass 算 success
+
+##### 主流 Score (2026 Q2)
+- Claude Sonnet 4.5: 62%
+- Claude Opus 4.5: 68%
+- GPT-5: 64%
+- o3: 71% (SOTA)
+- DeepSeek-R1: 49%
+- Devin: 13.86% (2024.04, 当时第一)
+
+##### 跟 Real World 关系
+- SWE-Bench 高不一定真好用 (benchmark gaming)
+- 但低分一定差
+- 趋势: 2024 个位数 → 2026 70%+
+
+#### 21.5.2 HumanEval / HumanEval+
+
+##### 是什么
+- OpenAI 2021 推出
+- 164 个 Python 函数, 写实现 + 测试 pass
+- 早期标准, 现已饱和 (Sonnet 95+)
+
+##### 升级版
+- HumanEval+ (2023): 加更多测试
+- LiveCodeBench (持续更新, 防 overfit)
+- BigCodeBench
+
+#### 21.5.3 LiveCodeBench
+
+##### 特点
+- 持续更新 (避免训练数据污染)
+- 100+ 题, 含 LeetCode-style + Real-world
+- 主流 score (2026):
+  - o3: 85%
+  - Sonnet 4.5: 78.5%
+  - GPT-5: 80%
+
+#### 21.5.4 BigCodeBench
+
+##### 特点
+- BigCode 团队推出
+- 多语言 (Python / Java / JS / 等)
+- 实战风 (含 framework / library)
+
+#### 21.5.5 SWE-Bench Multimodal
+
+##### 特点
+- 2024.10 推出
+- 图 + 代码 (e.g. 看 mockup 写 UI)
+
+#### 21.5.6 RepoBench
+
+##### 特点
+- 跨多文件 codebase 任务
+- 测试 long context + repository understanding
+
+### 21.6 Code Agent 选型决策
+
+#### 21.6.1 按用户类型
+
+##### 个人开发者
+- 首选: Cursor ($20/月, Tab + Composer + Agent)
+- 备选: GitHub Copilot ($10/月, 老牌)
+- 开源: Aider / Cline / Continue (免费 + 自带 API key)
+
+##### 工程师 + 终端偏好
+- 首选: Claude Code (CLI + Anthropic SDK + MCP)
+- 备选: Aider / Codex CLI
+
+##### 业务方 / 远程任务
+- 首选: Devin ($500/月, 完全自主) / Manus
+- 备选: OpenHands (开源)
+
+##### 国内合规
+- 首选: 通义灵码 / CodeGeeX
+- 备选: 智码 / Comate / MarsCode
+
+##### 大厂 / 巨型 monorepo
+- 首选: Sourcegraph Cody
+- 备选: Cursor + Repository Map
+
+##### 极致隐私 (政府 / 国防)
+- 首选: Tabnine (air-gap)
+- 备选: Continue + 本地 Llama
+
+#### 21.6.2 按场景
+
+##### Tab autocomplete 重
+- 首选: Cursor (业界最强)
+- 备选: GitHub Copilot
+
+##### 多文件编辑
+- 首选: Cursor Composer
+- 备选: Aider / Cline
+
+##### 自主 Agent (无监督)
+- 首选: Devin / Manus / OpenHands
+- 备选: Claude Code (有 confirmation)
+
+##### MCP 重 (企业系统集成)
+- 首选: Claude Code / Cursor / Cline
+- 备选: Continue
+
+#### 21.6.3 按预算
+
+##### < $20/月
+- GitHub Copilot ($10) / Cursor Hobby ($20)
+- Aider / Cline / Continue (开源, 自带 API key)
+
+##### $20-100/月
+- Cursor Pro ($40)
+- Aider 等开源 + Claude API ($30-50/月 typical)
+
+##### $100-500/月
+- Devin ($500) / Cursor Business ($40/seat)
+
+##### $500+/月
+- Devin / Sourcegraph Cody Enterprise / Tabnine Enterprise
+
+### 21.7 Code Agent 反模式 + 真实事故
+
+#### 21.7.1 反模式 1 — 不用 Tab autocomplete
+- 现象: 只用 Chat 模式, 不用 Tab
+- 后果: 工作流慢
+- 修复: Tab + Chat 都用 (Cursor / Copilot 都强)
+
+#### 21.7.2 反模式 2 — 删除文件不加 HITL
+- Replit 事故 (§5.7.7)
+- 修复: 副作用 tool 必 HITL
+
+#### 21.7.3 反模式 3 — 工具内调 LLM 嵌套
+- Cursor 早期事故 (1h $200)
+- 修复: 工具不内调 Agent + max_iter
+
+#### 21.7.4 反模式 4 — 不限 max_iter
+- 现象: Agent 跑几小时不停
+- 后果: 成本爆 + 卡死
+- 修复: max_iter (25-50) + budget cap
+
+#### 21.7.5 反模式 5 — Agent 改完不跑测试
+- 现象: LLM 改完 commit, 不知有没 break
+- 后果: CI fail / 生产事故
+- 修复: 改完必跑相关 test
+
+#### 21.7.6 反模式 6 — 不用 Repository Map
+- 现象: LLM 只看几文件, 不知整 codebase
+- 后果: 改 A 处 break B 处
+- 修复: Aider / Sourcegraph 风的 Repo Map
+
+#### 21.7.7 反模式 7 — 不用 LSP 验证
+- 现象: LLM 改完不 compile
+- 后果: 用户跑发现 syntax error
+- 修复: 改完必跑 LSP get_diagnostics
+
+#### 21.7.8 真实事故汇总
+
+##### 事故 1 — Cursor 早期工具内调 LLM (§5.7.7)
+
+##### 事故 2 — Replit Agent 删文件 (§12.4)
+
+##### 事故 3 — Devin SWE-Bench 争议 (§11.5.6)
+- 报 13.86%, 业界扒发现部分跑多次取最佳
+- 教训: Agent benchmark 易争议, 标准化重要
+
+##### 事故 4 — GitHub Copilot 间接 Prompt Injection (2024.06 学术 demo)
+- 在 GitHub README 嵌入 prompt
+- 用户用 Copilot 时被劫持
+- 教训: Code Agent 也是 Prompt Injection 攻击面
+
+##### 事故 5 — Aider 改测试通过率掉 (用户报告 2024)
+- LLM 改完测试 pass, 但功能其实错了
+- 测试覆盖不够
+- 教训: 不要只信测试, 还要 review
+
+### 21.8 Code Agent 真实工作流
+
+#### 21.8.1 个人开发者日常 (Cursor 风)
+- 早 — 跟 Cursor Chat 描述今天目标
+- Tab — 边写边接受 autocomplete (~50% 代码)
+- Composer — 中等改造 (3-10 文件) ⌘+K 描述, AI 实现
+- Agent — 大改造 (新 feature) 完整 Agent 跑
+- 提交 — 自己 review + git push
+
+#### 21.8.2 团队工作流 (Copilot Business 风)
+- Copilot Workspace 接 GitHub issue
+- AI 提建议 (实现思路)
+- AI 写代码 → 创 PR
+- Code review (人 + AI 混)
+- Merge → CI
+
+#### 21.8.3 大型重构 (Devin 风)
+- 描述: "Python 2 → 3 全项目"
+- Devin 远程跑 (8-24h)
+- 进度可视 (Web UI 看)
+- 完成给 PR
+- 人 review + merge
+
+#### 21.8.4 SWE Agent + Bug Bounty
+- AI 跑 OSS issue → 自动修
+- Devin / OpenHands 用例
+- 但成功率仍低 (SWE-Bench 70% ≠ 真实 70%)
+
+### 21.9 Code Agent 未来趋势 (2026-2027)
+
+#### 21.9.1 趋势 1 — Agent SWE-Bench Verified > 80%
+- 2024: 13% (Devin)
+- 2025 Q4: 60-70% (Sonnet 4.5 / o3)
+- 2026: 80%+ 可能
+- 真实生产用普及
+
+#### 21.9.2 趋势 2 — IDE 全 Agent 化
+- VSCode + Cursor + Continue + Cline 都加 Agent mode
+- IDE 成 Agent Host (类 Cursor)
+
+#### 21.9.3 趋势 3 — Code Agent + DevOps 一体
+- Agent 写代码 + 测试 + 部署
+- 类 Replit Agent 但更专业
+- 业务方 self-serve
+
+#### 21.9.4 趋势 4 — 自训 Code 模型普及
+- Cursor / Tabnine / 等 都自训
+- 替代部分 API 调用
+- 节省成本 + 极致 Tab 延迟
+
+#### 21.9.5 趋势 5 — 国产 Code Agent 崛起
+- 通义灵码 / CodeGeeX 持续追上
+- 国产化合规需求
+- 中文场景优势
+
+#### 21.9.6 趋势 6 — 单人生产力 5-10×
+- Cognition / Anthropic 内部数据
+- 工程师 + Agent 配合
+- 重新定义"工程师" 角色
+
+
+## 二十二. Voice + Realtime + 多模态 Agent
+
+### 22.0 Voice + 多模态思维导图 ⭐
+
+> 进入本章前先看这张思维导图建立全章认知.
+
+### 22.1 Voice / Realtime / 多模态 是什么
+
+#### 22.1.1 一句话
+- **Voice Agent**: 语音输入 + 语音输出, 跟用户实时对话
+- **Realtime Agent**: 低延迟流式 (端到端 < 500ms), 像真人对话感觉
+- **多模态 Agent**: 文 + 图 + 视频 + 音频 + 代码 一体处理
+- **2025-2026 主流方向**, 跟 GUI Agent (§5.5) 并列
+
+#### 22.1.2 跟传统 Voice Bot 区别
+
+| 维度 | 传统 Voice Bot (Siri / Alexa 早期) | Realtime Voice Agent (2025+) |
+|---|---|---|
+| 架构 | ASR → NLU → Dialog → TTS | 端到端 LLM (audio in, audio out) |
+| 延迟 | 1-3 秒 (累积多模型) | 200-500ms (单模型) |
+| 自然度 | 机器味 | 接近真人 |
+| 中断 | 不支持 (用户说完才听) | 支持 (用户中途打断) |
+| 情感 | 平淡 | 有语调 / 情感 |
+| LLM | 简单意图分类 | 完整 LLM 推理 |
+
+### 22.2 Voice Agent 主流方案
+
+#### 22.2.1 三大派对比
+
+| 派 | 代表 | 架构 | 优势 | 劣势 |
+|---|---|---|---|---|
+| **端到端原生** | OpenAI Realtime / Gemini Live / Anthropic Voice | 单模型 audio in/out | 极致延迟 + 自然 | 闭源 + 贵 |
+| **Cascade (流水线)** | Whisper + GPT + ElevenLabs | ASR → LLM → TTS | 灵活 + 可换组件 | 累积延迟 |
+| **Hybrid** | Pipecat / Vocode | 混合 | 可调 | 复杂 |
+
+#### 22.2.2 OpenAI Realtime API (2024.10)
+
+##### 特色
+- 端到端 audio model (gpt-4o-realtime-preview)
+- WebSocket 双向流式
+- 端到端延迟 < 500ms (极致)
+- 支持中断 (interruption)
+- Function calling 内置
+
+##### 价格 (2026 Q2)
+- audio input: $40 / 1M tokens (audio token)
+- audio output: $80 / 1M tokens
+- text input: $5 / 1M
+- text output: $20 / 1M
+- (audio token ≠ text token, 1s audio ≈ 50-100 tokens)
+- 估算: 1 分钟对话 ~$0.30-1.00
+
+##### 技术细节
+- WebSocket: wss://api.openai.com/v1/realtime
+- 客户端发: audio chunks (PCM 16-bit / G.711)
+- 服务端发: audio chunks + text + tool calls
+- VAD (Voice Activity Detection) 内置
+- Turn detection 自动
+
+##### 真实采用
+- OpenAI Apps (内置)
+- 大量 Voice Agent 创业 (基于 Realtime API)
+- 客服 / 助理 / 教育
+
+#### 22.2.3 Gemini Live (Google 2024.08)
+
+##### 特色
+- Gemini 2.5 Flash / Pro 内置
+- WebSocket 双向流式
+- 支持视频 + 音频 + 文 (真多模态)
+- 屏幕分享 (Agent 看屏幕指导)
+
+##### 价格
+- 跟 Gemini Pro / Flash 类似 (按 token)
+- audio token 比 text 贵 ~2-4×
+
+##### 真实采用
+- Google Workspace 集成
+- Android 集成 (跟 Apple Intelligence 对标)
+
+#### 22.2.4 Anthropic Voice Mode (2025+)
+
+##### 状态
+- 2025 H2 推出 (具体名待 Anthropic 公开)
+- Claude 4.5 系列底层
+- WebSocket / WebRTC
+
+##### 特色
+- Anthropic 风格 (helpful / harmless / honest)
+- 跟 Claude Desktop / Claude Code 配套
+- 隐私优先
+
+#### 22.2.5 Cascade 方案 (Whisper + LLM + TTS)
+
+##### 流程
+- Step 1 — ASR (Whisper / Deepgram / AssemblyAI) audio → text
+- Step 2 — LLM (Claude / GPT / etc) text → text
+- Step 3 — TTS (ElevenLabs / Cartesia / OpenAI) text → audio
+- 累积延迟 1-3 秒
+
+##### 优势
+- 可换任意组件
+- 各组件成熟 / 便宜
+- 灵活适配业务
+
+##### 劣势
+- 延迟累积 (vs 端到端 < 500ms)
+- 不支持自然中断 (要工程实现)
+- 情感 / 语调 单调
+
+##### 真实采用
+- 大量企业内部 Voice Bot
+- 创业初期 (端到端贵)
+
+##### 主流 ASR
+- **OpenAI Whisper**: 开源 + API ($0.006/min)
+- **Deepgram**: 实时强 ($0.0043/min Nova-2)
+- **AssemblyAI**: 转录 + summarization ($0.65/h)
+- **Azure Speech**: 老牌 + 多语言
+
+##### 主流 TTS
+- **ElevenLabs**: 业界标杆, 自然度 SOTA
+- **OpenAI TTS**: 4 voices, $15/1M chars
+- **Cartesia**: 极致延迟 (<200ms)
+- **Google Cloud TTS / Azure**: 老牌
+- **Play.ht / Resemble**: voice cloning
+
+#### 22.2.6 Pipecat (Daily.co) 框架
+
+##### 是什么
+- 开源 Voice Agent 框架
+- 跟 Daily.co (WebRTC) 一体
+- 支持 Cascade + 端到端
+
+##### 真实采用
+- Daily 客户
+- Voice Agent 创业用得多
+
+#### 22.2.7 Vocode
+
+##### 是什么
+- 类 Pipecat, 开源 Voice Agent
+- 支持电话 (Twilio / Vonage)
+
+##### 真实采用
+- 客服自动化 (替代 IVR)
+
+### 22.3 Voice Agent 工程挑战
+
+#### 22.3.1 挑战 1 — 延迟
+
+##### 端到端预算 < 500ms (流畅对话)
+- 网络: 50-100ms (好网络)
+- ASR: 100-300ms
+- LLM: 200-500ms (含 TTFT)
+- TTS: 100-200ms
+- 总和容易超 800ms (Cascade 难)
+
+##### 优化
+- 端到端 LLM (单模型)
+- Speculative TTS (LLM 生成中边 TTS 边播)
+- Edge inference (LLM 在 CDN 节点)
+- WebRTC 优化网络
+
+#### 22.3.2 挑战 2 — 中断
+
+##### 用户说话中 Agent 也说
+- 需要 VAD (Voice Activity Detection) 实时
+- 检测到用户 voice → Agent 立刻停说
+- LLM context 加 [user interrupted]
+
+##### 主流实现
+- WebRTC 监听 mic + speaker
+- 用 silero / WebRTC VAD
+- 停 TTS 立即
+
+#### 22.3.3 挑战 3 — Turn Detection
+
+##### 谁该说话
+- 简单: 静音 1s 算 turn 结束
+- 复杂: 用 LLM 判断 (语义)
+- OpenAI Realtime 内置 turn_detection
+
+#### 22.3.4 挑战 4 — Function Calling 时延迟
+- LLM 调 tool 时, Agent 沉默 (1-3s)
+- 用户感觉"卡了"
+- 优化:
+  - tool 调用前说"稍等" (filler)
+  - 后台调 tool, 同时继续对话 (难)
+  - tool 缓存
+
+#### 22.3.5 挑战 5 — 情感 / 语调
+- 端到端 LLM 输出含情感 (强)
+- Cascade 的 TTS 难自然 (除非 ElevenLabs)
+- 情感识别 (用户语气): 仍弱
+
+### 22.4 多模态 Agent (Vision + Audio + Video)
+
+#### 22.4.1 多模态 LLM 主流 (2026 Q2)
+
+| LLM | 输入 | 输出 |
+|---|---|---|
+| Claude Sonnet 4.5 | 文 + 图 | 文 |
+| GPT-5 / GPT-5o | 文 + 图 + 音频 | 文 + 音频 |
+| Gemini 2.5 Pro | 文 + 图 + 视频 + 音频 | 文 |
+| Qwen 3 VL | 文 + 图 | 文 |
+| GLM-4V | 文 + 图 | 文 |
+| Gemini Live | 文 + 图 + 视频 + 音频 | 文 + 音频 |
+
+#### 22.4.2 Vision Agent
+
+##### 应用场景
+- **客服**: 用户拍照诊断退货
+- **教育**: 看作业批改 + 讲解
+- **医疗**: 看 X 光 / 病理 (辅助, 非诊断)
+- **制造**: 看产品质检
+- **设计**: 看 UI mockup 改 → 实现
+- **GUI Agent** (§5.5): Computer Use 看屏幕
+
+##### 价格
+- 图 token 比文 token 贵 (单图 ~ 1500 tokens)
+- Sonnet 4.5: 单图 ~$0.005
+- Gemini 2.5 Pro: 单图 ~$0.002
+
+##### 反模式
+- ❌ 不限图大小 (1 MB+ 图浪费)
+- ❌ 不预处理 (resize / crop / OCR 先)
+- ✅ 标配: resize 到 1024px + OCR 文字 + 然后给 LLM
+
+#### 22.4.3 Video Agent
+
+##### 现状 (2026 Q2)
+- **Gemini 1.5/2.5**: 1M-2M context, 能看 1+ 小时视频
+- **GPT-5**: 视频弱 (主要图 + 音频)
+- **Sora 2** (OpenAI): 视频生成 SOTA
+- **Veo 3** (Google): 视频生成
+
+##### 应用场景
+- **会议总结**: 1h 会议视频 → 摘要 + 待办
+- **教学视频**: 课程视频 → 笔记 + 习题
+- **监控分析**: 安防视频 → 事件检测
+- **YouTube 摘要**: 长视频快速看核心
+
+##### 价格
+- 1 分钟视频 ~ 10K-50K tokens (Gemini)
+- 1 小时视频 ~ $1-5 (Gemini Pro)
+
+##### 工程挑战
+- 视频上传慢
+- 处理慢 (分钟级)
+- token 贵
+- 当前生产采用少
+
+#### 22.4.4 Audio Agent (非 Voice 对话)
+
+##### 应用场景
+- 转录 (ASR): Whisper / Deepgram
+- 摘要长会议
+- Podcast 翻译
+- 音频内容审核
+
+##### 跟 Voice Agent 区别
+- Audio Agent: 异步处理 (上传 → 等结果)
+- Voice Agent: 实时对话 (双向流式)
+
+### 22.5 Voice + Realtime 真实采用
+
+#### 22.5.1 OpenAI Apps (Realtime 内置)
+- ChatGPT app 自带 Voice Mode
+- 数千万用户
+- 日常对话 / 翻译 / 教育
+
+#### 22.5.2 Apple Intelligence (Siri 重写)
+- iOS 18 Siri 完全重写为 LLM
+- 跟 ChatGPT (OpenAI) 集成
+- on-device + cloud 混合
+
+#### 22.5.3 Google Gemini in Android
+- Android 集成
+- 跟 Workspace 一体
+- 视频 + 音频 全部支持
+
+#### 22.5.4 Microsoft Copilot Voice
+- Windows 11 集成
+- 跟 Copilot 一体
+
+#### 22.5.5 Klarna Voice (推测)
+- 客服 Voice 模式扩展
+- 用 OpenAI Realtime / Anthropic Voice
+
+#### 22.5.6 Replit Agent + Voice
+- 用 Voice 描述需求, Replit 写代码
+
+#### 22.5.7 中国
+- 字节豆包 Voice (移动 app)
+- 智谱清言 Voice
+- 火山方舟 Realtime API
+- 阿里云语音对话 API
+
+### 22.6 多模态 Agent 真实采用
+
+#### 22.6.1 Klarna 客服 (照片诊断)
+- 用户拍照 → Sonnet 4.5 看 → 诊断退货可行性
+
+#### 22.6.2 Cursor / Claude Code (设计图实现)
+- 用户贴 UI mockup → AI 实现 React / SwiftUI
+
+#### 22.6.3 NotebookLM (Google)
+- 用户上传 PDF / 视频 / 音频 → AI 综合 → Q&A
+- "Audio Overview": 自动生成 podcast 风格摘要
+
+#### 22.6.4 Anthropic 内部 (Computer Use)
+- 桌面 GUI Agent (看屏幕 + 操作)
+
+#### 22.6.5 NVIDIA AI Agent (制造)
+- 工厂监控视频 + Agent 检测异常
+- 替代部分人工巡检
+
+### 22.7 工程架构 — Voice / Realtime Agent 完整栈
+
+#### 22.7.1 客户端
+- **Web**: WebRTC / WebSocket
+- **iOS / Android**: Native + WebRTC
+- **桌面**: Electron / Native
+
+#### 22.7.2 接入层
+- WebRTC SFU (Daily.co / LiveKit / Twilio)
+- WebSocket gateway
+
+#### 22.7.3 媒体处理
+- VAD (silero / WebRTC VAD)
+- 噪音抑制 (RNNoise / NVIDIA Maxine)
+- Echo cancellation
+- 编解码 (Opus / G.711)
+
+#### 22.7.4 LLM 接入
+- OpenAI Realtime / Gemini Live (端到端)
+- 或 Whisper + Sonnet + ElevenLabs (Cascade)
+
+#### 22.7.5 工具 / 业务
+- Function Calling (Realtime API 内置)
+- 业务 API
+- DB / KB
+
+#### 22.7.6 监控
+- 全程 trace (latency 每段 / 总)
+- 用户满意度 (👍 / 👎)
+- 成本 (按 audio token)
+
+### 22.8 Voice Agent 反模式
+
+#### 22.8.1 反模式 1 — Cascade 用在追求极致延迟
+- 现象: 客服需要 < 500ms, 用 Whisper + GPT + ElevenLabs (累积 1-2s)
+- 修复: 用 OpenAI Realtime / Gemini Live (端到端)
+
+#### 22.8.2 反模式 2 — 不实现中断
+- 现象: 用户说话 Agent 还在说
+- 后果: 用户沮丧
+- 修复: VAD 监听 + 即时 stop TTS
+
+#### 22.8.3 反模式 3 — Function Call 时沉默
+- 现象: 调 tool 1-3s, 用户感觉"卡了"
+- 修复: 加 filler ("稍等, 帮你查...")
+
+#### 22.8.4 反模式 4 — 不限通话时长
+- 现象: 用户挂着不挂, 烧 audio token
+- 后果: 单用户月 $100+
+- 修复: 30 分钟自动提醒 + budget cap
+
+#### 22.8.5 反模式 5 — 不监控延迟
+- 现象: 上线后延迟漂移到 1s+, 用户走
+- 修复: 实时监控每段 latency
+
+#### 22.8.6 反模式 6 — TTS 不缓存常用回复
+- 现象: 每次 "您好" 都跑 TTS, 浪费
+- 修复: 常用 TTS 缓存 (audio file)
+
+### 22.9 Voice / 多模态 Agent 未来 (2026-2027)
+
+#### 22.9.1 趋势 1 — 端到端 Voice 取代 Cascade
+- OpenAI Realtime / Gemini Live / Anthropic Voice 普及
+- Cascade 仅在边缘 / 旧设备
+
+#### 22.9.2 趋势 2 — 视频 Agent 实时化
+- 当前: 异步 (上传 → 等)
+- 2026+: Realtime Video Agent (Gemini Live 已起步)
+- 应用: Agent 跟你看屏幕指导
+
+#### 22.9.3 趋势 3 — 情感 + 个性化
+- LLM 学用户语气
+- 不同情绪用不同 voice
+- 接近"真人"
+
+#### 22.9.4 趋势 4 — 价格暴跌
+- 当前 audio token 贵 (10× text)
+- 2026-2027 跟 text 价格收敛
+
+#### 22.9.5 趋势 5 — 多模态原生 Agent OS
+- Apple Intelligence / Google Gemini OS / 鸿蒙
+- 用户跟 Agent 自然交互 (说 + 看 + 听)
+- 替代部分 GUI 操作
+
+#### 22.9.6 趋势 6 — Voice Agent 进电话
+- 替代部分客服电话 (95%+ 解决率)
+- 替代部分销售外呼
+- 替代医疗预约 / 客户回访
+
+### 22.10 Voice Agent 上线 Checklist
+
+#### 22.10.1 技术
+- [ ] LLM 选定 (Realtime / Gemini Live / Cascade)
+- [ ] VAD + 中断支持
+- [ ] WebRTC / WebSocket 接入
+- [ ] Function Calling 集成
+- [ ] 噪音抑制 + Echo cancellation
+- [ ] 监控 latency 每段
+
+#### 22.10.2 业务
+- [ ] 用例明确 (客服 / 助理 / 教育)
+- [ ] ROI 估算 (vs 人工)
+- [ ] 用户测试 (10 人 1 周)
+- [ ] 错误兜底 (听不懂 → 转人工 / 文字)
+
+#### 22.10.3 安全
+- [ ] PII 过滤 (audio 转 text 后)
+- [ ] 录音存储 (合规)
+- [ ] 用户同意录音
+- [ ] 数据驻留
+
+#### 22.10.4 成本
+- [ ] 单分钟成本估
+- [ ] 通话时长上限
+- [ ] 用户级 budget
+
+#### 22.10.5 质量
+- [ ] 准确率 (转录 + 答案)
+- [ ] 用户满意度 (👍 / 👎)
+- [ ] 自然度 (人评)
+
+
+## 二十三. Prompt Engineering 进阶 + LLM Inference 优化
+
+### 23.0 Prompt + Inference 思维导图 ⭐
+
+> 进入本章前先看这张思维导图建立全章认知.
+
+### 23.1 Prompt Engineering 核心原则 (Anthropic / OpenAI 风格)
+
+#### 23.1.1 6 大核心原则
+
+##### 原则 1 — 清晰 + 具体
+- 不: "总结这文档"
+- 好: "用 3 个 bullet 总结这文档的核心论点, 每点 < 30 字, 含数字证据"
+
+##### 原则 2 — 用例子 (Few-shot)
+- LLM 看 1-3 个例子比纯描述强 5-10×
+- 例子要 cover 边缘 case
+- 例子放在指令后, 用 XML 包
+
+##### 原则 3 — 给 LLM 思考空间 (CoT)
+- "Let's think step by step" (Wei 2022)
+- 或更具体: "First analyze X, then Y, finally Z"
+- Reasoning 模型 (o3 / R1) 内置 CoT 不需提
+
+##### 原则 4 — 结构化输出
+- JSON / XML / Markdown
+- 用 schema 强约束 (OpenAI strict / Pydantic)
+- 易解析 + 易验证
+
+##### 原则 5 — 用 XML 包重要内容
+- Anthropic 强烈推荐: `<context>...</context>`, `<example>...</example>`, `<task>...</task>`
+- LLM 在 XML 内"专注模式"
+- 防 prompt injection
+
+##### 原则 6 — 给角色 (Role)
+- "You are a senior backend engineer with 10 years experience"
+- 让 LLM 进入特定 mindset
+- 但别过度 (LLM 不真"是" engineer)
+
+#### 23.1.2 System Prompt 设计模板 (Anthropic 风)
+
+##### 完整结构 (描述, 不用 fence)
+- 1. 角色 + 背景
+- 2. 任务目标
+- 3. 输入说明
+- 4. 输出要求 (格式 + 长度 + 风格)
+- 5. 约束 (不要做什么)
+- 6. Few-shot 例子 (1-3 个, 含边缘)
+- 7. 边缘处理 (无信息 / 不确定 / 越权 怎么办)
+- 8. Final 提醒
+
+#### 23.1.3 OpenAI vs Anthropic 风格差异
+
+| 维度 | Anthropic (Claude) | OpenAI (GPT) |
+|---|---|---|
+| Markdown 用 | 强 (用很多结构) | 中 |
+| XML 用 | 强烈推荐 | 不强调 |
+| Role | 用 system message | 用 system message |
+| 长 prompt | 适应好 | 适应中 (10K+ 退化明显) |
+| Few-shot 位置 | 指令后, XML 包 | 指令后, 自由 |
+| 思考模式 | <thinking>...</thinking> 内省 | 不需 (o1/o3 内置) |
+
+### 23.2 高级 Prompt 技巧
+
+#### 23.2.1 Chain-of-Thought (CoT) — Wei 2022
+
+##### 标准 CoT
+- 加 "Let's think step by step"
+- LLM 输出推理 + 答案
+- GSM8K (数学): 17.9% → 56.4% (+213%)
+
+##### Manual CoT (示例引导)
+- Few-shot 含 reasoning chain
+- 比 zero-shot CoT 好 5-10%
+
+##### Self-Consistency CoT (Wang 2022)
+- 同 prompt 跑多次 (temperature > 0)
+- 选多数 (majority vote)
+- GSM8K +13% on top of CoT
+
+#### 23.2.2 Tree of Thoughts (ToT) — Yao 2023.05
+
+##### 已在 §8.8 详述
+- 探索思考树, BFS/DFS 剪枝
+- Game of 24: CoT 4% → ToT 74%
+
+#### 23.2.3 Plan-and-Solve — Wang 2023.05
+
+##### 已在 §8.9
+- "Let's first understand the problem and devise a plan to solve it. Then carry out the plan step by step"
+- GSM8K: CoT 78 → PS 82.5
+
+#### 23.2.4 Reflexion — Shinn 2023.03 (§8.7)
+
+#### 23.2.5 Constitutional AI (Anthropic 2022)
+
+##### 是什么
+- LLM 自己根据 "宪法" 评判输出 + 改进
+- 训练时用, 推理时也可用
+
+##### 推理时用法
+- Step 1 — LLM 输出初稿
+- Step 2 — 同 LLM 看初稿, 按"宪法" critique
+- Step 3 — LLM 改进
+- 类似 Reflexion 但用宪法 (固定准则)
+
+#### 23.2.6 Meta-Prompting
+
+##### 是什么
+- 让 LLM 帮你写 prompt
+- e.g. "Write a system prompt for a customer service agent that ..."
+- 适合: 不会写 prompt 时
+
+##### Anthropic Prompt Generator
+- 官方工具 (console.anthropic.com)
+- 输入需求, 自动生成完整 system prompt
+
+#### 23.2.7 Skeleton-of-Thought (SoT)
+
+##### 是什么
+- LLM 先生成大纲 (skeleton)
+- 然后并行填充每节
+- 加速长输出 2-5×
+
+##### 应用
+- 长报告生成
+- 多视角分析
+- 不适合: 强连贯文本
+
+#### 23.2.8 Step-Back Prompting (Google 2023)
+
+##### 是什么
+- 让 LLM 先抽象问题再答
+- "Before answering, what's the more general question?"
+- 适合: 复杂特定问题
+
+#### 23.2.9 Decomposition (Least-to-Most)
+
+##### 是什么
+- 把复杂问题拆成简单子问题
+- 逐个解决
+- 适合: 数学 / 编程 多步问题
+
+#### 23.2.10 Chain-of-Verification (CoVe) — Meta 2023
+
+##### 是什么
+- LLM 答完后, 自己生成验证问题
+- 答验证问题
+- 改进答案
+- 反幻觉
+
+### 23.3 Structured Outputs (结构化输出)
+
+#### 23.3.1 为什么结构化
+- LLM 自由文本难解析 (regex / parsing 易错)
+- 业务系统需要 schema (DB / API)
+- 减少 hallucination (schema 约束)
+
+#### 23.3.2 OpenAI Structured Outputs (2024.08)
+
+##### 用法 (伪代码)
+- response_format = {"type": "json_schema", "json_schema": {"name": "user", "strict": True, "schema": {...}}}
+- 或 Pydantic: response = client.beta.chat.completions.parse(response_format=UserSchema)
+
+##### 限制
+- strict 模式不支持: anyOf / 嵌套递归 / 某些 JSON Schema 特性
+- 准 100% 符合 schema (OpenAI 官方保证)
+
+##### 真实采用
+- 几乎所有 OpenAI 项目结构化输出场景
+- 极大简化代码
+
+#### 23.3.3 Anthropic Structured Outputs
+
+##### 用 Tool Use 模拟
+- 定义一个 tool (e.g. extract_user_info)
+- Force tool_choice = {"type": "tool", "name": "extract_user_info"}
+- LLM 必输出该 tool 的 input schema
+- 等于结构化输出
+
+##### 优势
+- 不需特殊 API
+- input_schema 完整 JSON Schema 支持
+
+#### 23.3.4 Pydantic AI (类型安全)
+
+##### 用法
+- class User(BaseModel): name: str; age: int
+- agent = Agent(model="...", result_type=User)
+- result = agent.run_sync("...")
+- result.data — 强类型 User 对象
+
+##### 优势
+- Python type hints 友好
+- 编译期类型检查
+- 跟 FastAPI 一致体验
+
+#### 23.3.5 Outlines (开源)
+
+##### 是什么
+- 用 grammar / regex 强制 LLM 输出
+- 支持任何 LLM (含开源)
+- HuggingFace 集成
+
+##### 适合
+- 自托管开源 LLM 结构化输出
+- 复杂 grammar (e.g. JSON / SQL / 自定义)
+
+### 23.4 LLM Inference 优化深度
+
+#### 23.4.1 关键概念
+
+##### Tokens
+- LLM 输入输出最小单位
+- BPE / SentencePiece tokenization
+- 1 英文 token ≈ 0.75 词
+- 1 中文 token ≈ 0.5-1.5 字 (取决 tokenizer)
+
+##### Attention
+- LLM 核心机制 (Transformer)
+- 计算复杂度 O(n²) on context length
+- 长 context → 慢 + 贵
+
+##### KV Cache
+- Key/Value tensors 缓存
+- 同 prompt 重复 query 复用
+- 节省 50-90% latency on long context
+
+##### TTFT (Time To First Token)
+- 第一个 token 延迟
+- 用户感知"快慢"主要看这个
+- 流式 (streaming) 关键
+
+##### TPS (Tokens Per Second)
+- 输出速度
+- 决定长答案多久输出完
+
+#### 23.4.2 Inference 框架 7 主流
+
+| 框架 | 公司 | 主打 | License |
+|---|---|---|---|
+| **vLLM** | UC Berkeley | PagedAttention 主推 | Apache 2.0 |
+| **SGLang** | UC Berkeley | RadixAttention + KV 复用 | Apache 2.0 |
+| **TensorRT-LLM** | NVIDIA | NVIDIA GPU 极致 | NVIDIA |
+| **TGI (Text Generation Inference)** | HuggingFace | 易用 + HF 集成 | Apache 2.0 |
+| **Ollama** | Ollama | 本地 / Mac M-series | MIT |
+| **llama.cpp** | ggerganov | CPU + GGUF | MIT |
+| **LMDeploy** | InternLM | 中国生态 | Apache 2.0 |
+
+#### 23.4.3 vLLM 深度
+
+##### 核心创新 — PagedAttention
+- 类比 OS 虚拟内存
+- 把 KV cache 分页存
+- 提升 GPU 内存利用率 24×
+- 吞吐 2-4× vs HF transformers
+
+##### 适合
+- 大规模 serving (batch + concurrent)
+- 多用户共享 GPU
+
+##### 真实采用
+- 大量公司自托管 LLM 用
+- vLLM project lead 的 Anyscale 商业化
+
+#### 23.4.4 SGLang 深度
+
+##### 核心创新 — RadixAttention
+- 自动复用相同 prefix 的 KV cache
+- 跨 query / 跨用户 KV 共享
+- 比 vLLM 更适合 multi-turn / 多用户共享 system prompt
+
+##### 适合
+- Agent (多 query 共 system prompt)
+- 多 turn 对话 (前 N 轮共享)
+
+##### 真实采用
+- 2025 Q2 起逐步取代 vLLM 部分场景
+- xAI Grok 用 SGLang
+
+#### 23.4.5 TensorRT-LLM 深度
+
+##### 核心
+- NVIDIA 自家, 极致 GPU 优化
+- INT8 / FP8 量化
+- 多 GPU tensor parallelism
+- 比 vLLM 快 1.5-3× (NVIDIA GPU)
+
+##### 适合
+- 极致性能 + NVIDIA GPU
+- 大规模 serving
+
+##### 劣势
+- 编译 model 麻烦
+- NVIDIA only
+
+#### 23.4.6 Ollama 深度
+
+##### 核心
+- 本地推理框架
+- Mac M-series 优化 (Metal)
+- 一行命令: ollama run llama3.2
+
+##### 适合
+- 个人开发者
+- 本地实验
+- 隐私场景
+
+##### 真实采用
+- 大量个人开发者
+- Continue.dev / Cursor / Cline 都支持 Ollama
+
+#### 23.4.7 llama.cpp 深度
+
+##### 核心
+- C++ 极致优化
+- 支持 GGUF 格式 (量化 4-bit / 8-bit)
+- CPU 也能跑 (慢但可)
+
+##### 适合
+- Edge / 嵌入式
+- 量化模型
+
+#### 23.4.8 主流 Inference 优化技术
+
+##### 技术 1 — KV Cache
+- 必须 (所有框架内置)
+- 节省 50-90% latency on long context
+
+##### 技术 2 — Continuous Batching
+- 多 query 动态拼 batch (vs static batching)
+- 提升 GPU 利用率 2-5×
+
+##### 技术 3 — PagedAttention (vLLM)
+- KV 分页
+- 已述 §23.4.3
+
+##### 技术 4 — RadixAttention (SGLang)
+- KV 跨 query 共享
+- 已述 §23.4.4
+
+##### 技术 5 — Speculative Decoding
+- Small model 预测, Big model 验证
+- 加速 2-3×
+- 主流 LLM provider 内置 (用户不感知)
+
+##### 技术 6 — Quantization
+- FP16 → INT8 / INT4 / FP8
+- 节省 50-87% 内存
+- 略损精度 (1-3%)
+
+##### 技术 7 — Tensor Parallelism / Pipeline Parallelism
+- 多 GPU 拆模型
+- 大模型 (70B+) 必需
+
+##### 技术 8 — FlashAttention
+- 算法优化, 减少内存读写
+- FlashAttention-3 (2024) 在 H100 上接近理论极限
+
+#### 23.4.9 Quantization 详解
+
+##### 类型
+- **FP16 / BF16**: 16-bit, 最常用 baseline
+- **INT8**: 8-bit, 减半内存, 略损精度
+- **INT4**: 4-bit, 1/4 内存, 损失 1-5%
+- **FP8** (H100+): 8-bit float, 接近 FP16 精度
+
+##### 主流量化方法
+- **GPTQ** (2022): 训后 INT4, 主流
+- **AWQ** (2023): 训后 INT4, 比 GPTQ 准
+- **GGUF** (llama.cpp): 多 bit (Q2-Q8) 灵活
+- **AQLM** (2024): 极致 2-bit (但损失大)
+
+##### 何时用
+- ✅ 自托管节省 GPU 内存
+- ✅ Edge / 嵌入式
+- ❌ Cloud serving (provider 自己量化, 用户不需关心)
+
+#### 23.4.10 自托管 vs API 决策
+
+##### 自托管 break-even
+- 7B 模型: ~1K QPS 持续
+- 70B 模型: ~5K QPS 持续
+- 405B 模型: ~10K QPS 持续
+
+##### 计算
+- 月 GPU 成本: 8 × H100 ~ $30K (云) / $400K (自购)
+- API 成本: $3/Mtok (Sonnet) × 2K tokens × 1K QPS × 86400 × 30 = $15.5M
+- 1K QPS 才 break even (Sonnet 价格)
+
+##### 何时自托管
+- ✅ Privacy 极致 (政府 / 国防 / 金融)
+- ✅ 高 QPS (5K+ 持续)
+- ✅ 特殊定制 (LoRA / fine-tune)
+- ❌ 中小规模 (< 1K QPS)
+
+### 23.5 Prompt Engineering 真实采用
+
+#### 23.5.1 Anthropic 内部 (Prompt Engineering Best Practices 2024.10 公开)
+- XML tags 重度用
+- Few-shot 标配
+- 长 prompt + Prompt Caching
+- Constitutional AI 内置 Claude 训练
+
+#### 23.5.2 OpenAI 内部
+- ChatGPT 系统 prompt 已被多次泄漏
+- Markdown 重 + role-play
+- 多 layer (system + developer + user)
+
+#### 23.5.3 Cursor system prompt
+- 已被泄漏 (~5K tokens)
+- 含: 角色 / 工作流 / 工具 / 编码风格 / 边缘处理
+- 结构化清晰
+
+#### 23.5.4 Klarna Agent prompt (推测)
+- 多语言模板
+- Few-shot 客服 case
+- 升级人工触发条件
+
+### 23.6 Inference 优化真实采用
+
+#### 23.6.1 vLLM 用户
+- Anyscale (vLLM 团队商业化)
+- 大量初创自托管
+- LMSYS Chatbot Arena 内部
+
+#### 23.6.2 SGLang 用户
+- xAI Grok serving
+- 国内自托管 (Qwen / DeepSeek)
+
+#### 23.6.3 TensorRT-LLM 用户
+- NVIDIA 自家
+- 大型 GPU 集群 (Anthropic / OpenAI 内部部分推测)
+
+#### 23.6.4 Ollama 用户
+- 个人开发者
+- 创业 PoC
+- Continue.dev / Cline / Cursor 集成
+
+### 23.7 Prompt Engineering 反模式
+
+#### 23.7.1 反模式 1 — 模糊 prompt
+- 现象: "总结这个" (无 length / 格式)
+- 修复: 具体 (3 bullets / 30 字 / 含数字)
+
+#### 23.7.2 反模式 2 — 不用 few-shot
+- 现象: 复杂任务纯描述
+- 修复: 1-3 个例子, XML 包
+
+#### 23.7.3 反模式 3 — 不结构化输出
+- 现象: 业务系统解析自由文本
+- 修复: JSON Schema (OpenAI strict / Anthropic Tool Use)
+
+#### 23.7.4 反模式 4 — 长 prompt 不缓存
+- 现象: 5K tokens system prompt 每次重发
+- 修复: Prompt Caching (Anthropic / OpenAI / Gemini)
+
+#### 23.7.5 反模式 5 — 假设 LLM 知道格式
+- 现象: "总结成 markdown" 但不说 H1/H2 用法
+- 修复: 给 example markdown
+
+#### 23.7.6 反模式 6 — 角色过度
+- 现象: "You are an omniscient AGI"
+- 后果: LLM 自信但易错
+- 修复: 现实角色 ("senior engineer" 等)
+
+#### 23.7.7 反模式 7 — 不考虑边缘
+- 现象: prompt 没说"不知道时怎么办"
+- 后果: LLM 编造 (hallucination)
+- 修复: "If you don't know, say 'I don't know'"
+
+### 23.8 Inference 优化反模式
+
+#### 23.8.1 反模式 1 — 自托管太早
+- 现象: 100 QPS 就自托管 8 H100
+- 后果: 月烧 $30K, API 才 $1K
+- 修复: < 1K QPS 用 API
+
+#### 23.8.2 反模式 2 — 不量化大模型
+- 现象: 70B 模型 FP16 跑, 8 × A100 才能装
+- 修复: INT4 量化, 2 × A100 够
+
+#### 23.8.3 反模式 3 — 用 HF Transformers serving
+- 现象: 直接 .generate() serving
+- 后果: 慢 5-10× vs vLLM
+- 修复: 必用 vLLM / SGLang
+
+#### 23.8.4 反模式 4 — 不用 Continuous Batching
+- 现象: 单次 batch=1
+- 后果: GPU 利用率 < 30%
+- 修复: vLLM 等内置 continuous batching
+
+#### 23.8.5 反模式 5 — 不监控 GPU 利用率
+- 现象: GPU 闲置 60%, 浪费成本
+- 修复: nvtop / DCGM 监控 + scale 调整
+
+### 23.9 Prompt + Inference 上线 Checklist
+
+#### 23.9.1 Prompt
+- [ ] System prompt 完整 (8 部分)
+- [ ] Few-shot 1-3 例
+- [ ] XML 包关键内容 (Anthropic)
+- [ ] 结构化输出 (JSON Schema / Tool Use)
+- [ ] Prompt Caching (35-49% 省)
+- [ ] 边缘处理 (无信息 / 不确定)
+- [ ] 反 Prompt Injection 加固
+
+#### 23.9.2 Inference (自托管)
+- [ ] vLLM / SGLang 选定
+- [ ] KV cache + Continuous batching
+- [ ] PagedAttention / RadixAttention
+- [ ] Quantization (按需)
+- [ ] GPU 利用率监控
+- [ ] Speculative decoding (按需)
+- [ ] 多 GPU tensor parallelism (大模型)
+
+#### 23.9.3 Inference (API)
+- [ ] LiteLLM / Portkey 中间层
+- [ ] Prompt Caching 启用
+- [ ] Streaming
+- [ ] 多 provider 备份 (failover)
+- [ ] 成本监控
+
+
+## 二十四. Agent 数据工程 + Eval Benchmarks 全集
+
+### 24.0 数据工程 + Benchmarks 思维导图 ⭐
+
+> 进入本章前先看这张思维导图建立全章认知.
+
+### 24.1 Agent 数据工程总览
+
+#### 24.1.1 数据工程在 Agent 项目的位置
+- LLM 训练 (大厂自训用): pretrain / SFT / RLHF / DPO 数据
+- RAG KB: 文档采集 / 清洗 / chunking / embedding 数据
+- Agent fine-tune: tool use trace / preference 数据
+- Eval / Golden Set: 测试 + 监控数据
+- 用户反馈 (online): 👍 / 👎 + 自由文本
+
+#### 24.1.2 数据工程 5 大环节
+- **采集** (Acquisition): 哪儿来
+- **标注** (Annotation): 怎么标
+- **清洗** (Cleaning): 去噪 + 去重 + 脱敏
+- **合成** (Synthetic): LLM 生成数据
+- **评估** (Quality): 数据本身好坏
+
+### 24.2 数据采集
+
+#### 24.2.1 采集 5 大渠道
+
+##### 渠道 1 — 真实生产 log
+- Agent 生产线日志
+- 含: query / response / tool call / 反馈
+- 优势: 真实分布
+- 劣势: 隐私 + 法律合规
+
+##### 渠道 2 — 公开数据集
+- HuggingFace Hub (10万+ datasets)
+- Kaggle / OpenAI Eval / Anthropic Eval
+- 学术 paper 配套数据
+- 优势: 免费 + 标注好
+- 劣势: 跟你业务可能不匹配
+
+##### 渠道 3 — 爬虫 (Web Scraping)
+- 公开网页 / 论坛 / 文档
+- 法律灰色 (robots.txt / 版权)
+- 大厂训练 (OpenAI / Anthropic) 主要靠这
+- 工具: Common Crawl / Scrapy / Playwright
+
+##### 渠道 4 — 标注外包
+- Scale AI / Surge AI / Appen / Lionbridge
+- 海外: $1-30/标注
+- 国内: ¥1-10/标注
+- 适合: 需要专业标注 (医疗 / 法律 / 代码)
+
+##### 渠道 5 — 合成数据 (Synthetic)
+- LLM 自己生成
+- 详见 §24.5
+
+#### 24.2.2 数据合规
+- GDPR: 用户数据采集需 consent
+- 个保法: 中国数据本地化
+- 版权: 训练数据版权归属 (NYT vs OpenAI 案件)
+- 用户合同: 是否允许用作训练
+
+#### 24.2.3 真实采用
+- **OpenAI**: Common Crawl + 书籍 + 互联网 + RLHF (Scale AI 标)
+- **Anthropic**: Common Crawl + 书 + RLHF + Constitutional AI (自动)
+- **DeepSeek**: 中文 + 英文混 + 大量 synthetic
+- **Klarna**: 真实客服 log (脱敏)
+
+### 24.3 数据标注
+
+#### 24.3.1 标注 4 大类型
+
+##### 类型 1 — 分类 (Classification)
+- 单选 / 多选
+- e.g. query 类别 (FAQ / 复杂 / 投诉)
+- 标注速度快 (1-5s/标)
+
+##### 类型 2 — 排序 (Ranking)
+- N 个候选选最佳 / 排序
+- e.g. RLHF preference 数据 (A/B 对比)
+- 速度中 (10-30s/标)
+
+##### 类型 3 — 自由文本 (Free-form)
+- 写完整答案
+- e.g. SFT 数据 (instruction → response)
+- 速度慢 (1-10min/标)
+
+##### 类型 4 — Span 抽取 (Span Annotation)
+- 在文本里标关键 span
+- e.g. NER (实体识别) / RE (关系抽取)
+- 速度中 (30s-2min/标)
+
+#### 24.3.2 标注质量保证
+
+##### 双人标注
+- 同一 sample 2 人独立标
+- 不一致 → 第 3 人裁决
+- 标注 agreement rate 监控 (Cohen's Kappa)
+
+##### Golden 测试
+- 在标注流中插已知答案
+- 标注员答错率 > 10% → 培训 / 换人
+
+##### 标注规范文档
+- 每类别详细定义
+- 边缘 case 列表
+- 反例 + 正例
+
+#### 24.3.3 主流标注平台
+
+| 平台 | 公司 | 主打 |
+|---|---|---|
+| **Scale AI** | Scale | 大厂级, 含 LLM RLHF |
+| **Labelbox** | Labelbox | 通用 + 多模态 |
+| **Surge AI** | Surge | LLM RLHF 专精 |
+| **Snorkel** | Snorkel | Programmatic Labeling |
+| **Argilla** | Argilla | 开源 + LLM 友好 |
+| **Label Studio** | HumanSignal | 开源 + 多类型 |
+| **百度众测** | 百度 | 国内最大 |
+| **阿里众包** | 阿里 | 国内 |
+
+#### 24.3.4 LLM-as-Judge 标注
+
+##### 是什么
+- LLM 自动给数据打标 (替代人工)
+- 适合: 大规模 / 简单分类 / 初筛
+
+##### 流程
+- LLM 标 → 人 review 一部分 → 确认准确率
+- 准确率 > 90% 可大规模用
+
+##### 主流模型
+- 简单: Haiku 4.5 / GPT-5 mini ($1/Mtok)
+- 复杂: Sonnet 4.5 / GPT-5 ($3-10/Mtok)
+- 极复杂: Opus 4.5 / o3 (慎用, 贵)
+
+### 24.4 数据清洗
+
+#### 24.4.1 清洗 6 大步骤
+
+##### 步骤 1 — 去重 (Deduplication)
+- 完全重复: hash (MD5 / SHA)
+- 近似重复: MinHash / SimHash / Embedding cosine
+- 阈值 cosine > 0.95 视为重复
+
+##### 步骤 2 — 去 PII
+- Presidio / 阿里云 PII / 自训
+- 替换为 [REDACTED:type]
+- 必做 (合规)
+
+##### 步骤 3 — 去 toxic / 有害
+- LlamaGuard / Perspective API
+- 暴力 / 色情 / 仇恨 / 自杀 等过滤
+
+##### 步骤 4 — 去低质
+- 太短 (< 50 字) / 太长 (> 100K 字符)
+- 重复字符 (e.g. "aaaa")
+- HTML 标签未清
+
+##### 步骤 5 — 去 contamination
+- 训练数据含测试集 → benchmark 失真
+- 必查 (不查上线 benchmark 数字虚高)
+
+##### 步骤 6 — 标准化
+- 编码 (UTF-8)
+- 大小写 / 标点 / 空格 normalize
+- 简繁转换
+
+#### 24.4.2 工具
+- **Datatrove** (HuggingFace): 大规模 pipeline
+- **dolma** (Allen AI): 开源 pretrain 清洗
+- **fastText / nltk / spacy**: 通用 NLP
+- **Presidio**: PII 专精
+
+### 24.5 Synthetic Data (合成数据)
+
+#### 24.5.1 为什么合成
+- 真实数据贵 (标注成本)
+- 真实数据少 (长尾场景)
+- 真实数据合规 (PII / 版权)
+- 大厂主流: 50%+ 训练数据是 synthetic (2025)
+
+#### 24.5.2 合成 5 大方法
+
+##### 方法 1 — Self-Instruct (Wang 2022)
+- 给 LLM 一些 seed instructions
+- LLM 自动生成更多 instructions
+- 用生成的 instructions 训练
+
+##### 方法 2 — Distillation (蒸馏)
+- 大模型 (GPT-4 / Sonnet) 生成数据
+- 小模型 fine-tune 学
+- DeepSeek-R1 distilled 到 Llama / Qwen 是经典
+
+##### 方法 3 — RLAIF (RL from AI Feedback)
+- LLM 替代人评 RLHF
+- 优势: 便宜 + 大规模
+- 劣势: 偏差 (LLM 自己评自己)
+
+##### 方法 4 — Augmentation (增强)
+- 给已有数据加变体 (paraphrase / 翻译再翻回)
+- 增加多样性
+
+##### 方法 5 — Persona-based
+- 让 LLM 扮演 N 个 persona 生成
+- 增加 perspective 多样
+
+#### 24.5.3 合成数据反模式
+- ❌ 全 synthetic 训练 (model collapse, 退化)
+- ❌ 不验证质量 (LLM 编错也用)
+- ❌ 不区分 synthetic vs real (后续追溯难)
+- ✅ 合成 + 真实 混合 (synthetic ≤ 50%)
+
+#### 24.5.4 真实采用
+- **DeepSeek-R1 → Llama/Qwen distill**: 开源 reasoning 普及
+- **Anthropic Constitutional AI**: 部分用 LLM 自评
+- **OpenAI**: 多代 GPT 用前代 synthetic 数据
+
+### 24.6 Eval Benchmarks 全集
+
+#### 24.6.1 Benchmark 分类
+
+| 类别 | 主流 Benchmark | 用途 |
+|---|---|---|
+| 通用智能 | MMLU / MMLU-Pro / GPQA / Big-Bench | 知识 + 推理 |
+| 数学 | GSM8K / MATH / AIME / Putnam | 数学解题 |
+| 代码 | HumanEval / MBPP / SWE-Bench / LiveCodeBench / BigCodeBench | 编程 |
+| Agent | TaskBench / AgentBench / GAIA / WebArena / OSWorld / τ-bench | Agent 端到端 |
+| 检索 | MTEB / BEIR / MIRACL | Embedding / Retrieval |
+| 安全 | TruthfulQA / RealToxicityPrompts / ToolEmu | 安全 / 真实性 |
+| 中文 | CEval / CMMLU / SuperCLUE / C-Eval-Hard | 中文专精 |
+| 长上下文 | RULER / NIAH (Needle in Haystack) / LongBench | 长 context |
+| 多模态 | MMMU / MathVista / VideoMME | 多模态 |
+| RAG | RAGAS / RGB / CRUD-RAG | RAG 专精 |
+
+#### 24.6.2 通用智能 Benchmarks
+
+##### MMLU (Massive Multitask Language Understanding)
+- 57 学科, 选择题
+- 已饱和 (Sonnet 4.5 89.5%, 接近 100%)
+- 仍是 baseline
+
+##### MMLU-Pro (2024 升级)
+- 更难, 10 选项 (vs MMLU 4 选项)
+- 当前 SOTA ~85% (Opus 4.5)
+
+##### GPQA (Graduate-Level QA)
+- 物理 / 生物 / 化学博士级
+- Diamond 子集 (200 题最难)
+- SOTA ~79% (Opus 4.5)
+
+##### Big-Bench / Big-Bench-Hard
+- Google 推出, 200+ 任务
+- 已部分饱和
+
+#### 24.6.3 数学 Benchmarks
+
+##### GSM8K (8K 小学题)
+- 已饱和 (Sonnet 95+%)
+
+##### MATH (MATH-500)
+- 高中竞赛级
+- SOTA ~98% (o3)
+
+##### AIME (American Invitational Mathematics Examination)
+- 高中数学竞赛 (USAMO 前)
+- 极难, SOTA ~92% (o3 2025)
+
+##### Putnam
+- 大学数学竞赛
+- 当前 SOTA ~50%
+
+#### 24.6.4 代码 Benchmarks (已在 §21.5 部分述, 这里补)
+
+##### HumanEval / HumanEval+
+- 早期标准, 已饱和
+
+##### MBPP / MBPP+
+- 974 题 Python
+- 已饱和
+
+##### SWE-Bench / SWE-Bench Verified
+- 真实 GitHub issue
+- SOTA 71% (o3 2026)
+- 详见 §21.5.1
+
+##### LiveCodeBench
+- 持续更新, 防 overfit
+- 详见 §21.5.3
+
+##### BigCodeBench
+- 多语言
+- 实战风
+
+##### CodeForces / LeetCode
+- 竞赛题
+- LLM 在 LeetCode 已超人类中位数
+
+##### MultiPL-E
+- 多语言 (18 种)
+
+#### 24.6.5 Agent Benchmarks 详解
+
+##### TaskBench (浙大 2023.11)
+- 17K 任务, 含 web / app
+- 评 Tool Use + Planning
+- SOTA Sonnet 4.5 ~78.5%
+
+##### AgentBench (清华 2023.08)
+- 8 环境 (OS / DB / KG / Game / Web / Code 等)
+- 评 LLM Agent 跨场景能力
+
+##### GAIA (Meta 2023.11)
+- General AI Assistants
+- 466 真实问题, 3 难度
+- Level 1: 38%/47% (Magentic-One/Sonnet 4.5)
+- Level 2: 24%/53% (新 SOTA)
+- Level 3: 12%/?
+- 业界最权威 Agent benchmark 之一
+
+##### WebArena (CMU 2023.07)
+- Web 任务 (购物 / Reddit / GitLab / 等)
+- SOTA Sonnet 4.5 ~45%
+
+##### OSWorld (HKU 2024.04)
+- 真实操作系统任务 (Ubuntu)
+- 369 任务, 跨 office / 浏览器 / coding
+- SOTA Sonnet 4.5 ~35%
+
+##### τ-bench (Sierra AI 2024.06)
+- Tool Use 专精 (含真实 API)
+- 评 multi-turn + tool calling
+
+##### WebShop
+- 模拟 Amazon 购物
+- 老 benchmark, 已部分饱和
+
+##### Mind2Web
+- 真实网页 + 真实任务
+- 浏览器 Agent benchmark
+
+#### 24.6.6 检索 Benchmarks (Embedding / Retrieval)
+
+##### MTEB (Massive Text Embedding Benchmark)
+- HuggingFace 维护
+- 56+ 任务, 8 类 (Classification / Clustering / Retrieval / Rerank / 等)
+- Embedding leaderboard 标准
+- SOTA: NV-Embed-v2 (72.3) / Voyage-3-large (70.5) / Qwen3-Embedding-8B (70.6)
+
+##### BEIR (Benchmarking IR)
+- 18 个 IR datasets
+- 主要英文, 跨域 retrieval
+- Reranker 也用
+
+##### MIRACL
+- 多语言检索 (含中文 / 阿拉伯 / 日 / 等)
+
+##### MS MARCO
+- Microsoft 经典 IR dataset
+- 1M passages
+
+##### Natural Questions / TriviaQA / HotpotQA
+- 经典 QA datasets
+- RAG 评估常用
+
+#### 24.6.7 安全 Benchmarks
+
+##### TruthfulQA
+- 评 LLM 是否 truthful (vs 模仿人类常见错误)
+- 老 benchmark, 已部分被超越
+
+##### RealToxicityPrompts
+- 输入有 prompt, 看 LLM 输出 toxicity
+- 评 safety
+
+##### ToolEmu (Tool 安全)
+- 模拟工具调用, 评 LLM 是否安全用工具
+
+##### HarmBench
+- 评 LLM 是否易被 jailbreak
+
+##### MMLU-Tox / SafeRLHF
+- 安全偏好
+
+#### 24.6.8 中文 Benchmarks
+
+##### C-Eval / CEval (清华)
+- 13K 题, 52 学科
+- 中文 MMLU 等价
+
+##### CMMLU
+- 67 学科, 11K 题
+- 类似 C-Eval
+
+##### SuperCLUE
+- 中文综合
+- 有时被吐槽 leaderboard 偏国产
+
+##### C-Eval-Hard
+- 25 学科, 难版本
+- 区分顶级模型
+
+##### CLUE / ZeroCLUE
+- 经典中文 NLP
+
+#### 24.6.9 长上下文 Benchmarks
+
+##### RULER (NVIDIA 2024)
+- 多任务长 context
+- 当前主流标准
+
+##### NIAH (Needle in Haystack)
+- 经典: 把 needle 藏长文档, LLM 找
+- Lost in the Middle 问题展示
+- Gemini 2.5 / Claude / GPT 都跑
+
+##### LongBench
+- 中英文长 context
+
+##### InfiniteBench
+- 100K+ context
+
+#### 24.6.10 多模态 Benchmarks
+
+##### MMMU (Massive Multi-discipline Multimodal Understanding)
+- 大学级图 + 文
+- 当前 SOTA ~75%
+
+##### MathVista
+- 数学 + 视觉
+
+##### VideoMME / MVBench
+- 视频理解
+
+##### ChartQA
+- 图表 QA
+
+#### 24.6.11 RAG-specific Benchmarks
+
+##### RAGAS (已述 §10.3.2)
+
+##### RGB (Retrieval-Augmented Generation Benchmark)
+- 评 RAG 能力 4 维度
+
+##### CRUD-RAG
+- 中文 RAG benchmark
+
+##### TruLens (开源)
+- RAG / Agent 评估框架
+- triad (Context Relevance / Groundedness / Answer Relevance)
+
+##### Ragnarok / RAGTruth
+- RAG 真实性评估
+
+### 24.7 检索专门 Metrics
+
+#### 24.7.1 NDCG (Normalized Discounted Cumulative Gain)
+
+##### 公式
+- DCG@K = Σ (rel_i / log2(i+1)) for i=1 to K
+- IDCG@K = 理想排序的 DCG (按 rel 降序)
+- NDCG@K = DCG@K / IDCG@K
+
+##### 含义
+- 0 到 1, 越大越好
+- 考虑位置 (前面权重高)
+- 工业标准
+
+#### 24.7.2 MRR (Mean Reciprocal Rank)
+
+##### 公式
+- RR = 1 / 第一个相关 doc 的 rank
+- MRR = mean(RR over all queries)
+
+##### 含义
+- 衡量"第一相关在第几"
+- 适合: QA / 单答案场景
+
+#### 24.7.3 Recall@K
+- top-K 中相关 doc 数 / 总相关 doc 数
+- 衡量"召回不召回得到"
+
+#### 24.7.4 Precision@K
+- top-K 中相关 doc 数 / K
+- 衡量"召回的对不对"
+
+#### 24.7.5 MAP (Mean Average Precision)
+- 平均每 query 的 AP
+- AP = mean(Precision@k for each relevant doc)
+
+#### 24.7.6 Hit Rate@K
+- top-K 内是否含至少 1 个相关
+- 简单粗暴 metric
+
+### 24.8 Eval 工具 + 框架
+
+#### 24.8.1 RAG Eval 工具
+
+##### RAGAS (Exploding Gradients)
+- Python 库
+- 4 指标 (Faithfulness / Answer Relevance / Context Precision / Context Recall)
+- LLM-judge 实现
+- 详见 §10.3.2
+
+##### TruLens
+- Python 库
+- triad metric
+- 跟 LangChain / LlamaIndex 集成
+
+##### DeepEval
+- 类 RAGAS, 替代选项
+
+##### LangSmith Evaluations
+- LangChain 配套
+- 一体化 trace + eval
+
+##### Phoenix Evals (Arize)
+- 开源
+- LLM-judge 模板库
+
+##### Langfuse Datasets
+- 开源
+- Dataset + run + score 一体
+
+#### 24.8.2 Agent Eval 工具
+
+##### LangSmith Datasets
+- Agent 也可评
+
+##### AgentBench (清华)
+- 跑全套 8 环境
+- 学术用
+
+##### Phoenix Agent Eval
+- 开源
+
+##### 自建 (生产标配)
+- Golden Set + 自定义 metric
+- 跟业务深度绑
+
+#### 24.8.3 Code Eval 工具
+
+##### swebench (Princeton)
+- pip install swebench
+- 跑 SWE-Bench 标准
+
+##### evalplus
+- HumanEval+ / MBPP+ 主流
+
+##### LiveCodeBench
+- 持续更新数据
+
+#### 24.8.4 安全 Eval 工具
+
+##### Garak
+- LLM red-teaming
+- pip install garak
+
+##### PyRIT (Microsoft)
+- AI 安全测试
+
+##### NeMo Guardrails 自带 eval
+- 跟 Guardrails 一体
+
+### 24.9 Golden Set 制作 + 维护 (深度)
+
+#### 24.9.1 Golden Set 是评估的基础 (已在 §10.3.3 述, 这里加深)
+
+#### 24.9.2 制作 6 步详细
+
+##### Step 1 — 收集 query
+- 真实生产 log (3-6 个月)
+- 按 query 类型分层 sample
+- 至少 1000 base + 200 真 Golden
+
+##### Step 2 — 分层
+- 简单 FAQ: 30%
+- 中等推理: 30%
+- 复杂多跳: 20%
+- 边缘 / 越权: 20%
+
+##### Step 3 — 标准答案
+- 双人独立标
+- 不一致 → 第 3 人裁
+- 标 agreement rate (Cohen's Kappa > 0.8)
+
+##### Step 4 — 标相关 doc (RAG 用)
+- 每 query 关联 3-5 个 ground truth doc
+- 用于 Context Recall 计算
+
+##### Step 5 — 元数据
+- 每 case 加: 难度 / 类别 / 来源 / 时间 / 标注人
+- 便于切片分析 (e.g. "复杂 case 准确率 50%")
+
+##### Step 6 — 双盲 review
+- 上线前 PM / 业务方 review 100 case
+- 确认 quality + 业务相关
+
+#### 24.9.3 维护
+
+##### 季度更新
+- 添加生产新失败 case (top-100 user 反馈)
+- 删过时 case (业务变化)
+- 重新标注 (业务规则改)
+
+##### 版本化
+- v1 / v2 / v3, 跟模型 release 对齐
+- 历史可追
+
+##### 多 Golden Set
+- Acceptance Test (50 case, 必 100% 过 才上线)
+- Regression Test (500 case, 跑每次 PR)
+- Eval Suite (5000 case, 季度跑全)
+
+### 24.10 数据工程 + Eval 真实采用
+
+#### 24.10.1 OpenAI 内部
+- 大量用 Surge AI / Scale AI 标注 RLHF
+- 内部 Eval Suite (大部分未公开)
+- 用 GPT-4 自评新模型
+- Common Crawl + 书 训练
+
+#### 24.10.2 Anthropic 内部
+- 自家标注团队 + 外包混合
+- Constitutional AI 自动标
+- RLHF 大量数据
+- Phoenix-like 内部 eval
+
+#### 24.10.3 DeepSeek
+- 大量 synthetic 数据
+- R1 → 蒸馏到 Llama / Qwen 是创新
+- 开源数据集 (部分)
+
+#### 24.10.4 Klarna
+- 真实客服 log (脱敏)
+- 多语言 Golden Set 5000+
+- 季度 eval 公开 ROI
+
+#### 24.10.5 LinkedIn
+- 5000+ Golden Set (招聘 query)
+- A/B 实验框架
+- 跟 LangSmith 一体
+
+#### 24.10.6 Anthropic / OpenAI / Google 标注预算 (推测)
+- 单家年标注预算 $50M-$500M
+- Scale AI 估值 $14B (主要靠 LLM 标注 ARR)
+
+### 24.11 数据 + Eval 反模式
+
+#### 24.11.1 反模式 1 — 没 Golden Set 上线
+- 现象: 改 prompt 凭感觉, 没回归
+- 后果: 退化没人发现
+- 修复: 必装 Golden Set + CI 回归
+
+#### 24.11.2 反模式 2 — 用合成 / 工程师想的 query 评估
+- 现象: PoC 阶段工程师写 50 query 当评估集
+- 后果: 上线后真实 query 分布不同, 准确率塌
+- 修复: 必用真实生产 log
+
+#### 24.11.3 反模式 3 — 不分层 Golden Set
+- 现象: 50 query 都简单 FAQ
+- 后果: 简单准 95%, 复杂 case 错而不知
+- 修复: 必分层 (FAQ/中等/复杂/边缘)
+
+#### 24.11.4 反模式 4 — 训练数据含测试集
+- 现象: scrape 时混入 benchmark
+- 后果: benchmark 分虚高, 真实差
+- 修复: 必查 contamination
+
+#### 24.11.5 反模式 5 — 全 LLM-judge 没人评
+- 现象: 完全靠 LLM 评估
+- 后果: LLM 自验证偏差 + 错过细节
+- 修复: 80% LLM-judge + 20% 人工
+
+#### 24.11.6 反模式 6 — Golden Set 不维护
+- 现象: 1 年前的 Golden Set, 业务已变
+- 后果: 评估跟生产脱节
+- 修复: 季度更新
+
+#### 24.11.7 反模式 7 — A/B 样本不够就决策
+- 现象: 跑 100 query 看 5% 提升就上线
+- 后果: 噪音 (统计不显著)
+- 修复: 单组 ≥ 200 + p < 0.05
+
+#### 24.11.8 反模式 8 — 不标注相关 doc
+- 现象: 只有 query + 答案, 没 ground truth doc
+- 后果: 没法算 Context Recall
+- 修复: 标 3-5 个相关 doc
+
+#### 24.11.9 反模式 9 — 全 synthetic 训练
+- 现象: 100% LLM 生成数据
+- 后果: model collapse, 退化
+- 修复: synthetic ≤ 50%, 真实 ≥ 50%
+
+#### 24.11.10 反模式 10 — 不监控数据 drift
+- 现象: 上线后用户群变化, query 分布变, 评估集没跟
+- 修复: 月度 drift 监控 + Golden Set 更新
+
+### 24.12 数据 + Eval 上线 Checklist
+
+#### 24.12.1 数据采集
+- [ ] 真实生产 log 接入
+- [ ] 公开数据集 review
+- [ ] 标注外包 (如需)
+- [ ] 合规 (consent / 版权 / PII)
+
+#### 24.12.2 数据清洗
+- [ ] 去重 (hash + MinHash)
+- [ ] 去 PII
+- [ ] 去 toxic
+- [ ] 去 contamination (训练 vs 测试)
+- [ ] 标准化 (UTF-8 / 大小写 / 简繁)
+
+#### 24.12.3 标注
+- [ ] 标注规范文档
+- [ ] 双人 + 第 3 人裁
+- [ ] Cohen's Kappa > 0.8
+- [ ] Golden 测试 (检查标注员)
+
+#### 24.12.4 Synthetic
+- [ ] LLM 生成 + 人 review 一部分
+- [ ] 准确率 > 90% 才大规模用
+- [ ] 跟真实数据混 (synthetic ≤ 50%)
+
+#### 24.12.5 Eval Benchmarks
+- [ ] 跑相关 benchmark (MMLU / SWE / GAIA / 等)
+- [ ] 跟 baseline 对比
+- [ ] 不显著的没必要换
+
+#### 24.12.6 Golden Set
+- [ ] 200-5000 真实 query
+- [ ] 4 类分层 (FAQ/中等/复杂/边缘)
+- [ ] 双人标 + Kappa > 0.8
+- [ ] 标 ground truth doc (RAG)
+- [ ] 季度更新
+
+#### 24.12.7 持续 Eval
+- [ ] CI/CD 自动跑回归
+- [ ] 在线评估 (1% sample)
+- [ ] Human eval (周抽 50)
+- [ ] Drift 监控
+
+### 24.13 数据工程 + Eval 未来 (2026-2027)
+
+#### 24.13.1 趋势 1 — Synthetic Data 主流
+- 2025: 大厂 50% synthetic
+- 2027: 70%+ synthetic (model collapse 风险增)
+- 真实数据成"高价值小份"
+
+#### 24.13.2 趋势 2 — Self-Improve Loop
+- LLM 生成 → 自评 → 自训
+- 减少人参与
+- 但 model collapse 警惕
+
+#### 24.13.3 趋势 3 — Benchmark 持续被攻克 + 新 benchmark 涌现
+- HumanEval / MMLU 等饱和
+- SWE-Bench / GAIA 接近饱和
+- 新 benchmark (更难 / 更真实) 持续出
+
+#### 24.13.4 趋势 4 — Eval 工具集成度提升
+- LangSmith / Phoenix / Langfuse 持续完善
+- Eval 不再是单独工具, 跟 trace 一体
+
+#### 24.13.5 趋势 5 — 国产 Eval 框架兴起
+- 中文 benchmark 持续完善 (SuperCLUE / C-Eval-Hard)
+- 国产 Eval 工具
+
+#### 24.13.6 趋势 6 — Privacy-preserving Eval
+- Federated learning + Eval
+- 数据不出企业内网
+- GDPR / 个保法 友好
+
+
+
+
 
 ---
 
@@ -10434,6 +13505,11 @@ if state_history.count(state_hash) >= 2: break
 | §17 Vector DB / Embedding / Reranker | §5 + §6 散落 | 本文档集中讲 8/12/8 家 |
 | §18 Observability | §10 提了一点 | 本文档完整体系 + 工具对比 |
 | §19 国产化 + 中国 LLM | 通用版有提 | 本文档全面国产生态 |
+| §20 MCP 实战 + Server 生态 | (新) | 协议细节 + 写 Server 教程 + 60+ Server |
+| §21 Code Agent 全栈深度 | 通用版散落 | 12 家完整对比 + Tree-sitter / LSP / Repository Map |
+| §22 Voice + 多模态 Agent | (新) | 端到端/Cascade + Realtime API + 多模态 LLM |
+| §23 Prompt Engineering + Inference | 通用版部分 | 高级技巧 (CoT/ToT/CoVe 等) + vLLM/SGLang 7 框架 |
+| §24 数据工程 + Eval Benchmarks | 通用版散落 | 数据 5 环节 + 12 类 benchmark 全集 + Golden Set |
 
 ### 附录 B: 参考资料
 
@@ -10459,4 +13535,5 @@ if state_history.count(state_hash) >= 2: break
 - v2.0 (2026.04) — §5-§9 (Tool Calling + Memory + Multi-Agent + 高级模式 + 框架), 阶段 2 完成
 - v3.0 (2026.04) — §10-§14 (FinOps + 案例 + 安全 + 落地 + 未来), 阶段 3 完成
 - v4.0 (2026.04) — §15-§19 全局补足 (Agent 面试题 + 2026 Pricing + 三组件深度 + Observability + 国产化), 全局深化完成
+- v5.0 (2026.04) — §20-§24 二次全局补足 (MCP 实战 + Code Agent 全栈 + Voice/多模态 + Prompt/Inference + 数据/Benchmarks), 全栈完整覆盖
 

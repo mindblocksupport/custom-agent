@@ -2845,6 +2845,275 @@ MERMAID_DIAGRAMS: dict[str, tuple[str, str]] = {
     class A,B,C,D,E,F,G cat
     class A1,A2,A3,A4,A5,B1,B2,B3,B4,C1,C2,C3,C4,D1,D2,D3,D4,E1,E2,E3,F1,F2,F3,F4,F5,G1,G2,G3 leaf"""
     ),
+    "MCP 实战思维导图": (
+        "🔌 §20 MCP 实战 + Server 生态: 协议细节 + 写 Server + 60+ 主流 Server.",
+        """flowchart LR
+    R(("MCP 实战"))
+    R --> A["协议栈"]
+    R --> B["3 角色"]
+    R --> C["写 Server"]
+    R --> D["官方 Server 7 个"]
+    R --> E["社区 Server 60+"]
+    R --> F["安全模型"]
+    R --> G["主流 Host"]
+
+    A --> A1["JSON-RPC 2.0"]
+    A --> A2["stdio / Streamable HTTP"]
+    A --> A3["Tools / Resources / Prompts"]
+    A --> A4["Capabilities 协商"]
+
+    B --> B1["Host (Claude Desktop / Cursor)"]
+    B --> B2["Client (Host 内 SDK)"]
+    B --> B3["Server (独立进程)"]
+
+    C --> C1["FastMCP (Python SDK)"]
+    C --> C2["@mcp.tool() 装饰器"]
+    C --> C3["MCP Inspector 测试"]
+    C --> C4["集成 Claude Desktop config"]
+
+    D --> D1["filesystem"]
+    D --> D2["github"]
+    D --> D3["postgres"]
+    D --> D4["brave-search"]
+    D --> D5["slack / memory / puppeteer"]
+
+    E --> E1["云: AWS/GCP/Azure"]
+    E --> E2["SaaS: Notion/Linear/Jira/Asana"]
+    E --> E3["DB: MongoDB/Redis/Elasticsearch"]
+    E --> E4["监控: Datadog/Grafana/PagerDuty"]
+    E --> E5["国内: 阿里云/钉钉/飞书"]
+
+    F --> F1["Server 来源验证"]
+    F --> F2["路径 / 范围限制"]
+    F --> F3["Tool 白名单"]
+    F --> F4["Audit Log"]
+
+    G --> G1["Claude Desktop (官方)"]
+    G --> G2["Cursor (50+ 内置 Server)"]
+    G --> G3["Continue.dev / Cline / Zed / Goose (Block)"]
+    G --> G4["Anthropic Claude Agent SDK"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F,G cat
+    class A1,A2,A3,A4,B1,B2,B3,C1,C2,C3,C4,D1,D2,D3,D4,D5,E1,E2,E3,E4,E5,F1,F2,F3,F4,G1,G2,G3,G4 leaf"""
+    ),
+    "Code Agent 思维导图": (
+        "💻 §21 Code Agent 12 主流深度 + Tree-sitter / LSP / Repository Map.",
+        """flowchart LR
+    R(("Code Agent 12 主流"))
+    R --> A["IDE 插件类"]
+    R --> B["IDE / Standalone"]
+    R --> C["CLI 类"]
+    R --> D["远程 + Web"]
+    R --> E["国内"]
+    R --> F["特殊技术"]
+    R --> G["Benchmark"]
+
+    A --> A1["GitHub Copilot (老牌, 多 LLM)"]
+    A --> A2["Sourcegraph Cody (大 codebase)"]
+    A --> A3["Tabnine (隐私 air-gap)"]
+    A --> A4["Continue.dev (开源)"]
+    A --> A5["Cline (VSCode 插件 + MCP)"]
+
+    B --> B1["Cursor ($9B 估值, Tab+Composer+Agent)"]
+    B --> B2["Replit Agent (零代码 web app)"]
+
+    C --> C1["Claude Code (Anthropic CLI)"]
+    C --> C2["Aider (开源, git-aware + Repository Map)"]
+    C --> C3["Codex (OpenAI CLI)"]
+
+    D --> D1["Devin ($4B, 完全自主)"]
+    D --> D2["OpenHands (开源, 原 OpenDevin)"]
+    D --> D3["Manus (Monica 中国)"]
+
+    E --> E1["通义灵码 (阿里)"]
+    E --> E2["CodeGeeX (智谱)"]
+    E --> E3["智码 (腾讯) / Comate (百度) / MarsCode (字节)"]
+
+    F --> F1["Tree-sitter (代码 AST)"]
+    F --> F2["LSP (Language Server Protocol)"]
+    F --> F3["Repository Map (Aider 创新)"]
+    F --> F4["Diff / SEARCH-REPLACE 编辑"]
+
+    G --> G1["SWE-Bench Verified (o3 71%)"]
+    G --> G2["LiveCodeBench (持续更新)"]
+    G --> G3["HumanEval+ / MBPP+"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F,G cat
+    class A1,A2,A3,A4,A5,B1,B2,C1,C2,C3,D1,D2,D3,E1,E2,E3,F1,F2,F3,F4,G1,G2,G3 leaf"""
+    ),
+    "Voice + 多模态思维导图": (
+        "🎙️ §22 Voice / Realtime / 多模态 Agent: 端到端 + Cascade + 多模态 LLM.",
+        """flowchart LR
+    R(("Voice + 多模态"))
+    R --> A["端到端 Voice"]
+    R --> B["Cascade 方案"]
+    R --> C["多模态 LLM"]
+    R --> D["工程挑战"]
+    R --> E["真实采用"]
+    R --> F["未来趋势"]
+
+    A --> A1["OpenAI Realtime API (2024.10)"]
+    A --> A2["Gemini Live (Google 2024.08)"]
+    A --> A3["Anthropic Voice Mode (2025)"]
+    A --> A4["端到端延迟 < 500ms"]
+
+    B --> B1["Whisper / Deepgram (ASR)"]
+    B --> B2["LLM (Claude/GPT)"]
+    B --> B3["ElevenLabs / Cartesia (TTS)"]
+    B --> B4["累积延迟 1-3s"]
+
+    C --> C1["Vision: Sonnet 4.5 / GPT-5 / Gemini 2.5"]
+    C --> C2["Video: Gemini 2.5 (1M-2M context)"]
+    C --> C3["Audio: GPT-5o / Gemini Live"]
+    C --> C4["生成: Sora 2 / Veo 3 / DALL-E 3"]
+
+    D --> D1["延迟预算 < 500ms"]
+    D --> D2["中断 (VAD + 立刻停 TTS)"]
+    D --> D3["Turn detection"]
+    D --> D4["Function Call 时填充 (filler)"]
+    D --> D5["情感 / 语调"]
+
+    E --> E1["OpenAI Apps (Realtime)"]
+    E --> E2["Apple Intelligence (Siri 重写)"]
+    E --> E3["Google Gemini in Android"]
+    E --> E4["Klarna 拍照诊断"]
+    E --> E5["国内 (字节豆包/智谱清言)"]
+
+    F --> F1["端到端取代 Cascade"]
+    F --> F2["视频 Agent 实时化"]
+    F --> F3["audio token 价格收敛"]
+    F --> F4["进电话替代客服"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F cat
+    class A1,A2,A3,A4,B1,B2,B3,B4,C1,C2,C3,C4,D1,D2,D3,D4,D5,E1,E2,E3,E4,E5,F1,F2,F3,F4 leaf"""
+    ),
+    "Prompt + Inference 思维导图": (
+        "🧪 §23 Prompt Engineering 高级 + LLM Inference 优化 7 框架.",
+        """flowchart LR
+    R(("Prompt + Inference"))
+    R --> A["核心原则 6"]
+    R --> B["高级技巧"]
+    R --> C["结构化输出"]
+    R --> D["Inference 框架 7"]
+    R --> E["优化技术 8"]
+    R --> F["量化"]
+    R --> G["自托管 vs API"]
+
+    A --> A1["清晰 + 具体"]
+    A --> A2["Few-shot 例子"]
+    A --> A3["CoT 思考空间"]
+    A --> A4["结构化输出"]
+    A --> A5["XML 包重要内容 (Anthropic)"]
+    A --> A6["给角色 (Role)"]
+
+    B --> B1["CoT (Wei 2022)"]
+    B --> B2["ToT (Yao 2023)"]
+    B --> B3["Plan-and-Solve"]
+    B --> B4["Self-Consistency"]
+    B --> B5["Constitutional AI"]
+    B --> B6["Meta-Prompting"]
+    B --> B7["Step-Back / Decomposition / CoVe"]
+
+    C --> C1["OpenAI Structured Outputs (strict)"]
+    C --> C2["Anthropic Tool Use 模拟"]
+    C --> C3["Pydantic AI"]
+    C --> C4["Outlines (开源)"]
+
+    D --> D1["vLLM (PagedAttention)"]
+    D --> D2["SGLang (RadixAttention)"]
+    D --> D3["TensorRT-LLM (NVIDIA 极致)"]
+    D --> D4["TGI / Ollama / llama.cpp / LMDeploy"]
+
+    E --> E1["KV Cache (50-90% 省)"]
+    E --> E2["Continuous Batching (2-5×)"]
+    E --> E3["PagedAttention / RadixAttention"]
+    E --> E4["Speculative Decoding (2-3×)"]
+    E --> E5["FlashAttention-3"]
+    E --> E6["Tensor / Pipeline Parallelism"]
+
+    F --> F1["FP16/BF16 (baseline)"]
+    F --> F2["INT8 / FP8 (减半内存)"]
+    F --> F3["INT4 / GPTQ / AWQ / GGUF"]
+
+    G --> G1["7B: 1K QPS break-even"]
+    G --> G2["70B: 5K QPS break-even"]
+    G --> G3["< 1K QPS 直接用 API"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F,G cat
+    class A1,A2,A3,A4,A5,A6,B1,B2,B3,B4,B5,B6,B7,C1,C2,C3,C4,D1,D2,D3,D4,E1,E2,E3,E4,E5,E6,F1,F2,F3,G1,G2,G3 leaf"""
+    ),
+    "数据工程 + Benchmarks 思维导图": (
+        "📊 §24 数据 5 环节 + 12 类 Eval Benchmarks 全集 + Golden Set.",
+        """flowchart LR
+    R(("数据 + Benchmarks"))
+    R --> A["数据 5 环节"]
+    R --> B["数据采集"]
+    R --> C["合成数据"]
+    R --> D["Benchmarks 12 类"]
+    R --> E["检索 Metrics"]
+    R --> F["Eval 工具"]
+    R --> G["Golden Set"]
+
+    A --> A1["采集 / 标注 / 清洗 / 合成 / 评估"]
+
+    B --> B1["真实生产 log"]
+    B --> B2["公开数据集 (HF / Kaggle)"]
+    B --> B3["爬虫 (Common Crawl)"]
+    B --> B4["标注外包 (Scale AI / Surge)"]
+
+    C --> C1["Self-Instruct"]
+    C --> C2["Distillation (R1→Llama)"]
+    C --> C3["RLAIF"]
+    C --> C4["反模式: 全 synthetic = collapse"]
+
+    D --> D1["通用: MMLU / GPQA"]
+    D --> D2["数学: GSM8K / MATH / AIME"]
+    D --> D3["代码: SWE-Bench / LiveCodeBench"]
+    D --> D4["Agent: GAIA / WebArena / OSWorld / τ-bench"]
+    D --> D5["检索: MTEB / BEIR"]
+    D --> D6["安全: TruthfulQA / HarmBench"]
+    D --> D7["中文: CEval / CMMLU / SuperCLUE"]
+    D --> D8["长上下文: RULER / NIAH"]
+    D --> D9["多模态: MMMU / VideoMME"]
+    D --> D10["RAG: RAGAS / TruLens / RGB"]
+
+    E --> E1["NDCG@K (主流)"]
+    E --> E2["MRR (单答案)"]
+    E --> E3["Recall@K / Precision@K"]
+    E --> E4["MAP / Hit Rate@K"]
+
+    F --> F1["RAGAS / TruLens / DeepEval"]
+    F --> F2["LangSmith / Phoenix / Langfuse"]
+    F --> F3["swebench / evalplus / Garak (安全)"]
+
+    G --> G1["200-5000 真实 query"]
+    G --> G2["4 类分层 (FAQ/中等/复杂/边缘)"]
+    G --> G3["双人标 + Kappa > 0.8"]
+    G --> G4["季度更新 + 版本化"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F,G cat
+    class A1,B1,B2,B3,B4,C1,C2,C3,C4,D1,D2,D3,D4,D5,D6,D7,D8,D9,D10,E1,E2,E3,E4,F1,F2,F3,G1,G2,G3,G4 leaf"""
+    ),
 }
 
 
