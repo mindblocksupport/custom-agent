@@ -41,55 +41,79 @@
 Anthropic "Building Effective Agents" (2024.12) 推出的三层架构, 是当前业界共识:
 
 - **层次 1 — Augmented LLM** (90% 场景): 单次 LLM 调用 + 检索 + 工具调用 + 记忆. 即标准 Modular RAG, 一次进出.
-- **层次 2 — Workflow** (8-15% 场景): 工程师写死多步流程, LLM 在固定节点上工作 (路径预先确定). 5 种主流 Pattern: Prompt Chaining / Routing / Parallelization / Orchestrator-Workers / Evaluator-Optimizer.
-- **层次 3 — Agent** (2-5% 场景): LLM 在循环里自主决策, 路径运行时生成. 5 种主流形态: Plan-and-Execute / ReAct / Multi-Agent / Self-Reflection / Iterative.
+- **层次 2 — Workflow** (8-15% 场景): 工程师写死多步流程, LLM 在固定节点上工作 (路径预先确定). 5 种主流 Pattern (详见 §4):
+  - **Prompt Chaining** (链式): 任务拆 N 步串行, 每步上一步输出做下一步输入. 例: 翻译 → 审校 → 格式化
+  - **Routing** (路由): 先分类输入, 再转发到不同分支. 例: 客服 query 分类后走不同 prompt
+  - **Parallelization** (并行): 同时跑多个独立 LLM 后聚合. 例: 多视角生成 / 投票
+  - **Orchestrator-Workers** (中枢-工人): 中枢 LLM 动态拆任务派 Worker LLM 做. 例: 写竞品分析
+  - **Evaluator-Optimizer** (评估-优化): Generator → Evaluator → Optimizer 循环 N 轮. 例: 翻译质量迭代
+- **层次 3 — Agent** (2-5% 场景): LLM 在循环里自主决策, 路径运行时生成. 5 种主流形态 (详见 §2):
+  - **Plan-and-Execute** (先规划后执行): LLM 先生成完整 plan (5-10 步), 再逐步 execute. 适合: 任务能拆清晰步骤
+  - **ReAct** (Reasoning + Acting): LLM 边想边做, 每步独立决策. 适合: 不确定的探索
+  - **Multi-Agent** (多 Agent 协作): N 个 Agent 各有专长, 协作完成大任务. 适合: 真正需角色分工
+  - **Self-Reflection** (自反思): LLM 输出后自评 + 改进 N 轮. 适合: 高质量输出
+  - **Iterative** (迭代检索): 检索→看不够→再检索→再看, 直到信息够. 适合: 多跳推理
 
 **核心原则**: **优先用层次 1, 失败再上层次 2, 再失败才上层次 3.** 跳层是 RAG 项目失败首因.
 
 ### 0.4 4 个核心决策
 
-| 决策点 | 选项 | 决策依据 | 详见 |
+| 决策点 | 选项 (含含义) | 决策依据 | 详见 |
 |---|---|---|---|
-| **决策 1 — 该用哪一层?** | Augmented LLM / Workflow / Agent | 单次 RAG 能解 → 层 1; 步骤可预先固定 → 层 2; 步骤需 LLM 决定 → 层 3 | §1.4 决策树 |
-| **决策 2 — 选哪种 Workflow Pattern?** | Prompt Chaining / Routing / Parallelization / Orchestrator-Workers / Evaluator-Optimizer | 任务能拆线性 → Chaining; 有类别 → Routing; 子任务独立 → Parallel; 子任务运行时知 → Orchestrator; 高质量 + 评估标准 → Evaluator | §4 |
-| **决策 3 — 选哪种 Agent 形态?** | Plan-and-Execute / ReAct / Multi-Agent / Self-Reflection / Iterative | 可预先分解 → P&E; 不可预测 → ReAct; 多角色 → Multi-Agent; 输出后自评 → Self-Reflection; 检索不全循环 → Iterative | §2 |
-| **决策 4 — 选哪个 Agent 框架?** | LangGraph / LlamaIndex / AutoGen / CrewAI / OpenAI Agents SDK / Anthropic Claude Agent SDK | 已用 LangChain → LangGraph; 多 Agent 协作 → AutoGen; 极简 → CrewAI; 单 LLM 厂 → OpenAI/Anthropic SDK | §9 |
+| **决策 1 — 该用哪一层?** | **Augmented LLM** (单次 LLM + 工具/检索) / **Workflow** (工程师固定路径) / **Agent** (LLM 自主决策路径) | 单次 RAG 能解 → 层 1; 步骤可预先固定 → 层 2; 步骤需 LLM 决定 → 层 3 | §1.4 决策树 |
+| **决策 2 — 选哪种 Workflow Pattern?** | **Chaining** (串行 N 步) / **Routing** (分类后转发) / **Parallel** (并行后聚合) / **Orchestrator** (中枢动态拆派) / **Evaluator** (评估迭代) | 任务能拆线性 → Chaining; 有类别 → Routing; 子任务独立 → Parallel; 子任务运行时才知 → Orchestrator; 高质量 + 评估标准 → Evaluator | §4 |
+| **决策 3 — 选哪种 Agent 形态?** | **P&E** (先 plan 后执行) / **ReAct** (边想边做) / **Multi-Agent** (多角色协作) / **Self-Reflection** (输出后自评) / **Iterative** (循环检索) | 可预先分解 → P&E; 不可预测 → ReAct; 多角色 → Multi-Agent; 输出后自评 → Self-Reflection; 检索不全循环 → Iterative | §2 |
+| **决策 4 — 选哪个 Agent 框架?** | **LangGraph** (状态图驱动, 灵活) / **LlamaIndex** (RAG 优先) / **AutoGen** (Microsoft, 群聊) / **CrewAI** (角色扮演简单) / **OpenAI Agents SDK** (OpenAI 官方) / **Anthropic Claude Agent SDK** (Anthropic 官方) | 已用 LangChain → LangGraph; 多 Agent 协作 → AutoGen; 极简 → CrewAI; 单 LLM 厂 → OpenAI/Anthropic SDK | §9 |
 
 ### 0.5 全文 14 章地图
 
 | 章 | 核心内容 | 适合谁 |
 |---|---|---|
-| §0 | 速览 + 决策框架 | 所有人 |
-| §1 | Anthropic 三层模型 (Agent vs Workflow vs Augmented LLM) | 想理解概念边界 |
-| §2 | Agent 5 大形态深度 (Plan-and-Execute / ReAct / Multi-Agent / Self-Reflection / Iterative) | Agent 设计者 |
-| §3 | 7 层架构 + 决策循环 (Layer 1-7 + Cost Controller 横切) | 架构师 |
-| §4 | Workflow 5 Pattern 深度 (Anthropic 官方框架) | Workflow 设计者 |
-| §5 | Tool Calling 深度 (三家 API + MCP + Computer Use + Browser Use) | Tool 工程师 |
-| §6 | Memory 深度 (三层 + Episodic/Semantic/Procedural/Skill) | Memory 设计 |
-| §7 | Multi-Agent 系统 (Orchestrator/Hierarchical/Swarm/Magentic-One) | Multi-Agent 设计 |
-| §8 | 高级 RAG-Agent 模式 (Self-RAG/CRAG/GraphRAG/LightRAG/Adaptive/Reflexion/ToT) | 算法研究 |
-| §9 | Agent 框架对比 (8 主流 + 选型决策) | 框架选型 |
-| §10 | 死循环防御 + FinOps + 评估 | SRE / 运维 |
-| §11 | 真实落地案例深度 (8 个标杆) | 学经验 |
-| §12 | 失败模式 + 安全 (Tool Misuse / Memory Leak / Prompt Injection) | 安全 / 运维 |
-| §13 | 落地路径 + 最佳实践 (4 阶段 + 团队 + 国产化) | PM / 项目经理 |
-| §14 | 未来趋势 (2026-2027) | 战略思考 |
+| §0 | 速览 + 4 个核心决策 + 学习路径 | 所有人 |
+| §1 | Anthropic 三层模型 (Agent vs Workflow vs Augmented LLM 概念边界) | 想理解概念 |
+| §2 | Agent 5 大形态深度 — P&E (先规划后执行) / ReAct (边想边做) / Multi-Agent (多角色) / Self-Reflection (自反思) / Iterative (循环检索) | Agent 设计者 |
+| §3 | 7 层架构 + 决策循环 (Query→Router→Planner→Tool Loop→Memory→Synthesizer→Validator + Cost Controller 横切) | 架构师 |
+| §4 | Workflow 5 Pattern 深度 — Chaining (串行) / Routing (分类) / Parallelization (并行) / Orchestrator-Workers (中枢-工人) / Evaluator-Optimizer (评估循环) | Workflow 设计 |
+| §5 | Tool Calling 深度 (Anthropic / OpenAI / Gemini 三家 API + MCP 协议 + Computer Use 桌面 Agent + Browser Use 浏览器 Agent) | Tool 工程师 |
+| §6 | Memory 深度 (Redis/Postgres/Vector DB 三层 + 4 类记忆: Episodic 情景 / Semantic 语义 / Procedural 程序 / Skill 技能) | Memory 设计 |
+| §7 | Multi-Agent 系统 — Orchestrator-Workers (中枢-工人) / Hierarchical (分层) / Swarm (蜂群) / Magentic-One (Microsoft 5 角色) | Multi-Agent 设计 |
+| §8 | 高级 RAG-Agent 7 模式 — Self-RAG (自反思 RAG) / CRAG (检索校正) / GraphRAG (知识图谱) / LightRAG (轻量图谱) / Adaptive (动态选策略) / Reflexion (反思 Agent) / ToT (思考树) | 算法研究 |
+| §9 | Agent 框架对比 (LangGraph / LlamaIndex / AutoGen / CrewAI / OpenAI / Anthropic / Pydantic AI / Smolagents 8 主流) | 框架选型 |
+| §10 | 死循环防御 + FinOps + RAGAS 评估 | SRE / 运维 |
+| §11 | 真实落地案例深度 — Klarna / Cursor / Devin / Manus / Glean / Notion / Replit 等 12 个 | 学经验 |
+| §12 | 失败模式 + 安全 (8 大失败 + 6 层防御 + GDPR/AI Act 合规) | 安全 / 运维 |
+| §13 | 落地路径 6 阶段 (立项→PoC→MVP→扩展→生产化→运营) + 团队 + 技术债 | PM / 项目经理 |
+| §14 | 未来趋势 (2026-2027) — 8 大方向 (多模态/Agent OS/MCP 标准/Long Memory/Edge/框架收敛/A2A/监管) | 战略思考 |
+| §15 | Agent 面试题专题 — 50+ 题完整答案 + 追问 + 反例 | 面试 / 评估 |
+| §16 | LLM 模型选型 + 2026 Pricing 大全 (15 家国际 + 国产) | 选型决策 |
+| §17 | Vector DB / Embedding / Reranker 三组件深度 (8/12/8 家) | RAG 工程 |
+| §18 | Agent Observability (Tracing 7 工具 + 15 指标 + 4 级告警) | SRE |
+| §19 | 国产化 Agent + 中国 LLM 生态 (Qwen/DeepSeek/Kimi/GLM + 信创合规) | 国内项目 |
+| §20 | MCP 实战 + 完整 Server 生态 (协议细节 + 写 Server 教程 + 60+ Server) | Tool 集成 |
+| §21 | Code Agent 全栈深度 (Cursor/Claude Code/Devin/Aider/Cline 等 12 家 + Tree-sitter/LSP) | 工程师 |
+| §22 | Voice + Realtime + 多模态 Agent (OpenAI Realtime / Gemini Live / Anthropic Voice) | Voice 工程师 |
+| §23 | Prompt Engineering 进阶 (CoT/ToT/CoVe 等) + LLM Inference 优化 (vLLM/SGLang 7 框架) | LLM 高级 |
+| §24 | Agent 数据工程 + Eval Benchmarks 全集 (12 类 benchmark + Golden Set 制作) | 评估 / 数据 |
 
 ### 0.6 学习路径 (按角色)
 
 | 角色 | 推荐路径 | 跳过 |
 |---|---|---|
-| **Agent 新手** | §0 → §1 → §3 → §4 → §13 | §7 §12 §14 |
-| **Agent 架构师** | §0 → §1 → §3 → §5 → §6 → §7 → §10 → §11 | §13 §14 |
-| **Agent 工程师** | 全文 (按 §0 → §14 顺序) | / |
-| **算法研究** | §0 → §2 → §8 → §14 | §10 §13 |
-| **PM / 业务** | §0 → §1 → §11 → §13 → §14 | §3-§7 §9-§10 |
-| **面试准备** | §0 → §1 → §2 → §3 → §11 → §12 | §13 §14 |
+| **Agent 新手** | §0 → §1 → §3 → §4 → §13 → §16 | §7 §12 §14 §17-§24 |
+| **Agent 架构师** | §0 → §1 → §3 → §5 → §6 → §7 → §10 → §11 → §17 → §18 → §20 | §13 §14 |
+| **Agent 工程师** | 全文 (§0 → §24) | / |
+| **算法研究** | §0 → §2 → §8 → §14 → §23 → §24 | §10 §13 §19 |
+| **PM / 业务** | §0 → §1 → §11 → §13 → §14 → §16 | §3-§7 §9-§10 §17-§24 |
+| **面试准备** | §0 → §1 → §2 → §3 → §15 (面试题) → §11 → §12 | §13 §14 §19 |
+| **Code Agent 用户** | §0 → §5 → §21 → §20 (MCP) → §15 | §11-§14 §19 |
+| **Voice / 多模态** | §0 → §5 → §22 → §16 | §13 §14 §19 §21 |
+| **国内项目** | §0 → §1 → §11 → §19 → §16 → §13 | §22 §23 |
+| **运维 / SRE** | §0 → §10 → §12 → §18 → §13 | §2 §8 §22 |
 
 ### 0.7 跟通用 RAG 文档的关系
 
-- [RAG 通用知识地图](./rag-knowledge-map.html) — 18,941 行, 覆盖 4 代 RAG (Naive/Advanced/Modular/Agent) 全栈 + 5 层企业架构 + 60+ 面试题
-- 本文档 — 8000-12000 行, 完全聚焦 Gen 4 Agentic RAG, 深度专精
+- [RAG 通用知识地图](./rag-knowledge-map.html) — 18,941 行, 覆盖 4 代 RAG (Naive 朴素 / Advanced 增强 / Modular 模块化 / Agent 智能体) 全栈 + 5 层企业架构 + 60+ 面试题
+- 本文档 (Agentic 专题深度版) — 13500+ 行, 完全聚焦 Gen 4 Agentic RAG, 24 章 + 25 思维导图, 深度专精
 - 内容关系: 通用版 §20 章是本文档的"超级浓缩版", 本文档是 §20 的"专题展开版" (10× 深度)
 
 ---
@@ -137,12 +161,17 @@ Anthropic "Building Effective Agents" (2024.12) 推出的三层架构, 是当前
 ##### 是什么
 - 工程师写死多步流程, LLM 在每个固定节点上做事 (路径预先确定)
 - **关键特征**: 路径固定, 流程图能预先画出来
-- 5 种主流 Pattern (§4 详讲)
+- 5 种主流 Pattern (§4 详讲):
+  - **Prompt Chaining** (链式调用) — 任务拆 N 步串行, 每步独立 prompt
+  - **Routing** (路由分流) — 先分类 query, 再转发到不同分支处理
+  - **Parallelization** (并行) — 同时跑多个独立 LLM, 后聚合 (含 Sectioning 切片 + Voting 投票 两子型)
+  - **Orchestrator-Workers** (中枢-工人) — 中枢 LLM 动态拆任务派给 Worker LLM
+  - **Evaluator-Optimizer** (评估-优化) — Generator 生成, Evaluator 评分, Optimizer 改进, 循环 N 轮
 
 ##### 适用 (8-15% 场景)
 - 任务可预先分解 (e.g. "分类 → 路由 → 答 → 校验")
 - 子任务独立可并行 (e.g. "10 个文档每个独立摘要")
-- 多角色协作但角色固定 (e.g. Researcher + Writer + Critic)
+- 多角色协作但角色固定 (e.g. Researcher 调研 + Writer 写作 + Critic 审稿)
 
 ##### 工程实现
 - 几十行代码 + 标准 LLM API (不需要 LangGraph 等重框架)
@@ -157,10 +186,15 @@ Anthropic "Building Effective Agents" (2024.12) 推出的三层架构, 是当前
 ##### 是什么
 - LLM 在循环里自己决定下一步, 路径运行时生成
 - **关键特征**: 路径动态, 流程图取决于运行时 LLM 输出, 不能预先画
-- 5 种主流形态 (§2 详讲)
+- 5 种主流形态 (§2 详讲):
+  - **Plan-and-Execute** (先规划后执行) — LLM 先输出完整 plan (5-10 步), 再逐步 execute, 失败时 re-plan
+  - **ReAct** (Reasoning + Acting 边想边做) — Thought → Action → Observation 循环, 每步 LLM 独立决策
+  - **Multi-Agent** (多 Agent 协作) — N 个 Agent 各有专长 (e.g. Researcher / Writer / Critic 角色), 通过 handoff 或群聊协作
+  - **Self-Reflection** (自反思) — LLM 输出后自评 + 改进, 迭代 N 轮直到满意
+  - **Iterative** (循环检索, Iterative Retrieval) — 检索 → 看不够 → 再检索 → 再看, 多跳推理直到信息完整
 
 ##### 适用 (2-5% 场景)
-- 任务无法预先分解 (e.g. Coding / 跨多源诊断 / 探索性研究)
+- 任务无法预先分解 (e.g. Coding 编程 / 跨多源诊断 / 探索性研究)
 - 需要 LLM 自己判断"何时停"
 - 跨 3+ 数据源的诊断
 - 需要执行操作 (创建工单 / 修代码 / 提 PR)
@@ -2502,11 +2536,11 @@ Anthropic "Building Effective Agents" (2024.12) 推出的三层架构, 是当前
 | 跨任务 | 无 | 强 (Agent 完成 task 1 记到 task 2) |
 
 #### 6.1.4 Memory 在 Agent 7 层架构的位置 (回顾 §3)
-- Memory 是横切层, 服务全部 7 层
-- L0 Query Understanding 用 Memory 拿用户偏好
-- L2 Planner 用 Memory 拿历史成功 plan
-- L4 Tool 用 Memory 拿历史调用结果 (避免重调)
-- L5 Synthesizer 用 Memory 拿历史输出风格
+- Memory 是横切层 (作为 §3 的 L5), 服务全部 7 层
+- L1 Query Understanding 用 Memory 拿用户偏好
+- L3 Planner 用 Memory 拿历史成功 plan
+- L4 Tool Loop 用 Memory 拿历史调用结果 (避免重调)
+- L6 Synthesizer 用 Memory 拿历史输出风格
 
 #### 6.1.5 Memory 设计 4 个核心问题
 - **问题 1**: 存什么 (what)? — 全部对话还是抽要点
@@ -7000,21 +7034,21 @@ Anthropic "Building Effective Agents" (2024.12) 推出的三层架构, 是当前
 
 **考察知识点**: Agentic RAG 架构设计
 
-**完整答案**:
-- **L0 — Query Understanding**: query 分类 / rewrite / 意图识别
-- **L1 — Router**: 路由到不同处理分支 (规则 70% / 语义 20% / LLM 10%)
-- **L2 — Planner**: 复杂 query 生成多步 plan
-- **L3 — Executor / Tool Loop**: ReAct 循环 + 工具调用
-- **L4 — Memory**: 三层 Memory 横切服务全部
-- **L5 — Synthesizer**: 多源信息综合生成答案
-- **L6 — Validator**: 输出审计 + Guardrail + Citation
-- **L7 — Cost Controller**: budget / latency / 死循环 防御 (横切)
+**完整答案** (跟 §3 编号对齐):
+- **L1 — Query Understanding** (入口理解): query 解析 / 分类 / rewrite / 意图识别 / 注入用户偏好
+- **L2 — Router** (路由分流): 路由到不同处理分支 (规则 70% / 语义 20% / LLM 10%)
+- **L3 — Planner** (规划): 复杂 query 生成多步 plan (5-10 步)
+- **L4 — Tool Loop** (工具循环): ReAct 循环 + 工具调用 + 观察反馈
+- **L5 — Memory** (记忆, 横切): 三层 Memory (Redis Session / Postgres User / Vector Business) 服务全部层
+- **L6 — Synthesizer** (综合): 多源信息综合生成最终答案
+- **L7 — Validator** (校验): 输出审计 + Guardrail + Citation 强制
+- **⊥ Cost Controller** (横切): 全程 budget / latency / 死循环 防御
 
 **追问**: 每层都必须吗?
-**答**: 不一定. 简单 Agent 只需 L3 + L4. 企业级 Agent 全 7 层. 每加一层多 200-500ms 延迟 + 复杂度.
+**答**: 不一定. 简单 Agent 只需 L4 + L5. 企业级 Agent 全 7 层. 每加一层多 200-500ms 延迟 + 复杂度.
 
-**追问**: L0 vs L1 区别?
-**答**: L0 understand (做什么), L1 route (派给谁). 一些设计合并 L0+L1.
+**追问**: L1 vs L2 区别?
+**答**: L1 understand (做什么 / 是什么意图), L2 route (派给谁 / 走哪条路). 一些设计合并 L1+L2 但分开更清晰.
 
 **反例**: ❌ 没 L7 Cost Controller (一上线烧爆) ❌ 没 L6 Validator (LLM 幻觉直出)
 
