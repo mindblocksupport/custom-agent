@@ -1809,25 +1809,2706 @@ Anthropic "Building Effective Agents" (2024.12) 推出的三层架构, 是当前
 - 详见 §1.3 三层选型决策树
 
 
-## 五. Tool Calling 深度 (待写, 阶段 2 完成)
+## 五. Tool Calling 深度 (Function Calling / Tool Use)
 
-> 阶段 2 内容: 三家 API 完整对比 + MCP 协议 + Computer Use + Browser Use + 工具池设计 + 工具描述工程
+### 5.0 Tool Calling 思维导图 ⭐
 
-## 六. Memory 深度 (待写, 阶段 2 完成)
+> 进入本章前先看这张思维导图建立全章认知.
 
-> 阶段 2 内容: 三层 Memory + Episodic / Semantic / Procedural / Skill Memory + 摘要策略 + 跨用户隔离
+### 5.1 Tool Calling 是什么 — Agent 的"四肢"
 
-## 七. Multi-Agent 系统 (待写, 阶段 2 完成)
+#### 5.1.1 一句话
+- Tool Calling (又名 Function Calling / Tool Use) 是 LLM 调用外部工具能力的统称
+- LLM 输出结构化 JSON (函数名 + 参数), 由宿主程序执行后回灌结果
+- **是 Agent 跟外部世界交互的唯一通道, 没 Tool Calling 就只是聊天机器人**
 
-> 阶段 2 内容: Orchestrator + Hierarchical + Swarm + CAMEL + Magentic-One + 通信协议
+#### 5.1.2 为什么需要 — LLM 三大固有缺陷
+- **知识截断 (Knowledge Cutoff)**: Sonnet 4.5 截止 2025.01, 问 2026 事不知道 → 需要 web_search 工具
+- **不能算 (Math)**: GPT-4 算 17 × 24 错 30%, Sonnet 4.5 算 4 位数乘法错 12% → 需要 calculator
+- **不能查私有数据**: LLM 不知用户订单 → 需要 query_database 工具
+- **不能改世界**: LLM 不能发邮件不能下单不能改文件 → 需要 send_email / place_order / write_file
+- **结论**: Tool Calling 是 LLM 跟"实时信息 + 计算 + 私有 KB + 副作用动作"接口
 
-## 八. 高级 RAG-Agent 模式 (待写, 阶段 2 完成)
+#### 5.1.3 6 步标准流程 (Anthropic / OpenAI 通用)
 
-> 阶段 2 内容: Self-RAG / CRAG / GraphRAG / LightRAG / Adaptive RAG / Reflexion / Tree of Thoughts
+##### 步 1 — 工具注册 (开发者侧)
+- 工程师定义工具 schema: 名称 / 描述 / 参数 (JSON Schema)
+- 注入到 system prompt 或 API tools 字段
+- LLM 在生成时知道"我有这些工具可用"
 
-## 九. Agent 框架对比 (待写, 阶段 2 完成)
+##### 步 2 — LLM 决定要不要调工具
+- 用户输入 query 后, LLM 内部判断:
+  - 直接答能 → 输出文本
+  - 需外部信息 / 动作 → 输出 tool_use 块 (含函数名 + 参数)
+- 这一步是 LLM 自主决策, 工程师不能干预
 
-> 阶段 2 内容: 8 主流框架深度对比 + 选型决策
+##### 步 3 — 宿主接收 tool_use 块
+- 解析 LLM 输出的 JSON
+- 提取 tool_name + arguments
+- **关键: 这里宿主可加 guardrail (允许/拒绝/改参数)**
+
+##### 步 4 — 宿主执行工具
+- 调对应函数 (本地 / RPC / HTTP API)
+- 拿到原始结果 (可能是 dict / string / file)
+- 异常要捕获并以可读形式返回 LLM (不要原始 stack trace)
+
+##### 步 5 — 结果回灌 LLM
+- 把 tool_result 块放回对话历史
+- 含字段: tool_use_id (匹配步 2 的 ID) + content (结果)
+- 重新调 LLM, LLM 看到结果继续推理
+
+##### 步 6 — LLM 综合输出
+- LLM 看 tool_result 后, 可能:
+  - 直接综合答案给用户
+  - 再调另一个工具 (chain)
+  - 调同一工具 (多次查询)
+- 直到 LLM 输出 stop_reason = end_turn 才算这轮结束
+
+#### 5.1.4 跟传统 Function Call 的区别
+
+| 维度 | 传统 Function Call (e.g. Python) | LLM Tool Calling |
+|---|---|---|
+| 谁决定调用 | 工程师写死 if/else | LLM 运行时决定 |
+| 参数来源 | 工程师传 | LLM 从 query 抽取 + 推断 |
+| 错误处理 | try/except | 错误回灌 LLM, 让 LLM 自己重试 |
+| 执行环境 | 同一 process | LLM 在云, 工具在本地 (跨网络) |
+| 调用次数 | 一次 | LLM 可链式调多次 |
+
+#### 5.1.5 关键金句
+- ✅ "Tool 是 Agent 的四肢, Memory 是 Agent 的脑, Planner 是 Agent 的意志" (业界共识)
+- ✅ "工具描述写得不好, LLM 用错工具或不用工具" (Anthropic 官方反复强调)
+- ✅ "工具数量超过 12 个, 召回率开始塌" (Anthropic 内部实验)
+
+### 5.2 三家 API 完整对比 — Anthropic / OpenAI / Gemini
+
+#### 5.2.1 三家速记表
+
+| 维度 | Anthropic Claude | OpenAI GPT | Google Gemini |
+|---|---|---|---|
+| 推出时间 | 2024.05 (Claude 3) | 2023.06 (GPT-3.5) | 2024.05 (Gemini 1.5) |
+| 输出块名 | tool_use block | tool_calls array | function_call part |
+| 工具定义字段 | tools (top-level) | tools (top-level) | tools.function_declarations |
+| 参数 schema | input_schema (JSON Schema) | parameters (JSON Schema) | parameters (OpenAPI Schema) |
+| 并行调用 | ✅ 默认支持 (parallel_tool_use) | ✅ 默认支持 | ✅ 支持 |
+| 强制调用 | tool_choice={"type": "tool", "name": "..."} | tool_choice={"type": "function", "function": {"name": "..."}} | tool_config.function_calling_config.mode = "ANY" |
+| 禁用工具 | tool_choice={"type": "none"} | tool_choice="none" | mode = "NONE" |
+| 流式 | ✅ tool_use_delta 增量返参数 | ✅ delta.tool_calls | ✅ chunk.function_call |
+| 成本 (Sonnet/GPT-5/Pro) | $3/$15 1M tokens | $1.25/$10 (GPT-5) | $1.25/$10 (Pro 2.5) |
+
+#### 5.2.2 Anthropic Tool Use 详解
+
+##### 工具定义示例 (伪代码描述)
+- tools = [{"name": "get_weather", "description": "获取指定城市当前天气", "input_schema": {"type": "object", "properties": {"city": {"type": "string"}, "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}}, "required": ["city"]}}]
+
+##### LLM 输出结构 (响应 content 数组)
+- content[0] = {"type": "text", "text": "我帮您查询..."}
+- content[1] = {"type": "tool_use", "id": "toolu_01ABC", "name": "get_weather", "input": {"city": "Beijing", "unit": "celsius"}}
+- 注意 stop_reason = "tool_use"
+
+##### 结果回灌结构 (下一轮 messages)
+- {"role": "assistant", "content": [上一轮的 content]}
+- {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01ABC", "content": "12°C, 多云"}]}
+
+##### Anthropic 独有特性
+- **disable_parallel_tool_use**: 强制 LLM 一次只调一个 (避免多调) , Anthropic 2024.10 加入
+- **tool_choice "auto" / "any" / "tool" / "none"** 4 种, 控制最细
+- **tool_use_id 必须严格匹配回灌**, 否则 API 报 400
+- **prompt caching** 跟 tool_use 完美配合, 工具定义可缓存 (省 35-49%)
+
+#### 5.2.3 OpenAI Function Calling 详解
+
+##### 工具定义示例 (伪代码)
+- tools = [{"type": "function", "function": {"name": "get_weather", "description": "...", "parameters": {"type": "object", "properties": {...}, "required": ["city"]}}}]
+
+##### LLM 输出结构 (response.choices[0].message)
+- message.role = "assistant"
+- message.content = null (或 partial 文本)
+- message.tool_calls = [{"id": "call_ABC", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\": \"Beijing\"}"}}]
+- 注意 arguments 是 JSON string 不是对象 (跟 Anthropic 不同)
+
+##### 结果回灌结构
+- {"role": "assistant", "content": null, "tool_calls": [上一轮 tool_calls]}
+- {"role": "tool", "tool_call_id": "call_ABC", "content": "12°C, 多云"}
+
+##### OpenAI 独有特性
+- **strict mode (2024.08 推出)**: parameters 加 "strict": true, schema 强制遵守 (但有限制: 不能用 anyOf / 嵌套递归)
+- **tool_choice "required"** 强制必调一个 (但 LLM 选哪个)
+- **arguments 是 JSON string**, 需 json.loads (容易忘 → 真实事故源)
+
+#### 5.2.4 Gemini Function Calling 详解
+
+##### 工具定义示例 (伪代码)
+- tools = [{"function_declarations": [{"name": "get_weather", "description": "...", "parameters": {"type": "OBJECT", "properties": {"city": {"type": "STRING"}}}}]}]
+- 注意 type 大写 (跟 OpenAI / Anthropic 不同)
+
+##### LLM 输出结构 (response.candidates[0].content)
+- content.parts[0].function_call = {"name": "get_weather", "args": {"city": "Beijing"}}
+- 注意 args 是 dict (跟 Anthropic 一样, 跟 OpenAI 不一样)
+
+##### 结果回灌结构
+- {"role": "model", "parts": [上一轮 function_call]}
+- {"role": "function", "parts": [{"function_response": {"name": "get_weather", "response": {"result": "12°C, 多云"}}}]}
+
+##### Gemini 独有特性
+- **tool_config mode**: AUTO / ANY / NONE 三档 (比 OpenAI / Anthropic 简单)
+- **allowed_function_names**: ANY 模式下可指定子集
+- **function_response 必须包 result key**: 跟 OpenAI / Anthropic 不一样
+
+#### 5.2.5 三家 API 字段名对照表 (跨家迁移必备)
+
+| 概念 | Anthropic | OpenAI | Gemini |
+|---|---|---|---|
+| 工具数组顶层 | tools | tools | tools |
+| 单工具 wrapper | (无, 直接对象) | {"type": "function", "function": {...}} | {"function_declarations": [...]} |
+| 工具名 | name | function.name | name |
+| 工具描述 | description | function.description | description |
+| 参数 schema | input_schema | function.parameters | parameters |
+| 强制调用模式 | tool_choice.type | tool_choice | tool_config.function_calling_config.mode |
+| LLM 输出块 | content[].type=tool_use | message.tool_calls | content.parts[].function_call |
+| 调用 ID | id | id | (无, 用 name 匹配) |
+| 工具参数 | input (dict) | arguments (JSON string) | args (dict) |
+| 工具结果块 | type=tool_result, tool_use_id | role=tool, tool_call_id | role=function, function_response.name |
+
+#### 5.2.6 真实迁移案例 — OpenAI → Anthropic
+
+##### Klarna (2024.06 公开)
+- 原 GPT-4 客服 Agent, 月账单 $3.5M
+- 迁 Sonnet 3.5, 月账单降到 $1.8M (降 49%)
+- 主要改造: tool_calls → content[tool_use], arguments JSON string → input dict, role=tool → tool_result
+
+##### 常见迁移坑
+- ❌ 忘了 OpenAI arguments 是 string, Anthropic 是 dict (直接传错)
+- ❌ Gemini type 必须大写 (STRING 不是 string), 抄 OpenAI schema 直接错
+- ❌ Anthropic tool_use_id 必须严格匹配, 不能省略
+- ✅ 用统一中间层抽象 (LiteLLM / LangChain LLM wrapper) 屏蔽差异
+
+### 5.3 MCP (Model Context Protocol) 深度 — Anthropic 2024.11 新协议
+
+#### 5.3.1 解决什么问题
+- 每家 LLM tool calling API 不同 → 工具不能跨 LLM 复用
+- 每加一个工具要改 LLM 配置, 部署痛苦
+- 工具供应商跟 LLM 提供方紧耦合, 生态难复用
+- **MCP 解法: 统一标准协议, 工具服务跟 LLM 解耦**
+
+#### 5.3.2 MCP 架构 — 3 角色
+
+##### 角色 1 — MCP Host (Claude Desktop / Cursor / IDE)
+- 用户交互的应用, 内嵌 LLM 调用
+- 通过 MCP Client 连接外部 MCP Server
+- 例: Claude Desktop 是 Host, 用户在 Desktop 跟 Sonnet 对话
+
+##### 角色 2 — MCP Client (Host 内的 SDK)
+- Host 内部组件, 跟 MCP Server 通信
+- 每个 Server 一个独立 Client (1:1)
+- 负责协议握手 / capability 协商 / 转换 LLM tool_use 到 MCP 调用
+
+##### 角色 3 — MCP Server (工具提供方)
+- 独立进程 / 服务, 实现具体工具
+- 暴露 3 类资源:
+  - **Tools**: 函数 (LLM 可调)
+  - **Resources**: 数据 (LLM 可读, e.g. 文件 / 数据库表)
+  - **Prompts**: 模板 (LLM 可用)
+- 例: GitHub MCP Server 暴露 list_repos / create_issue / search_code 等
+
+#### 5.3.3 MCP 协议栈
+
+##### 传输层 (Transport)
+- **stdio**: 本地 Server, Host 通过 stdin/stdout 通信 (最常用)
+- **HTTP+SSE**: 远程 Server, 用 Server-Sent Events 流式
+- 2025.03 加入 streamable HTTP, 替代 SSE
+
+##### 消息格式 (Message Format)
+- JSON-RPC 2.0 标准
+- Request: {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+- Response: {"jsonrpc": "2.0", "id": 1, "result": {"tools": [...]}}
+- Notification: 无 id, 服务端推送
+
+##### 核心方法 (Core Methods)
+- **initialize**: 握手, 协商 protocol version + capabilities
+- **tools/list**: 列出工具
+- **tools/call**: 调用工具
+- **resources/list**: 列出资源
+- **resources/read**: 读取资源
+- **prompts/list**: 列出 prompt 模板
+- **prompts/get**: 获取 prompt
+
+#### 5.3.4 MCP vs 传统 Tool Calling 对比
+
+| 维度 | 传统 Tool Calling | MCP |
+|---|---|---|
+| 工具部署 | 嵌入应用代码 | 独立 Server 进程 |
+| 工具复用 | 跨应用难 (需复制代码) | 跨应用易 (Server 独立) |
+| LLM 解耦 | 强耦合 (改 LLM 改代码) | 弱耦合 (Server 跟 LLM 无关) |
+| 协议 | 各家 LLM 自定义 | JSON-RPC 2.0 统一 |
+| 生态 | 工具自己写 | 社区共享 (npm / PyPI) |
+| 安全 | 工具跑在应用进程 | 工具跑在独立进程 (隔离) |
+| 学习曲线 | 简单 | 中等 (要懂协议) |
+
+#### 5.3.5 MCP 生态 (2025-2026)
+
+##### 官方 Server (Anthropic 维护)
+- **filesystem**: 读写本地文件
+- **github**: GitHub 操作 (issue / PR / search)
+- **postgres**: SQL 查询 + schema introspection
+- **brave-search**: Web 搜索
+- **slack**: Slack 消息 / 频道操作
+- **memory**: 持久化 KV store (跨会话)
+- **puppeteer**: 浏览器自动化
+
+##### 社区 Server (PyPI / npm 上 1000+)
+- AWS / GCP / Azure 服务包装
+- Notion / Linear / Jira / Asana
+- Stripe / Shopify / Square
+- Datadog / Grafana / PagerDuty
+- 国内: 阿里云 / 腾讯云 / 钉钉 / 飞书
+
+##### 主流 Host (支持 MCP)
+- **Claude Desktop** (官方, 2024.11 发布)
+- **Cursor** (2025.01 加入)
+- **Continue.dev** (VSCode 插件, 2025.01)
+- **Cline** (VSCode 插件)
+- **Zed** (Editor)
+- **Anthropic Claude Agent SDK** (2025.05+)
+
+#### 5.3.6 MCP 真实采用
+
+##### Cursor IDE (2025.01)
+- 内置 50+ MCP Server (GitHub / Jira / Linear / Sentry / 等)
+- 用户可自己加任何 npm/PyPI MCP Server
+- 月活几百万开发者用 MCP 连企业系统
+
+##### Anthropic 内部
+- 客服 Agent 内部用 MCP 连 Salesforce / Zendesk / 内部 KB
+- 工程师 Agent (Claude Code) 用 filesystem / github / playwright MCP
+
+##### Block (Square 母公司) (2025.02 公开)
+- 内部 1000+ 员工每天用 Claude Desktop + 自研 MCP Server 操作内部系统
+- 节省 30% 工程时间 (CEO Jack Dorsey 公开 say)
+
+#### 5.3.7 MCP 反模式 + 真实事故
+
+- ❌ **MCP Server 不做权限控制**: 用户 A 通过 Claude Desktop 读到用户 B 文件 (2025.03 某公司事故)
+- ❌ **MCP Server 没限制 path**: filesystem MCP 能读到 /etc/passwd (CVE-2025-XXXX)
+- ❌ **超过 30 个 MCP Server 同时连**: tool list 太大 (300+ tools), LLM 选错工具率塌到 60%
+- ❌ **MCP Server 死循环没保护**: tool 内部调 LLM 又触发 tool, 死循环烧 $$ (Cursor 早期 bug, 单用户 1 小时烧 $200)
+- ✅ 标配: 每个 MCP Server 加 ACL + path whitelist + 工具数 ≤ 12
+
+#### 5.3.8 MCP 最佳实践
+
+- 工具数控制 ≤ 12 (超过准确率塌, 见 §5.4.3)
+- 每个 Server 单一职责 (GitHub Server 只做 GitHub, 不混 Jira)
+- Server 独立部署 + 独立日志 + 独立监控
+- 敏感操作 (write / delete / 转账) 加 human-in-the-loop 二次确认
+- 用 Anthropic prompt caching 缓存工具定义 (省 35-49% 成本)
+
+### 5.4 工具池设计原则 — 工具数 / 描述工程 / Few-shot
+
+#### 5.4.1 工具数量黄金区间
+- **5-12 个工具**: LLM 选择准确率 95%+, 是 sweet spot
+- **3-5 个**: 准确率 98%+ 但场景太窄
+- **12-20 个**: 准确率掉到 80-90%, 边缘场景频繁选错
+- **20-30 个**: 准确率掉到 70-80%, 容易 hallucinate 不存在的工具
+- **30+ 个**: 准确率塌到 60% 以下, 几乎不可用
+
+#### 5.4.2 工具数过多的解决方案
+
+##### 方案 1 — 工具分组 + Router Agent
+- 把 30 个工具分到 5 组 (e.g. CRM / 财务 / 沟通 / 数据 / 文档)
+- 一级 Router Agent 先选组 (5 选 1)
+- 二级 Worker Agent 在组内选具体工具 (6 选 1)
+- 准确率从 70% 回到 92%+
+
+##### 方案 2 — Tool Retrieval (动态工具池)
+- 把 100+ 工具描述存向量库
+- query 来时先 RAG 召回 top-10 相关工具
+- 只把 top-10 给 LLM
+- 适合工具数极大场景 (e.g. SaaS 平台几百 API)
+
+##### 方案 3 — Hierarchical Tools
+- 顶层 5-7 个抽象工具 (e.g. "数据查询" / "数据修改" / "通知")
+- 每个抽象工具内部分发到具体子工具
+- 减少 LLM 选择空间
+
+#### 5.4.3 工具描述工程 (Tool Description Engineering)
+
+##### 原则 1 — Description 字段是首要战场
+- LLM 选工具靠 description, 不是 name
+- description 要写清: 做什么 + 输入是什么 + 输出是什么 + 何时用 + 何时不用
+- 烂描述: "get weather" → LLM 不知给城市还是经纬度
+- 好描述: "Get current weather for a specified city. Input: city name in English. Output: temperature, condition, humidity. Use when user asks about weather. Do not use for forecast (use get_forecast instead)"
+
+##### 原则 2 — 参数 description 同样重要
+- 不只工具有 description, 每个参数也要有
+- 烂: {"city": {"type": "string"}}
+- 好: {"city": {"type": "string", "description": "City name in English, e.g. 'Beijing', 'New York'. Do not pass Chinese name."}}
+- 这样 LLM 才知道要传什么格式
+
+##### 原则 3 — Few-shot 示例放 system prompt
+- 在 system prompt 里给 1-3 个工具调用示例
+- e.g. "用户问'明天北京天气', 应该调 get_forecast(city='Beijing', date='tomorrow')"
+- 比单纯写 description 有效 5-10×
+
+##### 原则 4 — 错误案例反向教学
+- system prompt 加: "不要把'北京'传给 city, 必须传英文 'Beijing'"
+- 反向教学比正向教学有时更有效
+
+##### 原则 5 — 命名清晰
+- 工具名用动词开头 (get_weather / send_email)
+- 不用缩写 (get_w → get_weather)
+- 不用 1 / 2 / new (get_weather_v2 → get_weather_by_coordinates)
+
+#### 5.4.4 Few-shot 模板 (业界标配)
+
+##### system prompt 结构 (伪代码描述)
+- "You are a helpful assistant with access to tools."
+- "Available tools:"
+- "1. get_weather: ... (description)"
+- "2. send_email: ... (description)"
+- ...
+- "Examples:"
+- "User: '明天北京天气' → Call get_forecast(city='Beijing', date='2026-04-27')"
+- "User: '发邮件给 alice' → Ask user for email content first, then call send_email(...)"
+- ...
+- "Important: When uncertain, ask user before calling tool."
+
+#### 5.4.5 Anthropic 官方建议 (Building Effective Agents 2024.12)
+- 工具描述写得像给"新员工 1 小时上手手册"
+- 投入工具描述的时间, 跟投入 LLM prompt 时间一样多
+- 工具数 ≤ 12, 多了上 hierarchical
+- 描述里写"什么时候用 / 什么时候别用" (LLM 容易乱用)
+
+### 5.5 Computer Use — Anthropic GUI Agent 深度
+
+#### 5.5.1 一句话
+- Anthropic 2024.10 发布 Computer Use, Claude 能看屏幕截图 + 操作鼠标键盘
+- 模型: claude-3-5-sonnet-20241022 (后续 4.x 增强)
+- **能做什么**: 跨任意桌面应用执行任务 (Excel / 浏览器 / IDE / 设计工具)
+
+#### 5.5.2 核心能力 — 4 个原子操作
+
+##### 操作 1 — screenshot
+- 截当前屏幕图 (PNG)
+- LLM 看图分析当前 UI 状态
+- 是 Computer Use 的"眼睛"
+
+##### 操作 2 — mouse (3 种)
+- mouse_move (x, y): 移光标
+- left_click / right_click / double_click: 点
+- drag (start, end): 拖拽
+
+##### 操作 3 — keyboard
+- key (key_name): 按键 (e.g. "Return" / "ctrl+s")
+- type (text): 输入文本
+
+##### 操作 4 — bash (可选)
+- 直接执行 shell 命令
+- Anthropic 推荐 GUI 不行才用 bash
+
+#### 5.5.3 6 步典型循环
+- 步 1 — LLM 读用户指令 (e.g. "在 Excel 里加一列求和")
+- 步 2 — LLM 调 screenshot 看当前屏幕
+- 步 3 — LLM 分析图, 决定下一步操作 (e.g. 点击 D1 单元格)
+- 步 4 — LLM 输出 mouse_move + left_click
+- 步 5 — 宿主执行 + 截新图
+- 步 6 — LLM 看新图, 决定下一步, 直到任务完成
+
+#### 5.5.4 跟 RPA (UiPath / Automation Anywhere) 对比
+
+| 维度 | 传统 RPA | Computer Use |
+|---|---|---|
+| 流程定义 | 工程师录制脚本 / 拖拽 | LLM 运行时决定 |
+| UI 变化适应 | 强依赖 selector, UI 改就坏 | LLM 看图理解, 适应性强 |
+| 跨应用 | 难 (每个应用要单独适配) | 易 (LLM 通用看图) |
+| 速度 | 快 (无 LLM 推理) | 慢 (每步 LLM 推理) |
+| 成本 | 一次性脚本开发费 | 持续 LLM token 费 |
+| 准确率 | 99%+ (只要 UI 不变) | 85-95% (LLM 偶尔错点) |
+| 调试 | 易 (脚本可视化) | 难 (LLM 决策黑盒) |
+
+#### 5.5.5 真实采用 + 案例
+
+##### Anthropic 官方 demo (2024.10 发布)
+- 在线订机票 (端到端): 看 query → 打开浏览器 → 搜航班 → 填表 → 付款
+- 端到端用时 ~5 分钟, 成本 ~$0.5
+
+##### 业界采用
+- **AlphaXiv** (论文翻译): Computer Use 操作 LaTeX 编辑器
+- **Anthropic 内部**: QA 测试自动化 (替代部分 Selenium)
+- **OpenAI Operator** (2025.01 跟进): 类似 Computer Use, 主打消费场景
+
+##### 中国国内采用
+- 暂无大规模公开 case, 主要因 Computer Use 需 Sonnet API + 速度限制
+- 国内厂商 (智谱 / 月之暗面) 在 2025-2026 跟进类似产品
+
+#### 5.5.6 真实事故 + 反模式
+
+##### 事故 1 — Anthropic Computer Use Demo (2024.10) 删文件
+- LLM 在 demo 中误判 UI, 点了"删除"按钮
+- 删了 demo VM 内重要文件
+- Anthropic 官方公开 say "the model is not perfect, treat as research preview"
+
+##### 事故 2 — 跨应用切换混乱 (社区报告 2024.11)
+- LLM 截图后, 用户切到另一应用
+- LLM 在新应用上点击, 操作错误目标
+- 修复: 截图后立即操作, 中间不允许用户输入
+
+##### 反模式
+- ❌ Computer Use 跑生产环境 (太慢 / 准确率不够)
+- ❌ 给 Computer Use 管理员权限 (rm -rf 风险)
+- ❌ 不加 human-in-the-loop (重要操作前必须用户确认)
+- ❌ Computer Use 跑加密货币交易 (一旦错点损失大)
+- ✅ 标配: VM 隔离 + 操作日志 + 重要操作 HITL + 限定 working app
+
+#### 5.5.7 Computer Use 性能 + 成本
+
+| 任务复杂度 | 步数 | 用时 | 成本 |
+|---|---|---|---|
+| 简单 (打开 app, 输文本, 保存) | 5-10 | 30s-1min | $0.05-0.15 |
+| 中等 (多步表单填写) | 15-25 | 2-5min | $0.3-1.0 |
+| 复杂 (跨 app 数据迁移) | 30-50 | 5-15min | $1-5 |
+| 超复杂 (端到端订机票) | 50+ | 10-30min | $2-10 |
+
+### 5.6 Browser Use — 浏览器 Agent 深度
+
+#### 5.6.1 一句话
+- Browser Use 是 Computer Use 的浏览器特化版本
+- 直接用 Chrome DevTools Protocol (CDP) / Playwright / Puppeteer 操作
+- 比 Computer Use 快 10× + 准 (因为有 DOM 而不是看图)
+
+#### 5.6.2 主流框架对比
+
+| 框架 | 公司/作者 | 推出 | 底层 | 主打 |
+|---|---|---|---|---|
+| **Browser Use** | browser-use.com | 2024.11 | Playwright + GPT-4/Claude | 通用 web Agent |
+| **Stagehand** | Browserbase | 2024.10 | Playwright + AI | act + extract + observe |
+| **AgentQL** | TinyFish | 2024.06 | 自研 query lang | 替代 selector |
+| **Skyvern** | Skyvern.com | 2024.07 | 视觉 + DOM 混合 | 表单填写专精 |
+| **Anthropic Playwright MCP** | Anthropic | 2025.01 | Playwright + MCP | Cursor / Claude Desktop |
+
+#### 5.6.3 Browser Use 工作流程
+
+##### 步 1 — 启动 Browser
+- 通过 Playwright 启动 Chromium
+- 加载初始 URL
+
+##### 步 2 — Agent 分析当前页
+- 提取 DOM (HTML 结构)
+- 截屏 (作为 fallback)
+- 提取交互元素 (button / input / link), 编号
+- e.g. "[1] button '登录', [2] input '邮箱', [3] input '密码'"
+
+##### 步 3 — LLM 决定操作
+- 看用户指令 + 当前页元素列表
+- 输出: "click 1" / "input 2 'alice@example.com'" / "scroll down"
+
+##### 步 4 — 执行 + 等待加载
+- 通过 Playwright API 执行
+- 等待 DOM 变化稳定 (避免点 too fast)
+
+##### 步 5 — 重复直到任务完成
+
+#### 5.6.4 Browser Use 跟 Computer Use 区别
+
+| 维度 | Computer Use | Browser Use |
+|---|---|---|
+| 范围 | 整个桌面 (任何 app) | 仅浏览器 |
+| 操作方式 | 看图 + 鼠标键盘 | 看 DOM + Playwright API |
+| 速度 | 慢 (每步截图分析) | 快 (DOM 直接结构化) |
+| 准确率 | 85-95% | 95-99% (DOM 准) |
+| 成本 | 高 (每步用图 token) | 低 (DOM 文本 token) |
+| 适用 | 跨 app 任务 | 纯 web 任务 |
+| 上手 | 难 (要 VM 配置) | 易 (npm install) |
+
+#### 5.6.5 真实采用
+
+##### Devin (Cognition Labs, 2024.03)
+- Browser Use 是 Devin 核心组件之一
+- 用于看文档 / 搜 stackoverflow / 测 web app
+
+##### Manus (Monica.im 2025.02)
+- 中国团队作品, 火爆出圈
+- 用 Browser Use 做端到端任务 (e.g. 帮用户买机票 / 订餐)
+
+##### Browser Use (开源项目本身)
+- GitHub 30k+ stars (2025)
+- 多家公司用作 RPA 替代品
+
+##### Skyvern 生产案例
+- 美国某保险公司用 Skyvern 自动填理赔表单
+- 替代 30 人 RPA 团队
+- 成本降 70%
+
+#### 5.6.6 反模式 + 真实事故
+
+##### 事故 1 — Browser Use 触发反爬
+- LLM 操作太机械 (固定间隔点击 / 总按 Tab)
+- 触发 Cloudflare / DataDome 反爬
+- 修复: 加随机延迟 + 模拟人类鼠标轨迹
+
+##### 事故 2 — 误删购物车
+- 用户说"清理购物车里我不要的", LLM 把全部删了
+- 修复: 删除前必须 LLM 确认 + HITL
+
+##### 反模式
+- ❌ Browser Use 跑加密货币交易 (一次错点损失大)
+- ❌ 不限制访问域名 (LLM 可能被钓鱼跳转到恶意站)
+- ❌ 不监控操作日志 (出事查不到)
+- ✅ 标配: 域名 whitelist + 操作日志 + 关键操作 HITL + 反爬随机化
+
+### 5.7 工具反模式总集 + 真实事故
+
+#### 5.7.1 反模式 1 — 工具数过多
+
+##### 现象
+- 工具池有 30+ 个 tool
+- LLM 频繁选错工具 / 调不存在的工具
+
+##### 根因
+- LLM 上下文 attention 在工具列表上分散
+- 准确率掉到 60-70%
+
+##### 修复
+- 拆 hierarchical (5 大类 × 6 工具)
+- 或上 Tool Retrieval (动态召回 top-10)
+
+#### 5.7.2 反模式 2 — 工具描述太短
+
+##### 现象
+- description 只写一句 "get weather"
+- LLM 不知传什么参数 / 何时用
+
+##### 根因
+- description 是 LLM 选工具的核心信号
+- 短描述 → LLM 靠 name 猜, 准确率塌
+
+##### 修复
+- 每个工具 description 写 50-200 字
+- 包: 做什么 / 输入 / 输出 / 何时用 / 何时不用 / 示例
+
+#### 5.7.3 反模式 3 — 不处理工具异常
+
+##### 现象
+- 工具内部抛异常, 直接返回 stack trace 给 LLM
+- LLM 看不懂, 卡死或乱回
+
+##### 根因
+- LLM 处理结构化异常能力差
+- stack trace 含敏感路径
+
+##### 修复
+- 在工具 wrapper 里 catch all
+- 转成可读 string: "Error: API rate limit exceeded, retry in 60s"
+- LLM 看到这种 string 知道怎么处理
+
+#### 5.7.4 反模式 4 — 副作用工具不加 HITL
+
+##### 现象
+- send_email / delete_file / transfer_money 等副作用工具
+- LLM 自动调, 一旦错就不可逆
+
+##### 根因
+- LLM 偶尔幻觉调错工具
+- 副作用一旦发生不可撤销
+
+##### 修复
+- 副作用工具调用前必须 HITL (human-in-the-loop)
+- 用户点确认才真的执行
+- 关键操作 (转账 / 删数据) 二次密码确认
+
+#### 5.7.5 反模式 5 — 工具死循环
+
+##### 现象
+- 工具 A 内部调 LLM, LLM 又触发工具 A
+- 无限循环烧 $$ + 把 token 池打满
+
+##### 根因
+- 工具内部不该再触发 Agent
+- 死循环检测缺失
+
+##### 修复
+- 工具内部禁用 LLM (只做纯逻辑)
+- 加 max_iterations (e.g. 25 步上限)
+- 加 budget_limit (e.g. 单 query $0.5 上限)
+
+#### 5.7.6 反模式 6 — 跨家 API 字段混淆
+
+##### 现象
+- 从 OpenAI 迁 Anthropic, arguments 还是 JSON string
+- API 报 400 但日志不清晰
+
+##### 根因
+- OpenAI / Anthropic / Gemini 字段名不统一
+- 工程师手抄不留意差异
+
+##### 修复
+- 用统一中间层 (LiteLLM / LangChain LLM wrapper)
+- 自动屏蔽差异
+- 写 type-safe wrapper
+
+#### 5.7.7 真实事故汇总
+
+##### 事故 1 — 某 SaaS 客服 Agent (2024.12)
+- 工具池 50+ 个, LLM 频繁调错
+- 修复: 拆成 5 组 + Router Agent, 准确率从 65% 回到 92%
+
+##### 事故 2 — Cursor 早期 (2024.10)
+- 工具内部调 Cursor agent, agent 又调工具, 死循环
+- 单用户 1 小时烧 $200
+- 修复: 加 max_iterations + 工具内部禁 agent 调用
+
+##### 事故 3 — Replit Agent (2024.09)
+- delete_file 工具不加 HITL
+- LLM 误判删了用户重要文件
+- 修复: 加 HITL + 操作前 git commit 自动备份
+
+##### 事故 4 — Anthropic Computer Use Demo (2024.10)
+- 已述, LLM 误删 demo VM 文件
+
+##### 事故 5 — 某金融 Agent (2025.01)
+- transfer_money 工具不加二次确认
+- 用户测试时 Agent 真的转了钱
+- 修复: 金额 > $100 必须二次密码 + 短信验证
+
+
+## 六. Memory 深度 — 三层架构 + 4 类记忆
+
+### 6.0 Memory 思维导图 ⭐
+
+> 进入本章前先看这张思维导图建立全章认知.
+
+### 6.1 Memory 是什么 — Agent 的"脑"
+
+#### 6.1.1 一句话
+- Memory 是 Agent 跨多轮对话 / 多次任务保留信息的能力
+- 没 Memory 的 LLM 是金鱼脑 (每次新对话都从零)
+- **Memory + Tool + Planner 是 Agent 三大支柱**
+
+#### 6.1.2 为什么需要 Memory
+- LLM 上下文窗口有限 (Sonnet 4.5 = 200K, Gemini 2.5 = 2M)
+- 一次对话超过窗口 → 早的内容丢
+- 跨对话完全断 (新对话 LLM 不记得上一对话)
+- 多用户场景: LLM 不能区分用户 (谁说了什么)
+- **Memory 解法: 把重要信息固化到外部存储, 按需召回**
+
+#### 6.1.3 Memory vs Context Window — 关键区别
+
+| 维度 | Context Window | Memory |
+|---|---|---|
+| 存储介质 | LLM 内部 attention | 外部 (Redis / Postgres / Vector DB) |
+| 容量 | 有限 (200K-2M tokens) | 无限 (硬盘) |
+| 持久性 | 单次对话 | 跨对话 / 跨用户 / 跨日 |
+| 召回方式 | 全部输入 | 按需检索 |
+| 成本 | 高 (Long Context 贵) | 低 (Vector DB 便宜) |
+| 跨用户 | 无 | 强 (按 user_id 隔离) |
+| 跨任务 | 无 | 强 (Agent 完成 task 1 记到 task 2) |
+
+#### 6.1.4 Memory 在 Agent 7 层架构的位置 (回顾 §3)
+- Memory 是横切层, 服务全部 7 层
+- L0 Query Understanding 用 Memory 拿用户偏好
+- L2 Planner 用 Memory 拿历史成功 plan
+- L4 Tool 用 Memory 拿历史调用结果 (避免重调)
+- L5 Synthesizer 用 Memory 拿历史输出风格
+
+#### 6.1.5 Memory 设计 4 个核心问题
+- **问题 1**: 存什么 (what)? — 全部对话还是抽要点
+- **问题 2**: 存哪里 (where)? — Redis (快但贵) / Postgres (久) / Vector DB (语义召回)
+- **问题 3**: 何时召回 (when)? — 每轮都查还是 LLM 决定
+- **问题 4**: 何时遗忘 (forget)? — 永不忘还是 TTL
+
+### 6.2 三层 Memory 架构 (业界标配)
+
+#### 6.2.1 三层概览
+
+| 层 | 名称 | 介质 | 存储内容 | TTL | 召回方式 |
+|---|---|---|---|---|---|
+| **L1** | Session Memory | Redis | 当前对话上下文 (最近 N 轮) | 30min-2h | 全量加载 |
+| **L2** | User Preference | Postgres JSONB | 用户长期偏好 (语言 / 风格 / 设置) | 永久 | 按 user_id 直查 |
+| **L3** | Business Knowledge | Vector DB (Qdrant / Weaviate) | 业务知识 / 历史成功 case | 永久 | 语义召回 |
+
+#### 6.2.2 L1 Session Memory — Redis 实战
+
+##### 为什么用 Redis
+- 内存数据库, 读写 < 1ms
+- 支持 TTL (自动过期)
+- 支持 LIST (FIFO 队列), 适合"最近 N 轮"
+- 支持 HASH, 适合存结构化对话
+
+##### 存储 schema
+- key: `session:{session_id}:messages` (LIST)
+- value: 每个 message JSON {"role": "user/assistant", "content": "...", "ts": 1704067200}
+- TTL: 通常 30min (用户离开 30min 后清)
+- 长度限制: 最多 50 条 (LPUSH + LTRIM 0 49)
+
+##### 召回流程
+- 每轮新 query 来时:
+  - LRANGE session:{id}:messages 0 -1 取全部
+  - 拼成 messages 数组传 LLM
+  - 新对话写入 LPUSH
+- 简单可靠, 不需要任何 LLM 推理
+
+##### 何时升级到 L2 / L3
+- 对话超过 50 轮 → 用 LLM 摘要后存 L3
+- 用户频繁问"我的偏好" → 升级到 L2
+- 跨设备 / 跨日延续 → 升级到 L2 / L3
+
+#### 6.2.3 L2 User Preference — Postgres JSONB
+
+##### 为什么用 Postgres
+- ACID 事务, 偏好不能丢
+- JSONB 字段灵活, schema 可演进
+- 索引支持, 按 user_id 查 < 5ms
+- 跟主业务库一致, 便于关联查询
+
+##### 存储 schema
+- 表 user_preferences (user_id PK, preferences JSONB, updated_at)
+- preferences 例:
+  - {"language": "zh", "tone": "formal", "default_model": "sonnet-4.5", "topics_interested": ["AI", "RAG"], "topics_blacklist": ["politics"]}
+
+##### 写入策略
+- 显式: 用户主动设置 (e.g. settings 页)
+- 隐式: LLM 从对话推断 (e.g. 用户说"以后回答简洁点" → tone = "concise")
+- 隐式写入要 LLM 二次确认 (避免误捕获)
+
+##### 读取流程
+- 每轮 query 来时:
+  - SELECT preferences WHERE user_id = ?
+  - 注入 system prompt: "User prefers: language=zh, tone=formal, ..."
+- 缓存到 Redis (1h TTL) 减少 DB 压力
+
+##### 多设备同步
+- L2 是用户级, 跨设备共享 (用户在手机说的偏好, 电脑也生效)
+- 这是 L1 (session 级) 做不到的关键差异
+
+#### 6.2.4 L3 Business Knowledge — Vector DB
+
+##### 为什么用 Vector DB
+- 业务知识 / 历史成功 case 量大且语义化
+- Postgres 全表扫不行, 需要语义召回
+- Vector DB (Qdrant / Weaviate / Milvus) 专门为此
+
+##### 存储内容
+- 历史成功 plan (Planner 学习用)
+- 历史 tool 调用结果 (避免重调)
+- 用户跨日跨 session 的"记得我" (e.g. "上次我说我家有狗")
+- LLM 摘要后的对话历史 (取代原始)
+
+##### 写入策略
+- 对话结束时, LLM 摘要这次对话核心 (3-5 句)
+- embedding 后存 Vector DB
+- metadata: user_id / session_id / timestamp / topic
+
+##### 召回流程
+- 新 query 来时:
+  - query embed
+  - Vector DB top-5 召回 user_id 内的相关历史
+  - 拼到 system prompt: "Past relevant context: ..."
+- 召回阈值: cosine > 0.6 才用 (避免无关召回)
+
+#### 6.2.5 三层组合策略
+
+##### 标准模式 (业界 80% 用)
+- L1 Redis 存最近 20 轮原始对话
+- L2 Postgres 存用户偏好
+- L3 Vector DB 存超过 20 轮的摘要 + 跨 session 重要事实
+- 每轮 query: L2 读 (1 SQL) + L1 读 (1 LIST) + L3 召回 (1 vector search) → 拼 system prompt
+
+##### 简化模式 (创业早期)
+- 只用 L1 Redis (够 90% 场景)
+- 用户量小, 不需要长期记忆
+
+##### 重度模式 (企业级 KB Agent)
+- L1 + L2 + L3 + L4 (Knowledge Graph) + L5 (Episodic event store)
+- 复杂但能力极强 (e.g. Anthropic Claude Desktop)
+
+### 6.3 4 类 Memory (认知科学分类)
+
+#### 6.3.1 Memory 4 类对照 (源自人脑研究)
+
+| 类 | 定义 | 例 | Agent 实现 |
+|---|---|---|---|
+| **Episodic** (情景) | 时间 + 地点 + 事件 | "上周我在北京吃了烤鸭" | 时序事件 store (timestamp 关键) |
+| **Semantic** (语义) | 抽象事实 / 概念 | "北京是中国首都" | Vector DB (语义召回) |
+| **Procedural** (程序) | 怎么做 | "我会骑自行车" | 工作流 / Skill 库 |
+| **Skill** (技能) | 学过的技巧 | "我会做番茄炒蛋" | 微调过的子模型 / Tool 库 |
+
+#### 6.3.2 Episodic Memory 详解 — 情景记忆
+
+##### 是什么
+- 用户跟 Agent 的具体交互事件
+- 含时间 / 地点 / 行为 / 结果
+- e.g. "2026-04-20 用户问北京天气, Agent 回复'18度多云'"
+
+##### 存储设计
+- Postgres 表 episodes (id, user_id, timestamp, query, response, action, outcome)
+- 也可用专用时序 DB (TimescaleDB / InfluxDB)
+- 索引 user_id + timestamp
+
+##### 召回策略
+- 新 query 来时, 召回该用户最近 7 天 episodes
+- 或语义召回 (embed query + 找相似 episode)
+
+##### 真实采用
+- **Mem.ai** (2024 创业): 把所有用户交互存 episode, Agent 用以"记得"
+- **ChatGPT Memory** (2024.04 推出): 类似机制, 自动保存有用 episode
+
+##### 反模式
+- ❌ 全部对话都存 episode → 量爆 + 隐私风险
+- ❌ 不加 user 选择"记什么" → 用户隐私顾虑
+- ✅ 标配: LLM 判断"这个值得记吗" + 用户可看可删
+
+#### 6.3.3 Semantic Memory 详解 — 语义记忆
+
+##### 是什么
+- 抽象事实 / 概念, 不绑特定时间地点
+- e.g. "用户家有狗, 名叫旺财, 4 岁"
+- 这跟 Episodic 区别: 不是"上周 X 天用户提到狗", 而是抽象事实
+
+##### 存储设计
+- Vector DB (Qdrant / Pinecone) 存事实
+- 每条 fact: text + embedding + user_id + extracted_from_episode_id
+- 用 LLM 从 episode 抽取 fact (e.g. 用户对话提到狗 → 抽出"用户家有狗")
+
+##### 召回策略
+- 每轮都把跟当前 query 语义相似的 fact 注入 system prompt
+- top-5, cosine > 0.7
+
+##### 真实采用
+- **MemGPT** (UC Berkeley, 2023.10): 抽 fact 存 Vector DB
+- **LangMem** (LangChain 2024.07): 分 episodic / semantic 两层
+
+##### 反模式
+- ❌ Fact 抽取不去重 (同一 fact 存 100 次)
+- ❌ Fact 不加 confidence (低质 fact 跟高质混)
+- ✅ 标配: LLM 抽完去重 + confidence 0-1 + 时效衰减
+
+#### 6.3.4 Procedural Memory — 程序记忆
+
+##### 是什么
+- 怎么做某事的"流程知识"
+- e.g. "退款流程: 验证订单 → 查物流 → 走退款审批 → 通知用户"
+- Agent 学到这个流程后, 下次直接复用
+
+##### 存储设计
+- Workflow definition (JSON / YAML / Python)
+- 关联触发条件 (e.g. user_intent = 退款 → 触发流程)
+
+##### 实现方式
+- **方式 1**: 工程师写死 (大部分公司用这个)
+- **方式 2**: LLM 学 (Voyager 风格, Agent 自己积累 skill)
+
+##### 真实采用
+- **Voyager** (NVIDIA 2023): Minecraft Agent 自己学 skill, 存 procedural memory
+- **企业 RPA** (UiPath / Automation Anywhere): 工程师定义的流程 = procedural memory
+
+##### 反模式
+- ❌ Procedural memory 不版本化 (流程变了老的不删)
+- ❌ Procedural memory 不审批 (任何 Agent 改流程)
+- ✅ 标配: 版本化 + Code Review + 灰度上线
+
+#### 6.3.5 Skill Memory — 技能记忆
+
+##### 是什么
+- 学过的具体技能, 比 procedural 更原子
+- e.g. "用 LaTeX 写公式" / "用 Excel SUM 函数"
+- Agent 学到后形成可复用的 skill
+
+##### 存储设计
+- Skill 库, 每 skill: name + description + 触发条件 + 执行代码 / 工具序列
+
+##### 实现方式
+- 大部分公司用 Tool Calling 替代 (工具就是 skill)
+- 高级: Agent 自己写 skill (Voyager 风格)
+
+##### 真实采用
+- **Voyager**: Skill 库自动增长, 越玩越强
+- **Open Interpreter** (Killian Lucas 2023): 自动写 Python skill 存复用
+
+#### 6.3.6 4 类记忆组合策略
+
+##### 简化版 (创业早期, 0-3 月)
+- 只用 Episodic (Postgres 表)
+- 召回最近 N 条注入 prompt
+- 够 80% 场景
+
+##### 标准版 (中型, 3-12 月)
+- Episodic (Postgres) + Semantic (Vector DB)
+- LLM 从 Episodic 抽 Semantic
+- 召回 Episodic 近 7 天 + Semantic top-5
+
+##### 完整版 (企业级, 12+ 月)
+- Episodic + Semantic + Procedural + Skill 全启
+- + 跨用户 group memory (如团队共享)
+- + 时间衰减 + 隐私脱敏
+
+### 6.4 摘要策略 — 对话超长怎么办
+
+#### 6.4.1 问题
+- 对话超过 50 轮, 全量塞 LLM 上下文太贵
+- 简单截断 (只取最近 20 轮) → 早信息全丢
+
+#### 6.4.2 摘要 4 大策略
+
+##### 策略 1 — 滑动窗口 + 摘要 (Sliding Window + Summary)
+- 保留最近 K 轮原始 (e.g. 20)
+- 早于 K 轮的, LLM 摘要成 1-2 段
+- 摘要存 Redis 或 Postgres
+- 优点: 简单
+- 缺点: 摘要丢细节
+
+##### 策略 2 — 增量摘要 (Incremental Summary)
+- 每 N 轮 (e.g. 10) 跑一次摘要
+- 新摘要基于上次摘要 + 这 10 轮
+- 优点: 摘要质量稳定
+- 缺点: 需要持续 LLM 调用
+
+##### 策略 3 — 重要性打分 (Importance-based)
+- LLM 给每条对话打分 (0-1, 重要性)
+- 保留 score > 0.7 的全部细节
+- 其它摘要 / 删
+- 优点: 关键信息不丢
+- 缺点: 需要 LLM 打分 (额外成本)
+
+##### 策略 4 — Vector 召回 (RAG over History)
+- 全部对话 embed 入 Vector DB
+- 新 query 来时召回相关历史 top-K
+- 优点: 历史无限长
+- 缺点: 召回不到的就完全丢
+
+#### 6.4.3 业界 best practice
+- 短对话 (< 50 轮): 全量加载, 不摘要
+- 中对话 (50-200 轮): 滑动窗口 + 摘要
+- 长对话 (200+ 轮): Vector 召回 + 摘要混合
+- 跨 session: 必须 Vector 召回 (Redis 已过期)
+
+#### 6.4.4 摘要 prompt 模板 (Anthropic 风格)
+- system: "You are a conversation summarizer. Extract key facts the assistant should remember to continue helping the user."
+- user: "Conversation:\n{full conversation}\n\nKey facts (3-5 bullets):"
+- 输出 3-5 条 facts, 存入 Memory
+
+### 6.5 跨用户隔离 — 多租户 Memory
+
+#### 6.5.1 问题
+- SaaS Agent 服务多用户 / 多租户
+- 用户 A 的 Memory 不能泄露到用户 B
+- 用户 A 的偏好不能影响用户 B 的对话
+
+#### 6.5.2 隔离 3 个层次
+
+##### 层 1 — 数据层 (Database Level)
+- 所有 Memory 表都带 tenant_id + user_id
+- 查询必须强制 WHERE tenant_id = ? AND user_id = ?
+- ORM (SQLAlchemy / Prisma) 加 row-level security
+
+##### 层 2 — 应用层 (Application Level)
+- 每次 API 请求验证 token, 解出 tenant_id + user_id
+- 注入到 ContextVar 全局可访问
+- Memory 模块从 ContextVar 自动取
+
+##### 层 3 — LLM 层 (LLM Level)
+- system prompt 不包含其它用户信息
+- LLM 输出审计 (检测是否包含其它用户 PII)
+- 极端: 用户 A 发起的 LLM 请求, 后台只能访问用户 A 的数据 (Postgres RLS + Vector DB collection 分隔)
+
+#### 6.5.3 真实事故 (反例)
+
+##### Air Canada (2024.02)
+- 客服 Agent Memory 没隔离
+- 用户 A 的退款规则被错误推荐给用户 B
+- 法庭判决 Air Canada 输, 强制兑现 Agent 承诺
+- 修复: Memory 严格按 user_id 隔离 + LLM 输出审计
+
+##### 某中国 SaaS Agent (2024.10)
+- 用户 A 在 Agent 里说自己的银行卡号
+- 用户 B 后续问 "我的银行卡号是什么", Agent 错误返了用户 A 的
+- 公司 IPO 计划延期 6 个月
+- 修复: Memory 表 row-level security + 测试每用户隔离
+
+#### 6.5.4 真实采用 — Anthropic Claude Desktop
+- 单用户单设备 (没有跨用户问题)
+- 但跨设备同步 (iCloud / Google Drive 加密备份)
+- 端到端加密, 服务端看不到 Memory 内容
+
+### 6.6 Memory 衰减 + 遗忘 — 长期 Memory 不能无限大
+
+#### 6.6.1 为什么需要遗忘
+- 用户偏好变化 (3 年前喜欢咖啡, 现在喜欢茶)
+- 业务事实过期 (3 年前公司在北京, 现在搬上海)
+- 隐私要求 (GDPR 用户有"被遗忘权")
+- 存储成本 (Vector DB 每 GB $0.5/月)
+
+#### 6.6.2 遗忘 5 种策略
+
+##### 策略 1 — TTL (Time-to-Live)
+- 每条 Memory 加过期时间
+- L1 Session: 30min
+- L2 User Pref: 永久 (用户改才更新)
+- L3 Episodic: 7-90 天
+- L3 Semantic: 永久 (但加 confidence 衰减)
+
+##### 策略 2 — Confidence Decay
+- 每条 Memory 加 confidence (0-1)
+- 时间过去, confidence 按 e^(-t/τ) 衰减
+- τ = 30 天 → 30 天后 confidence 降到 0.37
+- confidence < 0.3 自动删
+
+##### 策略 3 — LLM 判断
+- 定期 (每月) 跑 LLM 扫 Memory
+- LLM 判断 "这条还相关吗" → 删 / 保留 / 更新
+- 准但贵
+
+##### 策略 4 — 用户主动遗忘
+- 提供 "Forget about X" 命令
+- 用户说 "忘了我的旧地址", LLM 找到相关条目删
+
+##### 策略 5 — 容量上限
+- 每用户 Memory 上限 (e.g. 1000 条)
+- 超过时按"最久未访问"删 (LRU)
+
+#### 6.6.3 GDPR 合规 — 被遗忘权 (Right to be Forgotten)
+- GDPR Article 17, 用户可要求"完全删除我的所有数据"
+- 实现: 提供 API "DELETE /user/{id}/all_memory"
+- 必须 30 天内执行
+- Vector DB 删除要 hard delete (不是 soft delete)
+
+#### 6.6.4 时效性衰减 — Recency Decay 函数
+
+##### 公式
+- relevance(t) = base_score × exp(-t / τ)
+- t = 距今天数
+- τ = 半衰期 (30/90/365 天看场景)
+
+##### 三种衰减曲线
+- **Exponential**: 快速衰减 (新闻类, τ=7 天)
+- **Linear**: 匀速衰减 (一般 fact, τ=90 天)
+- **Step**: 阶跃衰减 (合同 / 价格类, τ=1 年到期突然失效)
+
+### 6.7 Memory 真实采用案例
+
+#### 6.7.1 ChatGPT Memory (OpenAI 2024.04)
+
+##### 设计
+- 自动从对话抽 fact 存
+- 用户可看可删
+- 跨对话 / 跨日 / 跨设备同步
+
+##### 实现 (推测)
+- Episodic + Semantic 两层
+- 触发条件: LLM 判断 "这个值得记"
+- 召回: 每轮注入相关 fact
+
+##### 用户反馈
+- 喜欢: 不用每次重新介绍自己
+- 担心: 隐私 (OpenAI 看到我所有偏好)
+- OpenAI 提供"匿名模式" 不存 Memory
+
+#### 6.7.2 Anthropic Claude (2024-2025)
+
+##### Claude Desktop
+- Project 级 Memory (项目内共享)
+- 用户上传文件 + 对话历史持久化
+- 没自动抽 fact (官方保守策略)
+
+##### Claude Code (CLI)
+- CLAUDE.md 文件作为 Project Memory
+- 用户手动写, Claude 每次自动加载
+- 适合工程师 (自己控)
+
+#### 6.7.3 Mem.ai (创业 2023)
+
+##### 定位
+- "AI Native Notes" 笔记 + Memory
+- 用户写笔记, AI 自动 link 相关历史
+- 对话时 AI 自动召回相关笔记
+
+##### 技术栈
+- Vector DB (内部) + LLM 自动抽 fact
+- 跟 Notion / Obsidian 等竞争
+
+#### 6.7.4 Microsoft Copilot Memory (2024.11)
+
+##### 设计
+- 跨 Microsoft 365 共享 (Outlook / Teams / Word)
+- 偏好 + 工作上下文持久化
+- 跟 Recall 功能 (截屏每秒) 隔离 (后者有隐私争议)
+
+#### 6.7.5 Google Gemini Memory (2024-2025)
+
+##### 设计
+- 跨 Google 服务 (Search / Gmail / Workspace)
+- 用户可关闭 / 选择存什么
+- 跟 Search 历史融合
+
+### 6.8 Memory 反模式 + 真实事故
+
+#### 6.8.1 反模式 1 — 全部对话存 Vector DB
+
+##### 现象
+- 每条 message 都 embed 入 Vector DB
+- 量爆 (1 用户每天 100 条 → 1 月 3000 条 → 1 年 36500 条)
+
+##### 根因
+- 存量大不一定有用
+- 大部分对话是闲聊 / 重复
+
+##### 修复
+- LLM 判断 "这条值得长存吗" 才存
+- 用 importance score 过滤
+- TTL + LRU 控制总量
+
+#### 6.8.2 反模式 2 — Memory 不版本化
+
+##### 现象
+- 用户偏好 "language=en", 用户改成 "zh"
+- 直接覆盖, 没历史
+- 用户后悔想回滚找不到
+
+##### 修复
+- 偏好表加 history (Postgres temporal table)
+- 或用 event sourcing (每次改写 event, 当前状态聚合算)
+
+#### 6.8.3 反模式 3 — 跨用户 Memory 串
+
+##### 现象 (Air Canada / 某 SaaS Agent 已述)
+- 用户 A 的偏好被用到用户 B 的对话
+
+##### 修复
+- 数据层强制 user_id WHERE
+- 应用层 ContextVar 隔离
+- LLM 层输出审计
+
+#### 6.8.4 反模式 4 — Memory 不脱敏
+
+##### 现象
+- 用户在 Agent 里说自己身份证号 / 银行卡号
+- 这些原文存入 Memory
+- 后续召回时被另一用户看到 (跨用户串)
+
+##### 修复
+- Memory 存入前 PII 过滤 (Presidio / 阿里云 PII)
+- 检测到敏感信息: 替换为 [REDACTED] 或拒存
+
+#### 6.8.5 反模式 5 — Memory 召回过度
+
+##### 现象
+- 每轮都召回 top-50 Memory
+- 噪音过多, 干扰 LLM 注意力
+- LLM 输出质量塌
+
+##### 修复
+- top-3 ~ top-5 即可
+- cosine 阈值 > 0.7
+- 加 LLM rerank 二次过滤
+
+#### 6.8.6 反模式 6 — Memory 写入无验证
+
+##### 现象
+- LLM 抽 fact 自动写 Memory
+- 抽错的也存了
+- 后续召回错误信息, 误导 LLM
+
+##### 修复
+- LLM 抽完二次确认 (用户点确认才存)
+- 或加 confidence 阈值 (LLM 自评 < 0.7 不存)
+
+#### 6.8.7 真实事故 — Replit Agent Memory 泄漏 (2024.10)
+- Replit Agent 把用户 A 的代码存到全局 Memory
+- 用户 B 调相似代码时, Memory 召回了用户 A 的代码
+- 用户 A 投诉商业代码泄漏
+- 修复: Memory 加 user_id + 完全隔离
+
+#### 6.8.8 真实事故 — Anthropic Claude Desktop 早期 Memory bug (2024.12)
+- Project 内 Memory 偶尔串到另一 Project
+- 影响: 测试期间 < 0.1% 用户
+- 修复: Memory 表加 project_id 强制 WHERE
+
+
+## 七. Multi-Agent 系统 — 多 Agent 协作架构
+
+### 7.0 Multi-Agent 思维导图 ⭐
+
+> 进入本章前先看这张思维导图建立全章认知.
+
+### 7.1 Multi-Agent 是什么 — 一群 Agent 协作
+
+#### 7.1.1 一句话
+- Multi-Agent System (MAS) = 多个 Agent (各有专长) 协作完成单 Agent 难以胜任的复杂任务
+- 跟单 Agent 的核心区别: 多 LLM 实例 + 角色分工 + 通信协议
+- **业界共识**: Multi-Agent 是 2024-2025 年最热但也最容易做坏的方向
+
+#### 7.1.2 为什么需要 Multi-Agent
+- **专业化**: 不同 Agent 用不同 prompt + 不同工具 + 不同模型, 各司其职
+- **并行加速**: N 个 Agent 同时跑, 比单 Agent 串行快 N×
+- **复杂任务拆解**: 一个超级任务拆成多个子任务, 每个子 Agent 只关心局部
+- **角色扮演**: 团队协作 (写作 / 评审 / debug) 自然映射到多角色
+- **反思 + 辩论**: 多 Agent 互相 challenge, 减少单 Agent 幻觉
+
+#### 7.1.3 Multi-Agent vs 单 Agent — 何时上
+
+##### 上 Multi-Agent 的信号
+- 任务能清晰拆成 3+ 子任务, 每子任务独立
+- 单 Agent prompt 已 2000+ tokens 还覆盖不全
+- 需要不同模型 (e.g. Sonnet 推理 + Haiku 格式化)
+- 需要并行加速 (子任务独立)
+
+##### 不上 Multi-Agent 的信号
+- 任务子步骤强耦合 (拆了反而错)
+- 单 Agent 能解决 (overkill, 多花 N 倍 token)
+- 调试要求高 (Multi-Agent 黑盒难调)
+- 实时性要求高 (Agent 间通信增加延迟)
+
+#### 7.1.4 Anthropic 的态度 (Building Effective Agents 2024.12)
+- Anthropic 明确警告: "Multi-Agent 是最容易过度设计的方向"
+- 大部分场景, Workflow Pattern 4 (Orchestrator-Workers) 比 Multi-Agent 更合适
+- "如果你不能清晰说明为什么需要 Multi-Agent, 就不要用"
+- **真正需要 Multi-Agent 的场景 < 5%**
+
+#### 7.1.5 Multi-Agent vs Workflow Pattern 4 (Orchestrator-Workers) 区别
+
+| 维度 | Workflow Pattern 4 | Multi-Agent System |
+|---|---|---|
+| Worker 内部 | 单次 LLM 调用 | 完整 Agent (有状态 + 多步) |
+| Worker 间通信 | 通过 Orchestrator 中转 | 可直接 Agent-to-Agent |
+| Worker 决策 | 没决策, 只执行 | 自主决策 + 工具调用 |
+| 复杂度 | 中 (Orchestrator + Worker) | 高 (N Agent 状态 + 通信) |
+| 失败模式 | Worker fail 不影响其它 | Agent 死锁 / 死循环 / 互相错信 |
+| 适合场景 | 90% 业务 | 真正需要 Agent 团队的 5% |
+
+### 7.2 Multi-Agent 5 大架构形态
+
+#### 7.2.1 形态总览表
+
+| 形态 | 一句话 | 拓扑 | 通信方式 | 真实代表 |
+|---|---|---|---|---|
+| **Orchestrator-Workers** | 中枢 Agent 派单, Worker Agent 执行 | 星型 (中心 + 周边) | 中枢中转 | OpenAI Swarm / Anthropic Claude Agent SDK |
+| **Hierarchical** | Manager → Lead → Worker 分层 | 树形 | 上下级 | Magentic-One / CrewAI Hierarchical |
+| **Sequential** | Agent 流水线串行处理 | 链型 | 顺序传递 | LangChain Agents Chain |
+| **Conversable** | Agent 互相对话 (像聊天群) | 图型 (任意点连接) | 公共会话 | AutoGen GroupChat |
+| **Swarm** | 平等 Agent 自组织, 主动接活 | 网状 | 共享黑板 | OpenAI Swarm (轻量版) / CAMEL |
+
+#### 7.2.2 形态 1 — Orchestrator-Workers (中枢-工人)
+
+##### 架构
+- 1 个 Orchestrator Agent (中枢)
+- N 个 Worker Agent (各专精)
+- 用户只跟 Orchestrator 说话
+- Orchestrator 拆任务, 派给 Worker
+- Worker 完成后回报 Orchestrator
+- Orchestrator 综合给用户
+
+##### 决策流程
+- 步 1 — 用户提复杂 query
+- 步 2 — Orchestrator 拆成子任务 (LLM 决定)
+- 步 3 — Orchestrator 调度 Worker (handoff / function call)
+- 步 4 — Worker 完成回报 (return value / message)
+- 步 5 — Orchestrator 综合 / 决定下一步
+- 步 6 — 直到全部完成, 给用户
+
+##### 真实采用
+- **OpenAI Swarm** (2024.10): 极简轻量框架, handoff 是核心机制
+- **Anthropic Claude Agent SDK** (2025): Subagent 是 Worker, Main Agent 是 Orchestrator
+- **CrewAI**: Crew = 一组 Agent, Manager Agent 中枢
+
+##### 代码示例 (Swarm 风格伪代码)
+- agent_orchestrator = Agent(name="Triage", instructions="...", functions=[transfer_to_research, transfer_to_code])
+- agent_research = Agent(name="Research", instructions="...", functions=[web_search])
+- agent_code = Agent(name="Code", instructions="...", functions=[write_file])
+- swarm.run(agent=agent_orchestrator, messages=[{"role":"user","content":"..."}])
+
+##### 优点 / 缺点
+- ✅ 优点: 控制清晰, Orchestrator 可全局决策
+- ❌ 缺点: Orchestrator 是瓶颈 (所有信息过它)
+- ❌ 缺点: Orchestrator 错则全错
+
+#### 7.2.3 形态 2 — Hierarchical (分层管理)
+
+##### 架构
+- Manager Agent (顶层)
+- N 个 Lead Agent (中层, 各负责一域)
+- M 个 Worker Agent (底层, 跟 Lead 同域)
+- 像公司层级: CEO → 部门总监 → 员工
+
+##### 决策流程
+- Manager 拆"战略任务" (e.g. "做完整产品调研")
+- Lead 拆"战术任务" (e.g. 市场 Lead 拆 "调研 5 家竞品")
+- Worker 拆"具体动作" (e.g. "搜竞品 A 网站, 抽 3 关键信息")
+- Worker → Lead → Manager 逐级回报
+- 任何级可上溯请示
+
+##### 真实采用
+- **Microsoft Magentic-One** (2024.11): Orchestrator + WebSurfer + FileSurfer + Coder + Terminal 5 角色
+- **CrewAI Hierarchical Process** (2024.07): Manager Agent + Worker Agent
+- **AutoGen GroupChatManager** (Microsoft 2023): 群聊管理员模式
+
+##### 优点 / 缺点
+- ✅ 优点: 复杂任务清晰分层, 责任明确
+- ✅ 优点: 可扩展 (加 Worker 不影响 Manager)
+- ❌ 缺点: 层级深通信慢
+- ❌ 缺点: 信息逐层失真 (传话游戏)
+
+#### 7.2.4 形态 3 — Sequential (流水线)
+
+##### 架构
+- Agent A → Agent B → Agent C → ... → 输出
+- 每 Agent 一个职责, 串行处理
+- 类似 Pattern 1 Prompt Chaining 的 Agent 版
+
+##### 决策流程
+- Agent A 接 input, 处理后 → output_A
+- output_A → Agent B input
+- Agent B 处理 → output_B → Agent C
+- 最后 Agent N 输出最终结果
+
+##### 真实采用
+- **LangChain SequentialAgentChain**
+- **任何 ETL pipeline**: 抽取 Agent → 清洗 Agent → 入库 Agent
+
+##### 优点 / 缺点
+- ✅ 优点: 简单易调
+- ❌ 缺点: 严格串行, 不能并行
+- ❌ 缺点: 中间 Agent 错就全错 (无回溯)
+
+#### 7.2.5 形态 4 — Conversable (群聊)
+
+##### 架构
+- N 个 Agent 在共享会话里
+- 任何 Agent 可发消息, 任何 Agent 可读
+- 由"主持人" (GroupChatManager) 决定谁下一个发言
+
+##### 决策流程
+- 用户提任务到群
+- 主持人 (LLM) 决定派谁先发言
+- Agent A 发言 (可能 mention Agent B)
+- 主持人决定下一发言者
+- 直到任务完成 (主持人判断)
+
+##### 真实采用
+- **AutoGen GroupChat** (Microsoft 2023): 经典群聊架构
+- **Anthropic 内部 Agent 评审**: 多 Agent 互相 review
+
+##### 优点 / 缺点
+- ✅ 优点: 灵活, Agent 间自由互动
+- ✅ 优点: 适合辩论 / 评审场景
+- ❌ 缺点: 主持人决策容易走偏
+- ❌ 缺点: 长群聊 token 爆 + 信息冗余
+
+#### 7.2.6 形态 5 — Swarm (蜂群)
+
+##### 架构
+- N 个平等 Agent
+- 共享"黑板" (Blackboard) 或消息队列
+- Agent 主动看黑板, 接自己擅长的活
+- 完成后写结果到黑板
+
+##### 决策流程
+- 任务推到黑板
+- 各 Agent 评估"我能做吗 + 我做得好吗" (LLM 判断)
+- 评分高的 Agent 接活
+- 完成写结果到黑板
+- 其它 Agent 看到结果, 继续接下一步
+
+##### 真实采用
+- **CAMEL** (KAUST 2023.03): Communicative Agents 框架, 经典 swarm
+- **OpenAI Swarm 框架** (2024.10): 名字 Swarm 但实际更接近 Orchestrator-Workers
+- **Microsoft Magentic-One** 也有 swarm 元素
+
+##### 优点 / 缺点
+- ✅ 优点: 无单点 / 高弹性
+- ✅ 优点: 自组织, 不需复杂调度
+- ❌ 缺点: Agent 抢活 / 漏活难协调
+- ❌ 缺点: 黑板设计是难题
+
+### 7.3 通信协议 — Agent 之间怎么说话
+
+#### 7.3.1 4 种通信机制
+
+##### 机制 1 — 共享 State (Shared State)
+- 所有 Agent 读写同一个 dict / DB
+- LangGraph 的核心机制 (StateGraph)
+- 优点: 简单
+- 缺点: 并发写冲突
+
+##### 机制 2 — 消息传递 (Message Passing)
+- Agent 发 message, 其它 Agent 接收
+- 像邮件 / 队列模型
+- AutoGen / CrewAI 用这个
+- 优点: 松耦合
+- 缺点: 消息丢 / 序
+
+##### 机制 3 — Handoff (转交)
+- Agent A 完成自己部分, 转交给 Agent B
+- B 接管完整上下文
+- OpenAI Swarm 的核心机制
+- 优点: 极简, 责任清晰
+- 缺点: 不能多 Agent 同时活跃
+
+##### 机制 4 — Tool Call as Communication
+- Agent A 调"send_message_to_B" 工具
+- B 监听消息触发
+- LangGraph + Anthropic SDK 用这个
+- 优点: 跟 Tool Calling 统一
+- 缺点: 一切都是 tool, 调试复杂
+
+#### 7.3.2 通信协议设计原则
+- 消息要带 sender / receiver / timestamp / message_id
+- 支持 reply (按 message_id 回)
+- 支持 broadcast (群发)
+- 加 deadline (避免无限等)
+- 加 retry (网络失败重试)
+
+### 7.4 Magentic-One 深度 (Microsoft 2024.11)
+
+#### 7.4.1 一句话
+- Microsoft Research 2024.11 发布的 Multi-Agent 框架
+- 5 角色 + 1 Orchestrator
+- 在 GAIA / WebArena 等 benchmark 上 SOTA
+
+#### 7.4.2 5 角色 + Orchestrator
+
+##### 角色 1 — Orchestrator (主管)
+- 任务拆解 + 进度跟踪
+- 维护 Task Ledger (任务总账)
+- 选择下一步谁来做
+
+##### 角色 2 — WebSurfer (网页浏览员)
+- 操作浏览器 (基于 Playwright)
+- 读网页 / 点击 / 填表
+- 类似 §5.6 Browser Use
+
+##### 角色 3 — FileSurfer (文件浏览员)
+- 读本地文件 (PDF / Office / 图)
+- 用 markitdown 工具
+- 输出统一的 markdown
+
+##### 角色 4 — Coder (码农)
+- 写 Python 代码
+- 沙盒里执行
+- 输出结果给 Orchestrator
+
+##### 角色 5 — ComputerTerminal (终端)
+- 执行 shell 命令
+- 沙盒隔离
+
+#### 7.4.3 Task Ledger (任务总账)
+
+##### 是什么
+- Orchestrator 维护的 markdown 文档
+- 包含: 任务目标 + 已知事实 + 已尝试动作 + 待办
+
+##### 字段
+- Goal: 用户目标 (e.g. "找 5 家 RAG 创业公司")
+- Facts: 已发现的事实 (e.g. "LangChain 估值 $1.1B")
+- Tried: 已尝试的动作 (e.g. "搜过 Crunchbase")
+- Plans: 待办计划 (e.g. "搜 PitchBook 验证")
+
+##### 更新机制
+- 每个 Agent 完成动作后, Orchestrator 更新 ledger
+- LLM 根据 ledger 决定下一步
+- 这是 Magentic-One 的核心创新 (类似人类 PM 的状态板)
+
+#### 7.4.4 Magentic-One benchmark
+- **GAIA Level 1**: 38% → SOTA (Magentic-One)
+- **GAIA Level 2**: 24% → SOTA
+- **GAIA Level 3**: 12% (但仍是 SOTA)
+- **WebArena**: 32.8% (SOTA 当时)
+- 比单 Agent (e.g. AutoGen) 高 5-15 个百分点
+
+#### 7.4.5 跟其它 Multi-Agent 框架的差异
+- Task Ledger 是核心创新 (其它框架没有)
+- 5 角色固定 (vs CrewAI 灵活)
+- 跟 AutoGen 同公司, AutoGen 是底层 lib, Magentic-One 是上层应用
+- 开源 (github.com/microsoft/autogen/tree/main/python/packages/autogen-magentic-one)
+
+### 7.5 OpenAI Swarm 深度 (2024.10)
+
+#### 7.5.1 一句话
+- OpenAI 2024.10 发布的 Multi-Agent 框架
+- 极简设计, 核心 200 行代码
+- 但被 Pydantic AI / OpenAI Agents SDK (2025.03) 取代
+
+#### 7.5.2 核心概念
+
+##### Agent
+- name + instructions + functions
+- functions 含普通 tool + handoff function
+
+##### Handoff
+- 特殊 function, 返回另一个 Agent
+- e.g. transfer_to_specialist() 返回 Agent specialist
+- Orchestrator 检测到返回 Agent → 切换到该 Agent
+
+##### Routine
+- "Routine" = 一组协作的 Agent + handoff 关系
+- 类似 CrewAI 的 Crew
+
+#### 7.5.3 例子 — 客服 Triage Routine
+- agent_triage: 接入口, 判断问题类型, handoff 到 specialist
+- agent_billing: 账单专家
+- agent_tech: 技术专家
+- 用户问账单 → triage handoff → billing 处理
+
+#### 7.5.4 OpenAI Swarm 优缺点
+- ✅ 极简, 学习曲线极低
+- ✅ 适合教学 / demo
+- ❌ 功能有限 (没 streaming / 没 long-running / 没分布式)
+- ❌ OpenAI 自己说 "experimental, 不建议生产"
+- ❌ 2025.03 后被 OpenAI Agents SDK 取代
+
+### 7.6 CrewAI 深度
+
+#### 7.6.1 一句话
+- 2023.10 由 João Moura 推出的 Multi-Agent 框架
+- 角色扮演设计 (Role + Goal + Backstory)
+- 2025 是最热 Multi-Agent 框架之一 (GitHub 30k+ stars)
+
+#### 7.6.2 核心概念
+
+##### Agent
+- role: 角色名 (e.g. "Senior Researcher")
+- goal: 目标 (e.g. "find 10 RAG companies")
+- backstory: 背景故事 (LLM prompt 增强)
+- tools: 可用工具
+- llm: 用哪个模型
+
+##### Task
+- description: 任务描述
+- agent: 派给哪个 Agent
+- expected_output: 期望产出
+
+##### Crew
+- agents: list of Agent
+- tasks: list of Task
+- process: Sequential / Hierarchical / Parallel
+
+#### 7.6.3 CrewAI 3 种 Process
+
+##### Sequential
+- Task 串行, 前一 Task 输出做下 Task 输入
+- 默认模式
+
+##### Hierarchical
+- 加 manager_llm
+- Manager Agent 自动分配 task
+- 跟 Magentic-One 类似
+
+##### Parallel (实验中)
+- Task 同时跑
+
+#### 7.6.4 CrewAI 真实采用
+- **大量小团队 / 个人开发者**: GitHub 30k stars 多来自个人项目
+- **企业 PoC**: 用 CrewAI 验证 Multi-Agent 想法 (但少有真生产)
+- **教育 / 培训**: 容易上手, 适合教学
+
+#### 7.6.5 CrewAI 优缺点
+- ✅ 角色扮演设计直观, 上手快
+- ✅ 文档 / 例子丰富
+- ❌ 抽象层重, 灵活性不如 LangGraph
+- ❌ 大型生产案例少
+
+### 7.7 AutoGen 深度 (Microsoft)
+
+#### 7.7.1 一句话
+- Microsoft 2023.10 发布的 Multi-Agent 框架
+- 是 Magentic-One 的底层
+- 2024.11 推出 v0.4 重构 (异步 + 分布式)
+
+#### 7.7.2 核心概念
+
+##### ConversableAgent
+- 基础 Agent 类
+- 能跟其它 Agent 对话
+
+##### GroupChat
+- N 个 Agent 在群里
+- GroupChatManager 决定谁下一个发言
+
+##### UserProxyAgent
+- 代表用户的 Agent
+- 可以执行 code, 接收 LLM 输出
+
+##### AssistantAgent
+- LLM 驱动的 Agent
+- 输出 reply
+
+#### 7.7.3 AutoGen v0.2 vs v0.4
+
+| 维度 | v0.2 (2023-2024.10) | v0.4 (2024.11+) |
+|---|---|---|
+| 同步/异步 | 同步 | 异步 (asyncio) |
+| 分布式 | 无 | 支持跨进程 / 跨机 |
+| 类型 | 弱 | 强类型 (Python type hints) |
+| 文档 | 简单 | 完整 (含 cookbook) |
+| 生产 | 不推荐 | 推荐 |
+
+#### 7.7.4 AutoGen 真实采用
+- **Microsoft Magentic-One** (上层应用)
+- **企业内部 Agent 系统** (Microsoft 客户)
+- **学术研究** (大量论文用 AutoGen)
+
+### 7.8 LangGraph Multi-Agent (2024.11+)
+
+#### 7.8.1 一句话
+- LangGraph 是 LangChain 子项目, 主打"状态图驱动 Agent"
+- 2024.11 加入 Multi-Agent 支持
+- 比 Swarm / CrewAI 灵活, 但学习曲线陡
+
+#### 7.8.2 核心概念
+
+##### StateGraph
+- 节点 = Agent
+- 边 = 控制流 (谁后跟谁)
+- State = 共享数据 (TypedDict)
+
+##### 4 种 Multi-Agent 模式 (LangGraph 文档)
+- **Network**: 任意 Agent 可调任意 Agent
+- **Supervisor**: Supervisor Agent 决定谁下一个 (类 Orchestrator)
+- **Hierarchical**: 多层 Supervisor
+- **Custom**: 完全自定义
+
+##### Checkpointer
+- 状态可持久化 (Postgres / Redis / SQLite)
+- 支持 long-running task (跑几小时不丢)
+
+#### 7.8.3 LangGraph Multi-Agent 真实采用
+- **Klarna (2024.06+)**: LangGraph 重写客服 Agent
+- **LinkedIn (2024.10)**: 招聘 Agent
+- **Replit Agent (2025)**: Code Agent
+- **Anthropic 内部某些项目** (LangGraph 跟 Anthropic 也兼容)
+
+#### 7.8.4 LangGraph 优缺点
+- ✅ 灵活, StateGraph 适合复杂控制流
+- ✅ 持久化 + 容错强
+- ✅ 跟 LangChain 生态融合
+- ❌ 学习曲线陡 (StateGraph + Reducer + Channel 概念多)
+- ❌ Pythonic 但不直观 (DAG 思维转换)
+
+### 7.9 Multi-Agent 反模式 + 真实事故
+
+#### 7.9.1 反模式 1 — 过度设计 Multi-Agent
+
+##### 现象
+- 任务本来单 Agent + 5 个 tool 能做
+- 工程师非要拆 5 个 Agent 各管 1 tool
+- 结果: 通信开销 + 调试地狱
+
+##### 根因
+- "听起来酷" 心态
+- 团队 KPI 推 (老板说要 Multi-Agent)
+- 不评估单 Agent 能否解决
+
+##### 修复
+- 先用单 Agent 试 1 周
+- 真不够再上 Multi-Agent
+- 上之前回答: "为什么单 Agent 不行?" 写下来
+
+#### 7.9.2 反模式 2 — Agent 死循环互相调
+
+##### 现象
+- Agent A handoff 到 B, B 又 handoff 回 A
+- 死循环烧 token
+
+##### 根因
+- handoff 没明确终止条件
+- 每个 Agent 都觉得"这不是我的活"
+
+##### 修复
+- 加 max_turns (e.g. 25 轮上限)
+- 每次 handoff 写 reason, Orchestrator 拦明显错的
+- 加 budget_limit (单任务 $5 上限)
+
+#### 7.9.3 反模式 3 — 信息逐层失真
+
+##### 现象
+- 5 层 Hierarchical, 用户原话经 5 次传递, 第 5 层 Worker 已搞错
+- 像传话游戏
+
+##### 根因
+- 每层 Agent 用自己 prompt 重新解读
+- LLM 不擅长精确转述
+
+##### 修复
+- 用户原 query 全程随附 (不只传摘要)
+- 加"质询机制": Worker 不确定可向上请示
+- 层级控制 ≤ 3 层 (太深必塌)
+
+#### 7.9.4 反模式 4 — Multi-Agent 没监控
+
+##### 现象
+- 出错只看到 "task failed"
+- 不知哪个 Agent 出错 / 在哪步
+
+##### 根因
+- 没接入 LangSmith / Phoenix / Langfuse
+- 自己写日志没结构化
+
+##### 修复
+- 必须接 trace 工具 (LangSmith / Phoenix)
+- 每个 Agent 调用都有 span
+- UI 可视化每个 Agent 输入输出
+
+#### 7.9.5 反模式 5 — Multi-Agent 没成本上限
+
+##### 现象
+- 单任务跑出来发现花了 $50 (本来预期 $1)
+- 月底账单 $50K (本来预期 $5K)
+
+##### 根因
+- N 个 Agent × 多轮 = N² 调用
+- 没设 budget cap
+
+##### 修复
+- 每任务设 budget cap (e.g. $5)
+- 超过自动降级到单 Agent
+- 实时账单监控 + 告警
+
+#### 7.9.6 真实事故汇总
+
+##### 事故 1 — Devin 早期 (2024.04)
+- Multi-Agent 协作时频繁卡死
+- 根因: Agent 间死锁 (互相等回复)
+- 修复: 加 deadline + 主动 cancel
+
+##### 事故 2 — 某 Crew 编排 RPA (2024.08)
+- 5 Agent 客服系统, 单 query 月均成本 $0.5 (vs 单 Agent $0.05)
+- 公司算账后回退到单 Agent + 5 tool
+- 教训: Multi-Agent 比单 Agent 贵 5-10×
+
+##### 事故 3 — Anthropic 内部 Agent 评审项目 (2024.11)
+- 3 Agent 互相 review, 偶尔互相错认错的
+- 修复: 加 ground truth 锚 + 限制 review 轮数
+
+##### 事故 4 — Replit Agent (2025.01)
+- LangGraph Multi-Agent 加 checkpointer 后, 状态膨胀
+- 单用户 state 100MB+ (写满 Postgres)
+- 修复: 加 state 压缩 + checkpoint TTL
+
+##### 事故 5 — 某中国创业 Multi-Agent 客服 (2025.02)
+- 5 Agent 协作处理用户 query
+- 频繁 inter-agent 通信失败 (网络抖动)
+- 修复: 改用单进程内多 Agent (避免跨网络)
+
+### 7.10 Multi-Agent 选型决策树
+
+#### 7.10.1 决策流程
+- 步 1 — 单 Agent 能否做? → 能则不上 Multi-Agent
+- 步 2 — 任务能拆成 3+ 子任务? → 不能则用单 Agent + 多 tool
+- 步 3 — 子任务独立? → 独立用 Parallelization Pattern (4.4); 强耦合上 Multi-Agent
+- 步 4 — 需要不同模型? → 是用 Multi-Agent (e.g. Sonnet + Haiku 混); 否单 Agent
+- 步 5 — 选拓扑:
+  - 简单层级 → Orchestrator-Workers (Swarm / Anthropic SDK)
+  - 复杂层级 → Hierarchical (CrewAI / Magentic-One)
+  - 平等协作 → Conversable (AutoGen GroupChat)
+  - 自组织 → Swarm (CAMEL)
+  - 流水线 → Sequential
+- 步 6 — 选框架:
+  - 极简 → OpenAI Agents SDK / Anthropic Claude Agent SDK
+  - 灵活 → LangGraph
+  - 直观 → CrewAI
+  - 异步分布式 → AutoGen v0.4
+  - benchmark SOTA → Magentic-One
+
+#### 7.10.2 框架选型矩阵 (2025-2026)
+
+| 框架 | 学习曲线 | 灵活性 | 生产成熟度 | 推荐度 |
+|---|---|---|---|---|
+| Anthropic Claude Agent SDK | 低 | 中 | 高 | ⭐⭐⭐⭐⭐ |
+| OpenAI Agents SDK | 低 | 中 | 中 | ⭐⭐⭐⭐ |
+| LangGraph | 高 | 极高 | 高 | ⭐⭐⭐⭐⭐ |
+| CrewAI | 中 | 中 | 中 | ⭐⭐⭐ |
+| AutoGen v0.4 | 中-高 | 高 | 中-高 | ⭐⭐⭐⭐ |
+| Magentic-One | 中 | 低 (固定 5 角色) | 高 (但场景窄) | ⭐⭐⭐ |
+| CAMEL | 中 | 中 | 低 (学术) | ⭐⭐ |
+| Pydantic AI | 低 | 中 | 中 | ⭐⭐⭐⭐ |
+
+
+## 八. 高级 RAG-Agent 模式 — Self-RAG / CRAG / GraphRAG / 等 7 种
+
+### 8.0 高级 RAG-Agent 思维导图 ⭐
+
+> 进入本章前先看这张思维导图建立全章认知.
+
+### 8.1 高级模式总览 — 7 种 + 选型
+
+#### 8.1.1 一句话
+- 普通 RAG (Retrieve → Augment → Generate) 是 Gen 1-2
+- 高级 RAG-Agent 模式在普通 RAG 上加 Agent 决策能力 (反思 / 校正 / 多步)
+- 都是 2023-2024 学术界推动, 现在生产逐渐普及
+
+#### 8.1.2 7 大模式速记表
+
+| 模式 | 论文 / 来源 | 一句话 | 适合 | 复杂度 |
+|---|---|---|---|---|
+| **Self-RAG** | Asai 2023.10 | LLM 自反思决定要不要检索 + 评估检索质量 | 减少不必要检索 | 中 |
+| **CRAG** | Yan 2024.01 | LLM 评估检索质量, 不行就重新检索 / web search | 检索质量不稳 | 中 |
+| **GraphRAG** | Microsoft 2024.07 | 用知识图谱替代向量库, 多跳推理 | 复杂关系查询 | 高 |
+| **LightRAG** | HKU 2024.10 | GraphRAG 轻量化, 双层图 (entity + relation) | GraphRAG 太重时 | 中 |
+| **Adaptive RAG** | KAIST 2024.03 | 按 query 复杂度动态选 RAG 策略 | 多类型 query 混合 | 中 |
+| **Reflexion** | Shinn 2023.03 | Agent 反思失败原因 + 调整策略 | 任务有评分反馈 | 中 |
+| **Tree of Thoughts** | Yao 2023.05 | LLM 探索多个 reasoning 分支 + 评估 + 剪枝 | 复杂推理任务 | 高 |
+
+#### 8.1.3 模式选型决策
+- 检索质量稳 + 简单 query → 普通 RAG (Gen 2)
+- 检索常召不到 → Self-RAG / CRAG
+- 关系复杂 + 多跳查 → GraphRAG / LightRAG
+- query 类型多样 → Adaptive RAG
+- 任务有反馈循环 → Reflexion
+- 复杂推理 → Tree of Thoughts
+
+### 8.2 Self-RAG 深度 (Asai et al. 2023.10)
+
+#### 8.2.1 论文核心 idea
+- **arXiv: 2310.11511**, ICLR 2024 Oral
+- 改造 LLM 输出 "Reflection Tokens" (4 种特殊 token)
+- LLM 自己决定: 要不要检索 / 检索的好不好 / 答案是否被支持
+
+#### 8.2.2 4 种 Reflection Token
+
+##### Token 1 — Retrieve [yes/no/continue]
+- LLM 决定 "我现在要不要检索"
+- yes: 触发检索
+- no: 不需要 (LLM 已知)
+- continue: 接着上次检索往下生成
+
+##### Token 2 — IsRel [relevant/irrelevant]
+- 检索回来后, LLM 评估"这段 chunk 跟我 query 相关吗"
+- 不相关的 chunk 丢
+
+##### Token 3 — IsSup [fully supported/partially/no support]
+- 生成时, LLM 标注 "这句话是被检索内容支持的吗"
+- 不被支持的可能是幻觉
+
+##### Token 4 — IsUse [score 1-5]
+- 整体生成质量打分
+- 用于 ranking 多个候选答案
+
+#### 8.2.3 训练流程
+- 步 1 — 准备语料 (query + chunk + 答案)
+- 步 2 — 用 GPT-4 标注 reflection token (e.g. 给每段标 IsRel)
+- 步 3 — 把 reflection token 嵌入训练数据
+- 步 4 — 微调 LLaMA / Mistral 等开源模型
+- 步 5 — 推理时 LLM 自动输出 token 控制流程
+
+#### 8.2.4 Self-RAG vs 普通 RAG 性能 (论文数据)
+- **Open-domain QA (PopQA)**: 普通 RAG 38.2 → Self-RAG 54.9 (+44%)
+- **Long-form generation (BIO)**: 普通 RAG 71.8 → Self-RAG 80.2 (+12%)
+- **Fact verification (PubHealth)**: 普通 RAG 31.4 → Self-RAG 72.4 (+131%)
+
+#### 8.2.5 真实采用
+- **Anyscale (开源 demo)**: 用 LangGraph 实现 Self-RAG
+- **少量企业 PoC**: 但训练成本高, 真生产用得少
+- **学术界引用**: Self-RAG 论文被引 1000+, 学术界标杆
+
+#### 8.2.6 Self-RAG 反模式
+- ❌ 不微调直接 prompt (没用, reflection token 必须训出来)
+- ❌ 用 Sonnet 预训, 微调 LLaMA 13B (能力差太多, 上限低)
+- ❌ 用 GPT-4 标注但量少 (5K), 模型学不会
+- ✅ 标配: 50K+ 标注数据 + LLaMA-2 13B / Mistral 7B 起步
+
+### 8.3 CRAG (Corrective RAG) 深度 (Yan et al. 2024.01)
+
+#### 8.3.1 论文核心 idea
+- **arXiv: 2401.15884**, EACL 2024
+- 在 RAG 检索后加一个 "Retrieval Evaluator"
+- 评估检索质量, 触发不同处理路径
+
+#### 8.3.2 三种评估结果 + 处理
+
+##### Correct (检索质量好)
+- 直接进入"知识精炼"阶段
+- 把 chunk 切更细, 提取关键句, 减噪音
+- 然后正常生成
+
+##### Incorrect (检索质量差)
+- 触发 Web Search (Bing / Google API)
+- 用网络搜索结果替代向量库结果
+- 然后正常生成
+
+##### Ambiguous (不确定)
+- 同时用本地检索 + Web Search
+- 两路结果都给 LLM
+- LLM 自己综合
+
+#### 8.3.3 Retrieval Evaluator 实现
+- 训练一个轻量分类器 (T5-Large)
+- 输入: query + chunk
+- 输出: relevance score (-1 ~ 1)
+- 阈值: > 0.7 = Correct, < 0.3 = Incorrect, 中间 = Ambiguous
+
+#### 8.3.4 CRAG vs Self-RAG 对比
+
+| 维度 | Self-RAG | CRAG |
+|---|---|---|
+| 评估方式 | LLM 输出 reflection token | 独立 evaluator 模型 |
+| 训练成本 | 高 (改 LLM 输出) | 低 (只训 evaluator) |
+| Plug-and-play | 否 (要换 LLM) | 是 (任何 RAG 加一个 evaluator) |
+| 性能 | 高 | 略低 (但好部署) |
+| 适合场景 | 重新设计 RAG | 在已有 RAG 上加补丁 |
+
+#### 8.3.5 CRAG 性能 (论文数据)
+- **PopQA**: 普通 RAG 33.3 → CRAG 54.9 (+65%)
+- **TriviaQA**: 普通 RAG 35.4 → CRAG 56.3 (+59%)
+- **Pub-Health**: 普通 RAG 23.5 → CRAG 42.8 (+82%)
+
+#### 8.3.6 CRAG 真实采用
+- **LlamaIndex 官方 cookbook** (2024.04): CRAG 模板
+- **LangGraph 官方 example** (2024.06): CRAG state graph
+- **多家企业 PoC**: 部署相对简单, 比 Self-RAG 普及度高
+
+#### 8.3.7 Web Search Fallback 实现
+- 用 Tavily API / Brave Search API / SERP API
+- 成本: $0.001-0.01 / search
+- 延迟: +500-1500ms
+- 反模式: 全 query 都触发 Web Search → 月账单爆
+
+### 8.4 GraphRAG 深度 (Microsoft Research 2024.07)
+
+#### 8.4.1 一句话
+- Microsoft Research 2024.07 开源 GraphRAG
+- 用 LLM 把文档抽成知识图谱 (entity + relation), 替代向量库
+- 优势: 多跳推理 + 全局问答
+
+#### 8.4.2 GraphRAG 架构 — 4 阶段
+
+##### 阶段 1 — Indexing (建图)
+- LLM 扫文档, 抽 entity (人 / 地 / 概念) 及 relation
+- e.g. ("Anthropic", "founded by", "Dario Amodei")
+- 用 Leiden 算法做社区检测 (community detection)
+- 每个社区生成 summary
+
+##### 阶段 2 — Local Search (局部查询)
+- 用户 query 关于具体 entity
+- 找该 entity 邻居 (1-2 跳)
+- 把邻居信息 + entity description 给 LLM 综合
+
+##### 阶段 3 — Global Search (全局查询)
+- 用户 query 关于全局主题 (e.g. "总结这本书的主要观点")
+- 用 community summary 列表
+- LLM 多轮 map-reduce 综合
+
+##### 阶段 4 — DRIFT Search (混合)
+- 既用 local 又用 global
+- LLM 自己决定权重
+
+#### 8.4.3 GraphRAG 跟向量 RAG 的核心区别
+
+| 维度 | 向量 RAG | GraphRAG |
+|---|---|---|
+| 数据结构 | 向量索引 | 知识图谱 (节点 + 边) |
+| 多跳推理 | 弱 (单次召回) | 强 (沿边走) |
+| 全局问答 | 难 (向量召回零散) | 易 (community summary) |
+| Indexing 成本 | 低 (embedding) | 高 (LLM 抽实体, 100× 贵) |
+| 推理成本 | 低 | 高 (community summary 占长上下文) |
+| 更新成本 | 低 (新文档 embed) | 高 (需重新建图 / 增量) |
+
+#### 8.4.4 GraphRAG 性能 (论文数据)
+- **Comprehensiveness**: GraphRAG > 向量 RAG, win rate 72-83%
+- **Diversity**: GraphRAG > 向量 RAG, win rate 62-82%
+- **特别适合**: "总结这 100 篇文档的主要观点" 这种 sensemaking 类任务
+
+#### 8.4.5 GraphRAG 成本 (实测)
+- Indexing: 1MB 文档 ~ $1-5 (LLM 抽实体)
+- 100MB 知识库 ~ $100-500 一次性
+- 推理: 单 global query ~ $0.05-0.5 (community summary 多轮 LLM)
+- 推理: 单 local query ~ $0.01-0.05
+
+#### 8.4.6 GraphRAG 真实采用
+- **Microsoft 内部** (Bing / Office Copilot 部分场景)
+- **Lettria** (法国创业 2024.10): 用 GraphRAG 做企业 KB
+- **少量金融 / 法律企业**: 关系复杂场景
+
+#### 8.4.7 GraphRAG 反模式
+- ❌ 全部场景都用 GraphRAG (太贵, 简单 query 浪费)
+- ❌ Indexing 不增量 (改一个文档要重建全图)
+- ❌ Community summary 不缓存 (每次重生成)
+- ✅ 标配: 简单 query → 向量 RAG, 复杂 query → GraphRAG (Adaptive)
+
+### 8.5 LightRAG 深度 (HKU 2024.10)
+
+#### 8.5.1 一句话
+- 香港大学 2024.10 提出, GitHub 8k+ stars
+- GraphRAG 轻量版, indexing 成本降 50-70%
+- 双层图 (entity 层 + relation 层) 简化结构
+
+#### 8.5.2 跟 GraphRAG 区别
+
+| 维度 | GraphRAG | LightRAG |
+|---|---|---|
+| 抽实体粒度 | 细 (含属性) | 粗 (主要 entity name) |
+| Community 检测 | Leiden 算法 | 简化版 |
+| Indexing 成本 | $100/100MB | $30/100MB |
+| 推理速度 | 慢 | 快 50% |
+| 准确率 | 略高 | 略低 |
+| 增量更新 | 复杂 | 原生支持 |
+
+#### 8.5.3 LightRAG 适合 / 不适合
+- ✅ 适合: 中型企业 KB (10-100MB), 增量更新频繁
+- ✅ 适合: GraphRAG 预算不够时
+- ❌ 不适合: 超大型 KB (1GB+, GraphRAG 准确率差距明显)
+- ❌ 不适合: 关系极复杂 (LightRAG 简化丢信息)
+
+#### 8.5.4 LightRAG 真实采用
+- **HKU 学术圈**
+- **多家中小企业** (开源易上手)
+- **跟 LangChain / LlamaIndex 集成 cookbook 多**
+
+### 8.6 Adaptive RAG 深度 (KAIST 2024.03)
+
+#### 8.6.1 论文核心 idea
+- **arXiv: 2403.14403**, NAACL 2024
+- 按 query 复杂度动态选不同 RAG 策略
+- 简单 → 直答, 中等 → 单次 RAG, 复杂 → 多步 RAG (Self-RAG)
+
+#### 8.6.2 3 种策略
+
+##### Strategy A — No Retrieval (LLM 直答)
+- 简单 query (e.g. "1+1=?")
+- LLM 自己答, 不浪费检索
+- 触发条件: query classifier 判断 LLM 已知
+
+##### Strategy B — Single-step RAG
+- 中等 query (e.g. "公司 2023 营收")
+- 一次检索 + 生成
+- 大部分 query 走这
+
+##### Strategy C — Multi-step RAG (Iterative)
+- 复杂 query (e.g. "对比 A vs B 在 X / Y / Z 三方面")
+- 多次检索 + Self-RAG style 迭代
+- 慢但准
+
+#### 8.6.3 Query Classifier
+- 训练一个 T5 / BERT 分类器
+- 输入 query, 输出 A/B/C
+- 标注用 GPT-4 + 人工 (5K-10K query)
+- 准确率 ~85-92%
+
+#### 8.6.4 Adaptive RAG 性能
+- 比固定单一策略快 30-50% (避免简单 query 走复杂流)
+- 准确率跟 Multi-step RAG 接近 (复杂 query 仍走 multi)
+- 成本降 40-60% (简单 query 省检索)
+
+#### 8.6.5 真实采用
+- **业界普遍采用思想** (但不一定叫 Adaptive RAG)
+- **§4.3 Routing Pattern 就是 Adaptive RAG 的工业实现**
+- **Klarna / Glean 内部 Router 都是 Adaptive RAG 思路**
+
+### 8.7 Reflexion 深度 (Shinn et al. 2023.03)
+
+#### 8.7.1 论文核心 idea
+- **arXiv: 2303.11366**, NeurIPS 2023
+- Agent 反思失败原因 + 调整下次策略
+- 把"自然语言反思"作为 verbal reinforcement
+
+#### 8.7.2 Reflexion 3 角色
+
+##### 角色 1 — Actor
+- 执行任务的 LLM Agent
+- 输出 action / answer
+
+##### 角色 2 — Evaluator
+- 评估 Actor 输出 (规则 / LLM-as-judge / 用户反馈)
+- 输出 reward score
+
+##### 角色 3 — Self-Reflection
+- 看 Actor 输出 + Evaluator score
+- 用自然语言写"反思" (e.g. "这次失败因为我没考虑边界条件")
+- 反思存入 episodic memory
+
+#### 8.7.3 Reflexion 循环
+- 步 1 — Actor 试 task (尝试 1)
+- 步 2 — Evaluator 打分 (e.g. 0/1 失败/成功)
+- 步 3 — 失败 → Self-Reflection 写反思
+- 步 4 — Actor 看反思 + 任务再试 (尝试 2)
+- 步 5 — 重复直到成功 / 用尽 budget
+
+#### 8.7.4 Reflexion 性能 (论文数据)
+- **HotpotQA**: GPT-4 baseline 68.4 → Reflexion 84.2 (+23%)
+- **AlfWorld**: 80% → 91% (+14%)
+- **HumanEval coding**: GPT-4 80.1 → Reflexion 91.0 (+14%)
+
+#### 8.7.5 Reflexion 反模式
+- ❌ 没 Evaluator (反思无信号, 像盲修)
+- ❌ 反思过短 (10 字以内, 等于没反思)
+- ❌ 反思不进 memory (下次又重犯)
+- ✅ 标配: Evaluator + 50+ 字反思 + persist 到 long-term memory
+
+### 8.8 Tree of Thoughts (ToT) 深度 (Yao et al. 2023.05)
+
+#### 8.8.1 论文核心 idea
+- **arXiv: 2305.10601**, NeurIPS 2023
+- 让 LLM 探索"思考树" (多条 reasoning 路径)
+- 每步评估每个分支, 剪枝差的, 深入好的
+- 类似象棋 alpha-beta 剪枝
+
+#### 8.8.2 ToT 4 步算法
+
+##### 步 1 — Thought Generation
+- 当前节点, LLM 生成 K 个候选 next thought
+- e.g. 数学题第 1 步, 生成 5 个不同切入
+
+##### 步 2 — State Evaluation
+- LLM 给每个候选打分 (sure / maybe / impossible)
+- 或用 BFS/DFS 探索
+
+##### 步 3 — Search Algorithm
+- BFS: 每层取 top-K 扩展
+- DFS: 深入最有希望的分支
+- A*: 估价函数引导
+
+##### 步 4 — Backtracking
+- 死路或低分 → 回到上一节点试别的分支
+
+#### 8.8.3 ToT 性能 (论文数据)
+- **Game of 24** (数学游戏): GPT-4 CoT 4% → ToT 74% (+1750%)
+- **Creative Writing**: ToT > CoT (人评)
+- **Crosswords**: ToT > CoT
+
+#### 8.8.4 ToT 实际应用
+- **AlphaCode 类编程**: 探索多种代码思路
+- **数学证明**: 探索多种证明路径
+- **创意写作**: 探索多种叙事
+
+#### 8.8.5 ToT 成本
+- 比 CoT 贵 5-20× (探索多分支)
+- 适合: 高价值 + 难任务 (代码 / 证明)
+- 不适合: 简单 QA / 客服 (overkill)
+
+### 8.9 Plan-and-Solve 深度 (Wang et al. 2023.05)
+
+#### 8.9.1 一句话
+- **arXiv: 2305.04091**, ACL 2023
+- "先 plan 后 solve" 比 "Let's think step by step" CoT 强
+- 是 Plan-and-Execute Agent 的雏形 (§2.2)
+
+#### 8.9.2 Plan-and-Solve prompt 模板
+- "Let's first understand the problem and devise a plan to solve it. Then, let's carry out the plan and solve the problem step by step."
+
+#### 8.9.3 性能 (论文数据)
+- **GSM8K** (数学): CoT 78.0 → PS 82.5
+- **AQuA**: CoT 73.6 → PS 81.1
+
+#### 8.9.4 跟 Plan-and-Execute Agent 关系
+- Plan-and-Solve 是 prompt 技巧 (单次 LLM 调用)
+- Plan-and-Execute Agent 是 §2.2, 真正分两步执行
+- 概念上 Plan-and-Execute 是 Plan-and-Solve 的工程化
+
+### 8.10 ReACT 加强版 (Reasoning + Acting)
+
+#### 8.10.1 ReACT 已在 §2.3 详细讲, 这里补充加强变体
+
+##### 变体 1 — ReAct + Reflexion
+- ReAct 循环 + 失败反思
+- 比单 ReAct 准确率 +10-20%
+
+##### 变体 2 — ReAct + Tool Caching
+- 重复调用同一 tool 缓存结果
+- 省 50-70% LLM token
+
+##### 变体 3 — ReAct + Async Tool Call
+- 多 tool 并行调
+- 速度提升 2-5×
+
+### 8.11 RAG-Agent 模式组合 — 真实生产配方
+
+#### 8.11.1 配方 1 — 简单 RAG (中小企业)
+- 普通 RAG (Hybrid 检索 + Rerank)
+- 加 Adaptive Routing (3 类 query)
+- 不上 Self-RAG / GraphRAG (overkill)
+- 月成本 $500-5000
+
+#### 8.11.2 配方 2 — 中等复杂 RAG (大企业 KB)
+- Hybrid + Rerank
+- + Adaptive Routing (5 类)
+- + CRAG (检索质量评估)
+- + Reflexion 在失败 case 上
+- 月成本 $5K-50K
+
+#### 8.11.3 配方 3 — 复杂关系 RAG (法律 / 金融)
+- Hybrid + Rerank (基础)
+- + GraphRAG (用于多跳关系查询)
+- + Multi-Agent (法律研究 Agent + 引用验证 Agent)
+- + ToT (复杂推理时)
+- 月成本 $50K+
+
+#### 8.11.4 配方 4 — Agent-First RAG (Anthropic Claude / Devin 风格)
+- 主架构是 Agent (ReAct + Plan-and-Execute)
+- RAG 是 Agent 的一个 tool
+- + Memory (跨会话)
+- + Reflexion (失败重试)
+- 月成本 $10K-100K
+
+### 8.12 高级 RAG-Agent 反模式
+
+#### 8.12.1 反模式 1 — 学术模式直接用生产
+- 现象: 看完 GraphRAG 论文直接生产用
+- 根因: 论文 dataset 跟生产数据差距大
+- 修复: 先小规模 PoC + 真实数据测试 + 跟 baseline 对比
+
+#### 8.12.2 反模式 2 — 模式叠加过度
+- 现象: 同时用 Self-RAG + CRAG + GraphRAG + Reflexion + ToT
+- 根因: "新东西都试一下" 心态
+- 修复: 一次只加一个模式 + A/B 对比 + 看清 ROI
+
+#### 8.12.3 反模式 3 — 不评估直接上线
+- 现象: 上 GraphRAG 后没 RAGAS 评测就上线
+- 根因: 急着上线
+- 修复: Golden Set + RAGAS + A/B 必须 (见 §10)
+
+#### 8.12.4 反模式 4 — 高级模式不做成本控制
+- 现象: ToT 单 query 烧 $10
+- 根因: 没设 budget cap
+- 修复: budget_per_query + 用户级 quota + 实时监控
+
+#### 8.12.5 反模式 5 — Self-RAG 不微调直接上
+- 现象: 用 prompt 模拟 reflection token
+- 根因: 没读论文细节
+- 修复: 必须微调 (LLaMA / Mistral 50K+ 标注数据)
+
+### 8.13 真实事故 + 案例
+
+#### 8.13.1 Microsoft GraphRAG 早期 (2024.07-08)
+- 开源后大量公司试用
+- 70% 公司发现成本超预算 5-10×
+- 修复: Microsoft 推 LightRAG 替代品 (LightRAG 出现的原因之一)
+
+#### 8.13.2 某金融公司 GraphRAG 上线 (2024.10)
+- KB 500MB 法律文档
+- Indexing 成本 $5K (一次)
+- 推理成本 $0.3/query, 月 $30K (10 万 query)
+- 业务说"贵但值, 多跳查询前所未有"
+
+#### 8.13.3 某创业公司 Reflexion 失控 (2024.11)
+- Reflexion 加到客服 Agent
+- 失败 case 反复重试, 单 query 烧到 $5
+- 修复: 加 max_reflections=3, 烧不超 $0.5
+
+#### 8.13.4 LangGraph CRAG cookbook 流行 (2024.06+)
+- LangGraph 官方 CRAG example 被广泛 fork
+- 是 CRAG 进入主流的关键推手
+- 大量企业基于 cookbook 改
+
+
+## 九. Agent 框架对比 — 8 主流 + 选型决策
+
+### 9.0 Agent 框架思维导图 ⭐
+
+> 进入本章前先看这张思维导图建立全章认知.
+
+### 9.1 8 主流 Agent 框架速记
+
+#### 9.1.1 框架总览表
+
+| 框架 | 公司 / 作者 | 推出 | 主语言 | GitHub Stars (2025) | 定位 |
+|---|---|---|---|---|---|
+| **LangGraph** | LangChain Inc | 2024.01 | Python / TS | 8k+ (子项目) | 状态图驱动 Agent, 灵活强 |
+| **LlamaIndex Agents** | LlamaIndex Inc | 2023.06 | Python / TS | 35k+ | RAG-first Agent |
+| **AutoGen** | Microsoft | 2023.10 | Python / .NET | 32k+ | 学术 / 多 Agent 群聊 |
+| **CrewAI** | João Moura | 2023.12 | Python | 30k+ | 角色扮演 Multi-Agent |
+| **OpenAI Agents SDK** | OpenAI | 2025.03 | Python | 7k+ | OpenAI 官方 (替代 Swarm) |
+| **Anthropic Claude Agent SDK** | Anthropic | 2025.05 | Python / TS | (内部主推) | Claude 官方 |
+| **Pydantic AI** | Samuel Colvin | 2024.12 | Python | 9k+ | 类型安全 Agent |
+| **Mastra** | Gatsby 创始人团队 | 2024.10 | TypeScript | 5k+ | TS 优先 Agent (Vercel 风) |
+| **Smolagents** | HuggingFace | 2025.01 | Python | 10k+ | 极简 + Code Agent |
+
+#### 9.1.2 选型矩阵
+
+| 场景 | 第一选择 | 第二选择 |
+|---|---|---|
+| RAG 重 + Python | LlamaIndex Agents | LangGraph |
+| 灵活控制流 + Python | LangGraph | Pydantic AI |
+| 多 Agent 群聊 + 学术 | AutoGen v0.4 | CrewAI |
+| 角色扮演 + 简单 | CrewAI | OpenAI Agents SDK |
+| OpenAI 生态 | OpenAI Agents SDK | LangGraph |
+| Anthropic Claude 生态 | Anthropic Claude Agent SDK | LangGraph |
+| 类型安全 + 小项目 | Pydantic AI | Mastra (TS) |
+| TypeScript / Vercel 生态 | Mastra | LlamaIndex.TS |
+| HuggingFace 生态 / Code Agent | Smolagents | LangGraph |
+| 极致性能 + 自己造 | 不用框架, 直接 LLM API | Anthropic SDK |
+
+### 9.2 LangGraph 深度
+
+#### 9.2.1 核心理念
+- 把 Agent 抽象成"状态图" (StateGraph)
+- 节点 = 函数 (可以是 LLM 调用 / tool 调用 / Agent)
+- 边 = 控制流 (条件转移)
+- State = 共享数据 (TypedDict)
+
+#### 9.2.2 关键概念
+- **StateGraph**: 主类
+- **Reducer**: 多源 update 同一 state 字段时如何合并
+- **Channel**: pub/sub 风格通信
+- **Checkpointer**: state 持久化 (PostgresSaver / RedisSaver)
+- **Interrupt**: 暂停 + 等待用户输入 (HITL)
+
+#### 9.2.3 LangGraph 优点
+- ✅ 灵活到极致, 任意控制流
+- ✅ State 持久化 → long-running task
+- ✅ 跟 LangChain 生态融合 (3000+ integration)
+- ✅ LangSmith 追踪一流
+- ✅ Checkpointer 支持 time travel debug
+
+#### 9.2.4 LangGraph 缺点
+- ❌ 学习曲线陡 (StateGraph + Reducer 概念抽象)
+- ❌ 启动样板代码多
+- ❌ 调试复杂 (异步 + 状态变化)
+- ❌ Python 强类型不够 (vs Pydantic AI)
+
+#### 9.2.5 LangGraph 真实采用
+- **Klarna**: 客服 Agent 重写 (2024.06)
+- **LinkedIn**: 招聘 / 销售 Agent
+- **Replit Agent**: 整站 Code Agent
+- **Uber Eats**: 订单 Agent
+- **Anthropic**: 部分内部项目
+
+#### 9.2.6 LangGraph 适合 / 不适合
+- ✅ 适合: 复杂 Multi-Agent + 长任务 + 需要追踪
+- ✅ 适合: 已用 LangChain 的项目
+- ❌ 不适合: 极简 Agent (用 Anthropic SDK 几十行就够)
+- ❌ 不适合: 团队没 LangChain 经验 (学习曲线陡)
+
+### 9.3 LlamaIndex Agents 深度
+
+#### 9.3.1 核心理念
+- LlamaIndex 是 RAG 框架, Agent 是其上层
+- "RAG-first Agent" — RAG 是一等公民, 不是 tool 之一
+- 自带 50+ 数据连接器 (Notion / Confluence / Slack / 等)
+
+#### 9.3.2 关键概念
+- **AgentRunner / AgentWorker**: Agent 执行核心
+- **QueryEngine**: RAG 查询引擎
+- **ToolSpec**: 工具规格
+- **Workflow** (2024.08+): 类 LangGraph 的 event-driven 控制流
+
+#### 9.3.3 LlamaIndex 跟 LangChain 的差异
+
+| 维度 | LlamaIndex | LangChain |
+|---|---|---|
+| 起源 | RAG 数据加载 | LLM 应用通用 |
+| Agent 定位 | RAG 增强 | 通用 |
+| 数据连接器 | 50+ 内置 | 通过 LangChain integrations |
+| 学习曲线 | 中 | 陡 (LangGraph) |
+| 社区 | 中等 | 大 |
+
+#### 9.3.4 LlamaIndex 真实采用
+- **大量 RAG 公司** (LlamaIndex 是 RAG 框架龙头)
+- **企业 KB 项目**
+- **跟 LlamaParse / LlamaCloud 配套**
+
+### 9.4 AutoGen 深度 (Microsoft)
+
+#### 9.4.1 v0.2 vs v0.4 (前面 §7.7 已说)
+
+#### 9.4.2 AutoGen 主打场景
+- 学术研究 (大量论文用)
+- Multi-Agent 群聊 (GroupChat)
+- Code 生成 + 执行 (UserProxyAgent 跑 code)
+
+#### 9.4.3 跟 Magentic-One 关系
+- AutoGen 是 lib, Magentic-One 是 lib 之上的应用 (5 角色)
+- 同公司同人 (Microsoft Research)
+
+#### 9.4.4 AutoGen 真实采用
+- Microsoft 内部 (Magentic-One)
+- 大量学术论文
+- 教育 / 培训
+
+### 9.5 CrewAI 深度
+
+#### 9.5.1 已在 §7.6 详细讲, 这里补充
+
+#### 9.5.2 CrewAI Flow (2024.12 新功能)
+- 类似 LangGraph Workflow
+- DAG 控制流
+- 突破纯 Sequential / Hierarchical 限制
+
+#### 9.5.3 CrewAI Enterprise
+- 商业版, 加了:
+  - 可视化 builder
+  - 监控 dashboard
+  - SLA 支持
+- 价格: 联系销售
+
+### 9.6 OpenAI Agents SDK 深度 (2025.03)
+
+#### 9.6.1 一句话
+- OpenAI 2025.03 正式发布 (Swarm 升级版)
+- 是 OpenAI 官方 Agent 框架
+- 跟 OpenAI Responses API + Computer-Using-Agent 配套
+
+#### 9.6.2 核心概念
+- **Agent**: 跟 Swarm 一样, name + instructions + tools + handoffs
+- **Runner**: 执行 Agent (类 Swarm.run)
+- **Handoff**: 转交另一 Agent (跟 Swarm 一致)
+- **Guardrail**: 输入输出安全检查
+
+#### 9.6.3 比 Swarm 加的新特性
+- ✅ Streaming
+- ✅ Tracing (内置)
+- ✅ Guardrail (LLM-as-judge)
+- ✅ Sessions (对话记忆)
+- ✅ 生产 grade
+
+#### 9.6.4 OpenAI Agents SDK 真实采用
+- **OpenAI Operator** (Computer-Using-Agent) 用这个
+- **OpenAI Apps** 内置 Agent
+- **大量 OpenAI 客户**
+
+### 9.7 Anthropic Claude Agent SDK 深度 (2025.05)
+
+#### 9.7.1 一句话
+- Anthropic 2025.05 发布 Claude Agent SDK
+- 主打 Tool Use + MCP + Subagent
+- 是 Claude Code (CLI) 背后的 SDK
+
+#### 9.7.2 核心概念
+- **Agent**: instructions + tools + subagents
+- **Subagent**: 嵌套 Agent (Orchestrator-Workers 模式)
+- **Tool**: 工具 (含 MCP tool 自动加载)
+- **Memory**: Project / Session / User 三层
+- **Hooks**: 生命周期钩子 (pre_tool / post_tool)
+
+#### 9.7.3 跟 OpenAI Agents SDK 区别
+
+| 维度 | OpenAI Agents SDK | Anthropic Claude Agent SDK |
+|---|---|---|
+| Multi-Agent 模式 | Handoff | Subagent (嵌套) |
+| Memory | Sessions (简单) | 三层 (深度) |
+| Tool 协议 | OpenAI tool_calls | Tool Use + MCP |
+| Tracing | 内置 | LangSmith / Phoenix 第三方 |
+| 主推场景 | Computer Use / 客服 | Code Agent / 工作流 |
+
+#### 9.7.4 Anthropic Claude Agent SDK 真实采用
+- **Claude Code (CLI)**: Anthropic 官方 IDE Agent
+- **Claude Desktop**: Project / MCP
+- **Block (Square 母公司)**: 内部工具
+- **大量 Anthropic 客户**
+
+### 9.8 Pydantic AI 深度
+
+#### 9.8.1 一句话
+- Samuel Colvin (Pydantic 作者) 2024.12 发布
+- "Pydantic 给 Agent": 强类型 + 类型安全
+- GitHub 9k+ stars 半年内, 增长极快
+
+#### 9.8.2 核心理念
+- 用 Pydantic Model 定义 Agent 输入输出
+- 编译期类型检查
+- 跟 FastAPI 一样的 dev 体验
+
+#### 9.8.3 关键概念
+- **Agent**: model + system_prompt + tools (装饰器)
+- **RunResult**: 强类型结果
+- **Model**: LLM 抽象 (支持 OpenAI / Anthropic / Gemini)
+
+#### 9.8.4 Pydantic AI 优点
+- ✅ 类型安全 (TypeScript 风)
+- ✅ FastAPI 风格 (dev 友好)
+- ✅ 跟 Logfire 一体化追踪
+- ✅ 学习曲线低 (Pydantic 用户秒上手)
+
+#### 9.8.5 Pydantic AI 真实采用
+- **大量 FastAPI / Pydantic 用户** (生态自然延伸)
+- **Logfire 客户**
+- **新创业项目** (类型安全很受欢迎)
+
+### 9.9 Mastra 深度 (TypeScript)
+
+#### 9.9.1 一句话
+- Gatsby 创始人团队 2024.10 发布
+- TypeScript 优先 Agent 框架
+- "Vercel for Agents" 定位 (DX 优先)
+
+#### 9.9.2 核心概念
+- **Agent**: instructions + tools + memory
+- **Workflow**: DAG 风格控制流
+- **Memory**: 内置 vector + KV
+- **Voice**: 语音 Agent 一等公民
+
+#### 9.9.3 Mastra 优点
+- ✅ TypeScript 优先 (前端友好)
+- ✅ 跟 Next.js / Vercel 完美融合
+- ✅ DX 极佳 (CLI / dashboard)
+- ✅ Voice Agent 内置
+
+#### 9.9.4 Mastra 缺点
+- ❌ 生态小 (vs LangChain Python)
+- ❌ 主要 TS, Python 项目用不上
+- ❌ 小公司, 长期不确定
+
+### 9.10 Smolagents 深度 (HuggingFace)
+
+#### 9.10.1 一句话
+- HuggingFace 2025.01 发布
+- 主打 "Code Agent" — Agent 直接写 Python 代码而不是 JSON tool call
+- 极简 (核心 1000 行)
+
+#### 9.10.2 Code Agent 思想
+- 传统: LLM 输出 JSON `{"tool": "search", "args": {"q": "..."}}`
+- Code Agent: LLM 输出 Python `result = search(q="...")`
+- 优势: 一次代码可调多 tool + 用变量 + 加循环
+
+#### 9.10.3 Smolagents 性能 (HuggingFace 测)
+- **GAIA**: Code Agent 38% (vs JSON Agent 25%, +52%)
+- **HumanEval**: 类似提升
+- 论文 / blog: huggingface.co/blog/smolagents
+
+#### 9.10.4 Code Agent 反模式
+- ❌ Code 沙盒不隔离 → 任意代码执行风险
+- ❌ Code 没 timeout → 死循环挂
+- ✅ 标配: E2B / Modal 沙盒 + 5s timeout
+
+### 9.11 框架综合对比 — 多维评分
+
+#### 9.11.1 8 框架 6 维度评分 (1-5 分)
+
+| 框架 | 灵活性 | 学习曲线 | 生产成熟度 | Multi-Agent | RAG 深度 | 类型安全 |
+|---|---|---|---|---|---|---|
+| LangGraph | 5 | 2 (难) | 5 | 5 | 4 | 3 |
+| LlamaIndex Agents | 4 | 3 | 4 | 3 | 5 | 3 |
+| AutoGen v0.4 | 4 | 3 | 4 | 5 | 3 | 4 |
+| CrewAI | 3 | 4 | 3 | 4 | 3 | 3 |
+| OpenAI Agents SDK | 3 | 5 (易) | 4 | 4 | 3 | 4 |
+| Anthropic Claude Agent SDK | 4 | 5 | 5 | 4 | 4 | 4 |
+| Pydantic AI | 4 | 5 | 4 | 3 | 3 | 5 |
+| Mastra (TS) | 4 | 4 | 3 | 3 | 3 | 5 |
+| Smolagents | 3 | 5 | 3 | 2 | 2 | 3 |
+
+#### 9.11.2 选型决策树
+
+##### 问 1 — 主语言?
+- Python → 走 Python 框架
+- TypeScript → Mastra / LlamaIndex.TS
+- 其它 → 直接 LLM API
+
+##### 问 2 — Python 路径, 主场景?
+- 复杂控制流 / Multi-Agent → LangGraph
+- RAG 重 → LlamaIndex Agents
+- OpenAI 生态 → OpenAI Agents SDK
+- Anthropic Claude 生态 → Anthropic Claude Agent SDK
+- 类型安全优先 → Pydantic AI
+- 学术 / 群聊 → AutoGen
+- 角色扮演 → CrewAI
+- Code Agent → Smolagents
+
+##### 问 3 — 团队经验?
+- 用过 LangChain → LangGraph 自然
+- 用过 Pydantic / FastAPI → Pydantic AI 自然
+- 没框架经验 → OpenAI / Anthropic SDK 起步
+
+##### 问 4 — 部署?
+- Serverless (Vercel) → Mastra
+- 自建 K8s → 任意
+- 云函数 (Lambda) → 轻框架 (Pydantic AI / Anthropic SDK)
+
+#### 9.11.3 反模式 — 选框架的常见错误
+- ❌ 跟着 GitHub stars 选 (有些 stars 来自 demo / 教程, 不代表生产)
+- ❌ 选最新的 (新框架 6 个月后可能被弃)
+- ❌ 不考虑团队经验 (学习曲线陡, 项目延期)
+- ❌ 不试 PoC 直接选 (1 周 PoC 比看文档强 10×)
+- ✅ 标配: 列 3 个候选, 1 周 PoC, 按团队 + 场景选
+
+### 9.12 框架替代方案 — 不用框架直接 LLM API
+
+#### 9.12.1 何时不用框架
+- 简单 Agent (1-3 tool, 单步), 框架 overhead 大
+- 团队偏 "看代码懂", 反框架抽象
+- 极致性能场景 (避免框架 overhead)
+- 学习目的 (从 0 实现学最快)
+
+#### 9.12.2 直接 API 实现 ReAct Agent (伪代码)
+- def react_agent(query, tools, max_iter=10):
+- &nbsp;&nbsp;messages = [{"role":"user","content":query}]
+- &nbsp;&nbsp;for i in range(max_iter):
+- &nbsp;&nbsp;&nbsp;&nbsp;resp = anthropic.messages.create(model="sonnet-4.5", messages=messages, tools=tools)
+- &nbsp;&nbsp;&nbsp;&nbsp;if resp.stop_reason == "end_turn":
+- &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return resp.content[-1].text
+- &nbsp;&nbsp;&nbsp;&nbsp;for block in resp.content:
+- &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if block.type == "tool_use":
+- &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result = execute_tool(block.name, block.input)
+- &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;messages.append({"role":"assistant","content":resp.content})
+- &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;messages.append({"role":"user","content":[{"type":"tool_result","tool_use_id":block.id,"content":result}]})
+- 总共 ~30 行就实现完整 ReAct Agent
+
+#### 9.12.3 不用框架的优缺点
+- ✅ 控制完全在自己手 (零黑盒)
+- ✅ 性能极致 (无 overhead)
+- ✅ 易调试 (代码就那么多)
+- ❌ 复杂 Multi-Agent / 持久化要自己写
+- ❌ Tool Use / Streaming / Retry 全自己实现
+- ❌ 不能用框架社区 plugin
+
+### 9.13 框架真实采用案例
+
+#### 9.13.1 Klarna — LangGraph (2024.06)
+- 客服 Agent 从 LangChain 0.x 升级 LangGraph
+- 复杂控制流 (Triage → Specialist → Verify)
+- 月 10M+ query, 成本 $1.8M (vs GPT-4 $3.5M)
+- 公开年报提到 LangGraph
+
+#### 9.13.2 Anthropic — 自家 SDK (Claude Code)
+- Anthropic 官方 IDE Agent (Claude Code) 用自家 Claude Agent SDK
+- 是 SDK 的 reference implementation
+- 内部所有 Agent 项目逐步迁移到自家 SDK
+
+#### 9.13.3 Cursor — 自研框架
+- Cursor (估值 $2.6B 2024.12) 不用任何框架
+- 自研 Agent loop + Tool Use
+- 理由: 极致性能 + 完全控制
+
+#### 9.13.4 Devin — 自研 + AutoGen 混合
+- Cognition Labs Devin 早期用 AutoGen
+- 后逐步替换为自研
+- 理由: AutoGen Python 版同步限制, 性能不够
+
+#### 9.13.5 Replit Agent — LangGraph
+- 整 IDE Agent 用 LangGraph
+- 状态持久化 (PostgresSaver) 是关键
+- 单用户长 session 几小时不丢
+
+#### 9.13.6 Microsoft Magentic-One / Office Copilot — AutoGen
+- Microsoft 自家产品深度依赖 AutoGen
+- 2024.11 v0.4 重构是为生产推动
+
+#### 9.13.7 LinkedIn — LangGraph
+- 招聘 / 销售 Agent
+- 跟 LangChain 早合作
+- LangSmith 追踪一体化
+
+#### 9.13.8 Manus (中国) — 自研 + Browser Use
+- Monica.im 团队 2025.02 发布 Manus
+- 自研 Agent loop + Browser Use 集成
+- 端到端任务 Agent 火爆
+
+### 9.14 框架反模式 + 真实事故
+
+#### 9.14.1 反模式 1 — LangChain 0.x 直接生产
+- 现象: 用 LangChain 0.x AgentExecutor 上生产
+- 根因: 0.x 已 deprecated, 用 LangGraph 替代
+- 修复: 迁 LangGraph
+
+#### 9.14.2 反模式 2 — 框架版本不锁
+- 现象: requirements.txt 写 langchain>=0.1
+- 半年后 langchain 1.0 break, 业务挂
+- 修复: 严格锁版本 + 季度升级 + regression test
+
+#### 9.14.3 反模式 3 — 框架 abstraction 当黑盒用
+- 现象: 不看 LangChain Agent 源码, 当黑盒
+- 出问题不会调
+- 修复: 至少读一遍核心 loop 源码
+
+#### 9.14.4 反模式 4 — Multi-Agent 框架做单 Agent
+- 现象: 用 CrewAI 做单 Agent 任务
+- overhead 大, 慢且贵
+- 修复: 单 Agent 用轻框架 (Anthropic SDK / Pydantic AI)
+
+#### 9.14.5 真实事故 — LangChain 0.0 升级到 0.1 (2024.01)
+- LangChain 0.0 → 0.1 大量 API break
+- 数百公司项目挂
+- 教训: 严格锁版本 + breaking change 提前 testing
+
+#### 9.14.6 真实事故 — AutoGen v0.2 → v0.4 (2024.11)
+- AutoGen 0.2 → 0.4 完全重构
+- 0.2 项目无法直接迁
+- 教训: 框架重构期最好等稳定再生产
+
+
 
 ## 十. 死循环防御 + FinOps + 评估 (待写, 阶段 3 完成)
 

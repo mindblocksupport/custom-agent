@@ -2084,6 +2084,255 @@ MERMAID_DIAGRAMS: dict[str, tuple[str, str]] = {
     class A,B,C,D,E,F cat
     class A1,A2,A3,B1,B2,B3,B4,C1,C2,C3,C4,D1,D2,D3,E1,E2,E3,F1,F2,F3,F4,F5 leaf"""
     ),
+    "Tool Calling 思维导图": (
+        "🛠️ §5 Tool Calling 全景: 6 步流程 + 三家 API + MCP + Computer Use + Browser Use + 工具池.",
+        """flowchart LR
+    R(("Tool Calling"))
+    R --> A["6 步标准流程"]
+    R --> B["三家 API 对比"]
+    R --> C["MCP 协议"]
+    R --> D["工具池设计"]
+    R --> E["Computer Use"]
+    R --> F["Browser Use"]
+    R --> G["反模式"]
+
+    A --> A1["1.工具注册 → 2.LLM 决定调用"]
+    A --> A2["3.宿主接收 → 4.执行工具"]
+    A --> A3["5.结果回灌 → 6.LLM 综合"]
+
+    B --> B1["Anthropic: tool_use block + input dict"]
+    B --> B2["OpenAI: tool_calls + arguments JSON string"]
+    B --> B3["Gemini: function_call + args dict + type 大写"]
+
+    C --> C1["MCP = Model Context Protocol (Anthropic 2024.11)"]
+    C --> C2["3 角色: Host / Client / Server"]
+    C --> C3["JSON-RPC 2.0 标准, stdio/SSE 传输"]
+    C --> C4["生态: 官方 Server (filesystem/github/postgres) + 社区 1000+"]
+
+    D --> D1["黄金区间: 5-12 个工具"]
+    D --> D2["超 12 个: Hierarchical / Tool Retrieval"]
+    D --> D3["描述工程: 何时用 + 何时不用 + 示例"]
+
+    E --> E1["Anthropic 2024.10 发布"]
+    E --> E2["4 原子操作: screenshot/mouse/keyboard/bash"]
+    E --> E3["真实: 端到端订机票 ~5min, $0.5"]
+
+    F --> F1["浏览器特化, DOM 直接操作"]
+    F --> F2["框架: Browser Use / Stagehand / AgentQL / Skyvern"]
+    F --> F3["真实: Devin / Manus 核心组件"]
+
+    G --> G1["工具数过多 (准确率塌)"]
+    G --> G2["副作用工具不加 HITL (Replit 删文件)"]
+    G --> G3["工具死循环 (Cursor 烧 $200/h)"]
+    G --> G4["跨家 API 字段混淆"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F,G cat
+    class A1,A2,A3,B1,B2,B3,C1,C2,C3,C4,D1,D2,D3,E1,E2,E3,F1,F2,F3,G1,G2,G3,G4 leaf"""
+    ),
+    "Memory 思维导图": (
+        "🧠 §6 Memory 全景: 三层架构 + 4 类记忆 + 摘要策略 + 跨用户隔离 + 衰减遗忘.",
+        """flowchart LR
+    R(("Memory"))
+    R --> A["三层架构"]
+    R --> B["4 类记忆"]
+    R --> C["摘要策略"]
+    R --> D["跨用户隔离"]
+    R --> E["衰减 + 遗忘"]
+    R --> F["反模式"]
+
+    A --> A1["L1 Session: Redis (30min TTL)"]
+    A --> A2["L2 User Pref: Postgres JSONB (永久)"]
+    A --> A3["L3 Business: Vector DB (语义召回)"]
+
+    B --> B1["Episodic (情景): 时间+地点+事件"]
+    B --> B2["Semantic (语义): 抽象事实"]
+    B --> B3["Procedural (程序): 怎么做"]
+    B --> B4["Skill (技能): 学过的技巧"]
+
+    C --> C1["滑动窗口 + 摘要"]
+    C --> C2["增量摘要 (每 10 轮)"]
+    C --> C3["重要性打分 (LLM 评)"]
+    C --> C4["Vector 召回 (RAG over History)"]
+
+    D --> D1["数据层: tenant_id + user_id 强制 WHERE"]
+    D --> D2["应用层: ContextVar + ORM RLS"]
+    D --> D3["LLM 层: 输出审计 + Anthropic Project 隔离"]
+
+    E --> E1["TTL (Session 30min, Episodic 7-90d)"]
+    E --> E2["Confidence Decay: e^(-t/τ)"]
+    E --> E3["GDPR 被遗忘权 (30 天内删)"]
+
+    F --> F1["全部对话存 Vector (量爆)"]
+    F --> F2["跨用户串 (Air Canada 案)"]
+    F --> F3["Memory 不脱敏 (PII 泄漏)"]
+    F --> F4["召回 top-50 噪音过多"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F cat
+    class A1,A2,A3,B1,B2,B3,B4,C1,C2,C3,C4,D1,D2,D3,E1,E2,E3,F1,F2,F3,F4 leaf"""
+    ),
+    "Multi-Agent 思维导图": (
+        "👥 §7 Multi-Agent 全景: 5 大形态 + 通信协议 + 主流框架 (Magentic-One/Swarm/CrewAI/AutoGen).",
+        """flowchart LR
+    R(("Multi-Agent"))
+    R --> A["5 大形态"]
+    R --> B["通信协议"]
+    R --> C["Magentic-One"]
+    R --> D["主流框架"]
+    R --> E["选型决策"]
+    R --> F["反模式"]
+
+    A --> A1["Orchestrator-Workers (中枢-工人)"]
+    A --> A2["Hierarchical (Manager→Lead→Worker)"]
+    A --> A3["Sequential (流水线)"]
+    A --> A4["Conversable (群聊, AutoGen)"]
+    A --> A5["Swarm (蜂群, CAMEL)"]
+
+    B --> B1["共享 State (LangGraph)"]
+    B --> B2["消息传递 (AutoGen/CrewAI)"]
+    B --> B3["Handoff (OpenAI Swarm)"]
+    B --> B4["Tool Call as Communication"]
+
+    C --> C1["Microsoft 2024.11"]
+    C --> C2["5 角色: Orchestrator/WebSurfer/FileSurfer/Coder/Terminal"]
+    C --> C3["Task Ledger 是核心创新"]
+    C --> C4["GAIA Level 1 SOTA 38%"]
+
+    D --> D1["OpenAI Swarm → OpenAI Agents SDK"]
+    D --> D2["CrewAI (角色扮演)"]
+    D --> D3["AutoGen v0.4 (异步分布式)"]
+    D --> D4["LangGraph Multi-Agent (4 模式)"]
+
+    E --> E1["单 Agent 能做就不上 Multi-Agent"]
+    E --> E2["真正需要的场景 < 5%"]
+    E --> E3["Anthropic 警告: 最易过度设计"]
+
+    F --> F1["过度设计 (单 Agent 能做)"]
+    F --> F2["Agent 死循环互相调"]
+    F --> F3["信息逐层失真 (传话游戏)"]
+    F --> F4["没监控 (LangSmith/Phoenix)"]
+    F --> F5["没 budget cap (烧 $50/任务)"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F cat
+    class A1,A2,A3,A4,A5,B1,B2,B3,B4,C1,C2,C3,C4,D1,D2,D3,D4,E1,E2,E3,F1,F2,F3,F4,F5 leaf"""
+    ),
+    "高级 RAG-Agent 思维导图": (
+        "🔬 §8 高级 RAG-Agent 全景: 7 大模式 (Self-RAG/CRAG/GraphRAG/LightRAG/Adaptive/Reflexion/ToT).",
+        """flowchart LR
+    R(("高级 RAG-Agent"))
+    R --> A["Self-RAG"]
+    R --> B["CRAG"]
+    R --> C["GraphRAG"]
+    R --> D["LightRAG"]
+    R --> E["Adaptive RAG"]
+    R --> F["Reflexion"]
+    R --> G["Tree of Thoughts"]
+
+    A --> A1["Asai 2023.10, ICLR 2024 Oral"]
+    A --> A2["4 reflection token (Retrieve/IsRel/IsSup/IsUse)"]
+    A --> A3["微调 LLaMA/Mistral, PopQA +44%"]
+
+    B --> B1["Yan 2024.01, EACL 2024"]
+    B --> B2["Retrieval Evaluator + 三种处理"]
+    B --> B3["Plug-and-play, 部署易"]
+    B --> B4["LangGraph cookbook 普及"]
+
+    C --> C1["Microsoft 2024.07 开源"]
+    C --> C2["LLM 抽 entity+relation 建知识图谱"]
+    C --> C3["Local Search + Global Search + DRIFT"]
+    C --> C4["100MB KB ~$100/月"]
+
+    D --> D1["HKU 2024.10, GraphRAG 轻量化"]
+    D --> D2["双层图, 成本降 50-70%"]
+    D --> D3["原生增量更新"]
+
+    E --> E1["KAIST 2024.03"]
+    E --> E2["按 query 复杂度选: No/Single/Multi-step RAG"]
+    E --> E3["§4.3 Routing 是工业实现"]
+
+    F --> F1["Shinn 2023.03, NeurIPS"]
+    F --> F2["Actor + Evaluator + Self-Reflection"]
+    F --> F3["反思入 episodic memory"]
+    F --> F4["HotpotQA +23%"]
+
+    G --> G1["Yao 2023.05, NeurIPS"]
+    G --> G2["探索思考树, BFS/DFS + 剪枝"]
+    G --> G3["Game of 24: 4% → 74%"]
+    G --> G4["贵 5-20×, 适合高价值任务"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F,G cat
+    class A1,A2,A3,B1,B2,B3,B4,C1,C2,C3,C4,D1,D2,D3,E1,E2,E3,F1,F2,F3,F4,G1,G2,G3,G4 leaf"""
+    ),
+    "Agent 框架思维导图": (
+        "🏗️ §9 Agent 框架全景: 8 主流框架对比 + 选型决策树 + 真实采用.",
+        """flowchart LR
+    R(("Agent 框架"))
+    R --> A["LangGraph"]
+    R --> B["LlamaIndex Agents"]
+    R --> C["AutoGen"]
+    R --> D["CrewAI"]
+    R --> E["OpenAI Agents SDK"]
+    R --> F["Anthropic Claude Agent SDK"]
+    R --> G["Pydantic AI / Mastra / Smolagents"]
+    R --> H["选型决策"]
+
+    A --> A1["状态图驱动 (StateGraph)"]
+    A --> A2["灵活强 + 学习曲线陡"]
+    A --> A3["真实: Klarna / LinkedIn / Replit"]
+
+    B --> B1["RAG-first Agent"]
+    B --> B2["50+ 数据连接器"]
+    B --> B3["Workflow (2024.08+) 加强控制流"]
+
+    C --> C1["Microsoft, v0.4 (2024.11) 异步重构"]
+    C --> C2["GroupChat 群聊"]
+    C --> C3["Magentic-One 底层"]
+
+    D --> D1["角色扮演 (Role+Goal+Backstory)"]
+    D --> D2["GitHub 30k+ stars"]
+    D --> D3["Sequential/Hierarchical/Parallel 3 mode"]
+
+    E --> E1["2025.03 发布 (Swarm 升级)"]
+    E --> E2["Handoff + Guardrail + Sessions"]
+    E --> E3["跟 Operator / Computer-Using-Agent 配套"]
+
+    F --> F1["2025.05 发布"]
+    F --> F2["Subagent + MCP + Hooks"]
+    F --> F3["Claude Code 背后 SDK"]
+
+    G --> G1["Pydantic AI: 类型安全, FastAPI 风"]
+    G --> G2["Mastra: TS 优先, Vercel 生态"]
+    G --> G3["Smolagents: HuggingFace, Code Agent"]
+
+    H --> H1["RAG 重 → LlamaIndex"]
+    H --> H2["复杂控制流 → LangGraph"]
+    H --> H3["Anthropic 生态 → Claude Agent SDK"]
+    H --> H4["类型安全 → Pydantic AI"]
+    H --> H5["TS → Mastra"]
+    H --> H6["简单 Agent 不用框架 (~30 行直接 API)"]
+
+    classDef root fill:#3B82F6,color:#fff,stroke:#1e40af,stroke-width:2px
+    classDef cat fill:#A855F7,color:#fff,stroke:#6b21a8,stroke-width:1px
+    classDef leaf fill:#f6f8fa,color:#1f2328,stroke:#d1d9e0
+    class R root
+    class A,B,C,D,E,F,G,H cat
+    class A1,A2,A3,B1,B2,B3,C1,C2,C3,D1,D2,D3,E1,E2,E3,F1,F2,F3,G1,G2,G3,H1,H2,H3,H4,H5,H6 leaf"""
+    ),
 }
 
 
