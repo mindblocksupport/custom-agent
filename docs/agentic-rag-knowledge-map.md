@@ -110,6 +110,8 @@ Anthropic "Building Effective Agents" (2024.12) 推出的三层架构, 是当前
 | **国内项目** | §0 → §1 → §11 → §19 → §16 → §13 | §22 §23 |
 | **运维 / SRE** | §0 → §10 → §12 → §18 → §13 | §2 §8 §22 |
 
+> 💡 **看不懂随时查附录 D 完整术语表** — 100+ 缩写完整对照 (LLM / RAG / MCP / SOTA / HITL / RBAC / 等)
+
 ### 0.7 跟通用 RAG 文档的关系
 
 - [RAG 通用知识地图](./rag-knowledge-map.html) — 18,941 行, 覆盖 4 代 RAG (Naive 朴素 / Advanced 增强 / Modular 模块化 / Agent 智能体) 全栈 + 5 层企业架构 + 60+ 面试题
@@ -2290,7 +2292,7 @@ Anthropic "Building Effective Agents" (2024.12) 推出的三层架构, 是当前
 - ❌ 给 Computer Use 管理员权限 (rm -rf 风险)
 - ❌ 不加 human-in-the-loop (重要操作前必须用户确认)
 - ❌ Computer Use 跑加密货币交易 (一旦错点损失大)
-- ✅ 标配: VM 隔离 + 操作日志 + 重要操作 HITL + 限定 working app
+- ✅ 标配: VM (Virtual Machine 虚拟机) 隔离 + 操作日志 + 重要操作 HITL (Human-in-the-Loop, 人工介入循环, 让用户点确认才执行) + 限定 working app
 
 #### 5.5.7 Computer Use 性能 + 成本
 
@@ -3293,7 +3295,7 @@ Anthropic "Building Effective Agents" (2024.12) 推出的三层架构, 是当前
 #### 7.4.1 一句话
 - Microsoft Research 2024.11 发布的 Multi-Agent 框架
 - 5 角色 + 1 Orchestrator
-- 在 GAIA / WebArena 等 benchmark 上 SOTA
+- 在 GAIA / WebArena 等 benchmark 上 SOTA (State Of The Art, 业界最高水平)
 
 #### 7.4.2 5 角色 + Orchestrator
 
@@ -7544,7 +7546,7 @@ if state_history.count(state_hash) >= 2: break
 - **MCP**: 50+ 内置 + 用户自加
 
 **关键技术**:
-- Tab autocomplete: 自训模型 + KV cache + Speculative decoding
+- Tab autocomplete: 自训模型 + KV cache (Key-Value 缓存, 复用前 token 计算省 50-90% latency) + Speculative decoding (推测式解码, 用 small model 预测 + big model 验证, 加速 2-3×)
 - 大文件编辑: 切片 + diff 模式
 - Agent: max_iter + budget + 死循环防御
 
@@ -8241,6 +8243,8 @@ if state_history.count(state_hash) >= 2: break
 > 进入本章前先看这张思维导图建立全章认知.
 
 ### 16.1 2026 Q2 主流 LLM 速记 (15 家)
+
+> ⚠️ **数据时效性**: 下表 pricing / benchmark 反映 2026 Q2 状态. LLM 价格年降 50-70%, benchmark 持续被刷新, 建议定期对照官网最新.
 
 #### 16.1.1 国际主流 (Closed-Source)
 
@@ -13570,4 +13574,237 @@ new code
 - v3.0 (2026.04) — §10-§14 (FinOps + 案例 + 安全 + 落地 + 未来), 阶段 3 完成
 - v4.0 (2026.04) — §15-§19 全局补足 (Agent 面试题 + 2026 Pricing + 三组件深度 + Observability + 国产化), 全局深化完成
 - v5.0 (2026.04) — §20-§24 二次全局补足 (MCP 实战 + Code Agent 全栈 + Voice/多模态 + Prompt/Inference + 数据/Benchmarks), 全栈完整覆盖
+- v5.1 (2026.04) — Detailed Check + 加附录 D 完整术语表 (100+ 缩写 / 全称 / 一句话解释)
+
+
+### 附录 D: 完整术语表 (Glossary) — 字母序
+
+> 全文 100+ 缩写 / 术语完整对照. 看不懂随时查这里.
+
+#### A
+- **A2A** (Agent-to-Agent Protocol) — Agent 间通信协议, Anthropic 2025.05 推出, 用于 Agent 互相协作 / 交易
+- **ABAC** (Attribute-Based Access Control) — 基于属性的访问控制, 比 RBAC 灵活, 适合企业级
+- **ACL** (Access Control List) — 访问控制列表, 决定谁能访问什么资源
+- **AGI** (Artificial General Intelligence) — 通用人工智能, 假想中能做人能做的所有任务的 AI
+- **AIME** (American Invitational Mathematics Examination) — 美国高中数学竞赛, 是 Reasoning 模型 benchmark
+- **APM** (Application Performance Monitoring) — 应用性能监控, 如 Datadog / New Relic
+- **ASR** (Automatic Speech Recognition) — 自动语音识别, 把音频转文字, 如 Whisper / Deepgram
+- **AST** (Abstract Syntax Tree) — 抽象语法树, 代码解析后的结构化树, Tree-sitter 输出
+- **AWQ** (Activation-aware Weight Quantization) — 激活感知权重量化, 2023 推出, 比 GPTQ 准
+- **Augmented LLM** — 增强型 LLM, Anthropic 三层模型层次 1 (单次 LLM + 检索/工具)
+
+#### B
+- **BEIR** (Benchmarking IR) — 信息检索 benchmark, 18 个英文 IR 任务
+- **BERT** (Bidirectional Encoder Representations from Transformers) — Google 2018 经典 encoder 模型
+- **BFS** (Breadth-First Search) — 广度优先搜索, ToT 探索方式之一
+- **BGE** (Beijing-general-embedding) — 中科院 BAAI 开源 embedding, 中文 SOTA
+- **BM25** (Best Matching 25) — 字面检索算法, 1994 推出, 工业标准
+- **BNPL** (Buy Now Pay Later) — 先买后付, Klarna 主营业务
+- **BPE** (Byte Pair Encoding) — 字节对编码, LLM 主流 tokenization 算法
+- **BYOC** (Bring Your Own Cloud) — 自带云, SaaS 部署模式之一
+
+#### C
+- **CCPA** (California Consumer Privacy Act) — 加州消费者隐私法
+- **CDP** (Chrome DevTools Protocol) — Chrome 调试协议, Browser Use 用
+- **CDN** (Content Delivery Network) — 内容分发网络
+- **CEval** (Chinese Eval) — 中文评估 benchmark, 清华推出
+- **CLI** (Command Line Interface) — 命令行界面, 如 Claude Code / Aider
+- **CoT** (Chain of Thought) — 思维链, "Let's think step by step", Wei 2022
+- **CoVe** (Chain of Verification) — 验证链, LLM 答完后自验证
+- **CRAG** (Corrective RAG) — 校正 RAG, Yan 2024.01, 检索后加 evaluator
+- **CRDT** (Conflict-free Replicated Data Type) — 无冲突复制数据类型
+- **CRM** (Customer Relationship Management) — 客户关系管理 (Salesforce 等)
+- **CUA** (Computer-Using Agent) — OpenAI 2025 桌面 GUI Agent
+- **CVE** (Common Vulnerabilities and Exposures) — 通用漏洞披露
+
+#### D
+- **DAG** (Directed Acyclic Graph) — 有向无环图, LangGraph / CrewAI Flow 控制流
+- **DAU** (Daily Active Users) — 日活跃用户
+- **DCG** (Discounted Cumulative Gain) — 折扣累积增益, 检索 metric (NDCG 基础)
+- **DFS** (Depth-First Search) — 深度优先搜索, ToT 探索方式
+- **DiskANN** — 磁盘 ANN (Approximate Nearest Neighbor) 算法, Milvus 支持, 适合超大规模
+- **DPA** (Data Processing Agreement) — 数据处理协议, 跟 LLM provider 必签 (含 Zero Retention)
+- **DPO** (Direct Preference Optimization) — 直接偏好优化, RLHF 替代品 (2023)
+- **DRIFT Search** — GraphRAG 的混合搜索 (local + global)
+
+#### E
+- **E2B** — 云端 sandbox, Code Agent 跑代码用
+- **Edge** (Edge AI / Edge Inference) — 边缘 AI, 模型在客户端 (手机 / 笔记本) 跑
+- **Embedding** — 嵌入, 文本/图 → dense vector, RAG 核心
+- **ETL** (Extract, Transform, Load) — 抽取-转换-加载, 数据处理流水线
+- **Episodic Memory** — 情景记忆 (Agent Memory 4 类之一), 时间+地点+事件
+
+#### F
+- **F-T** (Fine-tuning) — 微调
+- **FaaS** (Function as a Service) — 函数即服务, 如 AWS Lambda
+- **FAQ** (Frequently Asked Questions) — 常见问题
+- **FedRAMP** (Federal Risk and Authorization Management Program) — 美国政府云安全认证
+- **Few-shot** — 少样本提示, prompt 含 1-3 个例子
+- **FlashAttention** — 算法优化的 attention, 减少内存读写, FlashAttention-3 (2024) 接近理论极限
+- **FP8 / FP16 / BF16** — 8/16-bit 浮点数, LLM 推理常用精度
+
+#### G
+- **GAIA** (General AI Assistants benchmark) — Meta 2023.11 Agent benchmark
+- **GDPR** (General Data Protection Regulation) — 欧盟通用数据保护条例 (2018)
+- **GGUF** (GPT-Generated Unified Format) — llama.cpp 量化模型格式
+- **GLM** (General Language Model) — 智谱 GLM 系列 (清华系)
+- **GPQA** (Graduate-Level QA) — 博士级问答 benchmark, 极难
+- **GPTQ** (GPT Quantization) — LLM 量化方法 (训后 INT4)
+- **GraphRAG** — 知识图谱 RAG, Microsoft 2024.07
+- **GSM8K** — 8000 道小学数学题 benchmark, 已饱和
+
+#### H
+- **HF** (HuggingFace) — 开源 AI 模型平台
+- **HIPAA** (Health Insurance Portability and Accountability Act) — 美国医疗隐私法
+- **HITL** (Human-in-the-Loop) — 人工介入循环, 关键操作前必须用户确认
+- **HNSW** (Hierarchical Navigable Small World) — 主流向量索引算法 (2016)
+- **HumanEval** — OpenAI 2021 编程 benchmark, 164 道题
+- **Hybrid Search** — 混合搜索 (向量 + BM25 + Reranker)
+
+#### I
+- **IDE** (Integrated Development Environment) — 集成开发环境 (VSCode / Cursor / JetBrains)
+- **IDF** (Inverse Document Frequency) — 逆文档频率, BM25/TF-IDF 核心
+- **InfoNCE** — 对比学习损失函数, Embedding 训练用
+- **INT4 / INT8** — 4/8-bit 整数, LLM 量化常用
+- **IR** (Information Retrieval) — 信息检索
+- **IVF** (Inverted File Index) — 倒排文件索引, 向量索引算法 (聚类)
+
+#### J
+- **JSON-RPC** — 基于 JSON 的远程过程调用协议, MCP 用 JSON-RPC 2.0
+- **JWT** (JSON Web Token) — JSON Web 令牌, 鉴权常用
+
+#### K
+- **K8s** (Kubernetes) — 容器编排
+- **KB** (Knowledge Base) — 知识库
+- **KPI** (Key Performance Indicator) — 关键绩效指标
+- **KV Cache** (Key-Value Cache) — 键值缓存, LLM 推理核心优化 (节省 50-90% latency)
+
+#### L
+- **L1/L2/L3...** — Layer 编号 (本文档 §3 用 L1-L7)
+- **LLaMA / Llama** — Meta 开源 LLM 系列
+- **LLM** (Large Language Model) — 大语言模型
+- **LoRA** (Low-Rank Adaptation) — 低秩适配, 高效微调方法
+- **LSP** (Language Server Protocol) — 语言服务器协议, IDE 用
+- **LSH** (Locality-Sensitive Hashing) — 局部敏感哈希
+- **LTR** (Learning to Rank) — 排序学习
+- **LRU** (Least Recently Used) — 最近最少使用 (缓存淘汰策略)
+
+#### M
+- **MAP** (Mean Average Precision) — 平均精度均值, 检索 metric
+- **MAU** (Monthly Active Users) — 月活跃用户
+- **MCP** (Model Context Protocol) — Anthropic 2024.11 推出的工具协议
+- **MFA** (Multi-Factor Authentication) — 多因素认证
+- **MinHash** — 近似重复检测算法
+- **MLE** (Machine Learning Engineer) — 机器学习工程师
+- **MLM** (Masked Language Model) — 掩码语言模型, BERT 预训练目标
+- **MMLU** (Massive Multitask Language Understanding) — 综合语言理解 benchmark, 57 学科
+- **MMR** (Maximal Marginal Relevance) — 最大边际相关性, 平衡相关 + 多样
+- **MoE** (Mixture of Experts) — 混合专家, 大模型架构 (Mixtral / Qwen 3 235B / DeepSeek V3 都是 MoE)
+- **MRR** (Mean Reciprocal Rank) — 平均倒数排名, 检索 metric
+- **MTEB** (Massive Text Embedding Benchmark) — 大规模 Embedding benchmark, HuggingFace 维护
+
+#### N
+- **NER** (Named Entity Recognition) — 命名实体识别
+- **NDCG** (Normalized Discounted Cumulative Gain) — 归一化折扣累积增益, 检索主流 metric
+- **NIAH** (Needle in Haystack) — 大海捞针, 长上下文 benchmark
+- **NLU** (Natural Language Understanding) — 自然语言理解
+
+#### O
+- **OAuth** — 开放授权协议, 鉴权常用
+- **OCR** (Optical Character Recognition) — 光学字符识别 (图 → 文字)
+- **OPA** (Open Policy Agent) — CNCF 标准 ACL 决策引擎
+- **OpenLLMetry** — OpenTelemetry 的 LLM 扩展, Traceloop 推出
+- **OpenTelemetry / OTel** — CNCF 可观察性标准
+- **OS** (Operating System) — 操作系统
+- **OSS** (Open Source Software) — 开源软件
+- **OSWorld** — 真实操作系统 Agent benchmark (HKU 2024)
+
+#### P
+- **PaaS** (Platform as a Service) — 平台即服务
+- **PagedAttention** — vLLM 创新, KV cache 分页存储, 提升 GPU 利用率 24×
+- **PDF** (Portable Document Format) — 便携文档格式
+- **PII** (Personally Identifiable Information) — 个人身份信息 (身份证 / 银行卡 / 等)
+- **PLAID** — ColBERT-v2 的优化系统
+- **PoC** (Proof of Concept) — 概念验证
+- **PR** (Pull Request) — GitHub 合并请求
+- **Procedural Memory** — 程序记忆 (Agent Memory 4 类之一), 怎么做
+- **Prompt Injection** — 提示注入 (攻击)
+- **P50 / P95 / P99** — 第 50/95/99 百分位数 (统计), 用于 latency 分布
+
+#### Q
+- **QPS** (Queries Per Second) — 每秒查询数
+- **Quantization** — 量化, FP16 → INT8/INT4 减少模型大小
+
+#### R
+- **RadixAttention** — SGLang 创新, KV cache 跨 query 共享
+- **RAG** (Retrieval-Augmented Generation) — 检索增强生成
+- **RAGAS** (RAG Assessment) — RAG 评估框架, 4 指标 (Faithfulness / Answer Relevance / Context Precision / Context Recall)
+- **RBAC** (Role-Based Access Control) — 基于角色的访问控制
+- **ReAct** (Reasoning + Acting) — 推理-行动循环 Agent, Yao 2022
+- **Reflexion** — 反思 Agent, Shinn 2023.03
+- **Reranker** — 重排器, Cross-Encoder 精排 top-K
+- **RLAIF** (RL from AI Feedback) — 用 LLM 替代人评的 RLHF
+- **RLHF** (Reinforcement Learning from Human Feedback) — 人类反馈强化学习, ChatGPT 训练核心
+- **RLS** (Row-Level Security) — 行级安全, Postgres 原生支持
+- **ROI** (Return On Investment) — 投资回报率
+- **RPA** (Robotic Process Automation) — 机器人流程自动化 (UiPath / Automation Anywhere)
+- **RPC** (Remote Procedure Call) — 远程过程调用
+- **RPO** (Recovery Point Objective) — 恢复点目标 (灾备)
+- **RR** (Reciprocal Rank) — 倒数排名 (MRR 单 query 值)
+- **RRF** (Reciprocal Rank Fusion) — 倒数排名融合, k=60, Cormack 2009
+- **RTO** (Recovery Time Objective) — 恢复时间目标 (灾备)
+
+#### S
+- **SaaS** (Software as a Service) — 软件即服务
+- **SCC** (Standard Contractual Clauses) — 标准合同条款 (GDPR 跨境传输)
+- **SDK** (Software Development Kit) — 软件开发工具包
+- **Semantic Memory** — 语义记忆 (Agent Memory 4 类之一), 抽象事实
+- **Self-RAG** — 自反思 RAG, Asai 2023.10
+- **SFT** (Supervised Fine-Tuning) — 监督微调
+- **SLA** (Service Level Agreement) — 服务级别协议
+- **SLO** (Service Level Objective) — 服务级别目标
+- **SOC2** (Service Organization Control 2) — 美国安全审计标准
+- **SoT** (Skeleton of Thought) — 骨架思考, 先生成大纲再并行填充
+- **SOTA** (State Of The Art) — 业界最高水平
+- **SPLADE** (SParse Lexical AnD Expansion) — 稀疏检索, BERT 输出 sparse vector, Naver 2021
+- **SRE** (Site Reliability Engineering) — 站点可靠性工程
+- **SSE** (Server-Sent Events) — 服务端推送事件 (流式 HTTP)
+- **SSO** (Single Sign-On) — 单点登录
+- **SVE** (Self-Verification by Examples)
+- **SWE** (Software Engineering / Software Engineer) — 软件工程
+- **SWE-Bench** — 真实 GitHub issue 编程 benchmark, Princeton
+
+#### T
+- **T2I** (Text-to-Image) — 文生图
+- **TF-IDF** (Term Frequency - Inverse Document Frequency) — 词频-逆文档频率
+- **TLS** (Transport Layer Security) — 传输层安全 (HTTPS 底层)
+- **ToT** (Tree of Thoughts) — 思考树, Yao 2023.05
+- **TPS** (Tokens Per Second) — 每秒 token 数 (LLM 输出速度)
+- **TTFT** (Time To First Token) — 首 token 延迟
+- **TTL** (Time To Live) — 生存时间 (缓存过期)
+- **TTS** (Text-to-Speech) — 文本转语音
+
+#### U
+- **UI** (User Interface) — 用户界面
+- **URL** (Uniform Resource Locator) — 统一资源定位符
+- **UTF-8** — 字符编码标准
+
+#### V
+- **VAD** (Voice Activity Detection) — 语音活动检测
+- **VM** (Virtual Machine) — 虚拟机
+- **vLLM** — UC Berkeley 出品的 LLM 推理框架, PagedAttention 主推
+
+#### W
+- **WAF** (Web Application Firewall) — Web 应用防火墙
+- **WebRTC** (Web Real-Time Communication) — Web 实时通信, Voice Agent 用
+- **Workflow** — 工作流, Anthropic 三层模型层次 2
+
+#### X
+- **XML** (eXtensible Markup Language) — 可扩展标记语言
+
+#### Y
+- **YAML** — 配置文件格式
+
+#### Z
+- **Zero Retention** — 零保留, 企业版 LLM 合约条款 (数据不存不训练)
 
