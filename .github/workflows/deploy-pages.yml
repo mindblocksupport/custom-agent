@@ -1,4 +1,4 @@
-name: Deploy RAG Knowledge Map to GitHub Pages
+name: Deploy Knowledge Maps to GitHub Pages
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
     paths:
       - 'docs/rag-knowledge-map.md'
       - 'docs/agentic-rag-knowledge-map.md'
+      - 'docs/agent-frameworks.md'
       - 'docs/index.html'
       - 'scripts/md_to_html.py'
       - '.github/workflows/deploy-pages.yml'
@@ -39,6 +40,7 @@ jobs:
         run: |
           python3 scripts/md_to_html.py docs/rag-knowledge-map.md docs/rag-knowledge-map.html
           python3 scripts/md_to_html.py docs/agentic-rag-knowledge-map.md docs/agentic-rag-knowledge-map.html
+          python3 scripts/md_to_html.py docs/agent-frameworks.md docs/agent-frameworks.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
