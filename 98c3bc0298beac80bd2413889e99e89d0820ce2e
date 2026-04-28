@@ -1,0 +1,176 @@
+services/api-server/src/api_server/main.py
+  cb73be6825dc0746 6,15,19-21,50,56-58,61-66,113-114
+apps/web-console/lib/api/sessions.ts
+  cb73be6825dc0746 16,32,55-59,63,68-78
+services/api-server/tests/test_chat_multimodal.py
+  cb73be6825dc0746 1-163
+services/api-server/src/api_server/routes/me.py
+  cb73be6825dc0746 41-79,94,97-109,143-183,195-199,266-370,421-425,446-492,505-509
+services/api-server/src/api_server/db/workspaces.py
+  cb73be6825dc0746 45-46,74,86-87,90,95,208-209,222-228,230-233,239-262,284-409,414-415,429-436
+services/api-server/src/api_server/routes/workspaces.py
+  cb73be6825dc0746 20,25,28-36,45,58,72,86-87,90-93,100-101,107-109,122,132,147-154,188,203-210,217,225-231,247-251,260,267-268,272-336,343,353-360
+apps/web-console/components/CostDashboardDrawer.tsx
+  cb73be6825dc0746 75,122-169,339-354,403-526,684-855
+apps/web-console/lib/api/keys.ts
+  cb73be6825dc0746 1-67
+services/api-server/tests/test_keys_routes.py
+  cb73be6825dc0746 1-104
+services/api-server/tests/test_chat_budget.py
+  cb73be6825dc0746 1-298
+apps/web-console/lib/api/skills.ts
+  cb73be6825dc0746 64-72
+apps/web-console/hooks/useMyBudget.ts
+  cb73be6825dc0746 1-44
+apps/web-console/components/SettingsDrawer.tsx
+  cb73be6825dc0746 4-6,20-21,33,39,72,80,83-105,108-123,125-141,143-347,349-351,353-407,409-435,437-440,442,447-454,456-459,461,466-468,470-489,495-538,540-541,543-545,547,552,554-685,687-688,690,694-698,701,703-710,712-714,716-787,789-801,803-804,806,808-837,839,841-849,851-869,871-983,986-991,997-1081
+infra/migrations/007_audit_role_tags.sql
+  cb73be6825dc0746 1-36
+apps/web-console/lib/export.ts
+  cb73be6825dc0746 1,5-59
+apps/web-console/components/CitationsCard.tsx
+  cb73be6825dc0746 4,85,90-103,128-133
+apps/web-console/components/Welcome.tsx
+  cb73be6825dc0746 3-5,56-62,89,119-129,131-138,141-190
+apps/web-console/components/SessionTagsModal.tsx
+  cb73be6825dc0746 1-200
+apps/web-console/lib/templating.ts
+  cb73be6825dc0746 1-30
+infra/migrations/008_member_budget.sql
+  cb73be6825dc0746 1-10
+apps/web-console/app/api/audit/[[...path]]/route.ts
+  cb73be6825dc0746 1-43
+apps/web-console/app/api/keys/[[...path]]/route.ts
+  cb73be6825dc0746 1-46
+services/api-server/src/api_server/routes/chat.py
+  cb73be6825dc0746 23,118,121,125-164,269-282,285,287-290,293,296,298,343-350,353-356,362,418,423-552,568-601,742-752,786-788,799,801-809,811-813
+apps/web-console/lib/api/workspaces.ts
+  cb73be6825dc0746 8,20-21,64-65,69-74,82-96
+apps/web-console/hooks/useKb.ts
+  cb73be6825dc0746 96-144,146-166
+apps/web-console/hooks/useSessions.ts
+  cb73be6825dc0746 29-33,39,63-64,68-72,90,176-198,224,229
+apps/web-console/next.config.mjs
+  cb73be6825dc0746 7-24
+apps/web-console/components/WorkspaceSettingsDrawer.tsx
+  cb73be6825dc0746 39,208-219,258-259,261-270,339,341-357,508-865
+apps/web-console/hooks/useAgent.ts
+  cb73be6825dc0746 8,12,20-25,31,33-34,40-41,43-46,50,81-89,96-98,106-114,123-134,169-171,178-202,210-213,375,384-390,406,409-410,432,437
+services/api-server/src/api_server/routes/sessions.py
+  cb73be6825dc0746 19,24,27-35,48-49,61,90,127,137,146-155,158-189,234,237-240,247-259,269-286
+services/api-server/src/api_server/routes/audit.py
+  cb73be6825dc0746 1-181
+apps/web-console/components/KbDocDrawer.tsx
+  cb73be6825dc0746 1-284
+apps/web-console/package.json
+  cb73be6825dc0746 7-8,10,12
+services/api-server/src/api_server/cron.py
+  cb73be6825dc0746 1-112
+apps/web-console/components/SkillVarsModal.tsx
+  cb73be6825dc0746 1-152
+services/api-server/src/api_server/db/skills.py
+  cb73be6825dc0746 237-319
+services/api-server/src/api_server/db/audit.py
+  cb73be6825dc0746 1-150
+apps/web-console/components/SkillsPanel.tsx
+  cb73be6825dc0746 3,5,7,14,23,31,140,143,205-409,456,462,468,474,559-570,706,715,718,722,833-964
+services/api-server/tests/test_me_routes.py
+  cb73be6825dc0746 1-55
+services/gateway/src/gateway/router.py
+  cb73be6825dc0746 32-56
+apps/web-console/components/CommandPalette.tsx
+  cb73be6825dc0746 4,9-11,13-14,25,42,55-56,59,65,70-98,208-222,238,254,256,332,336-343,451-454
+apps/web-console/app/globals.css
+  cb73be6825dc0746 253-297
+apps/web-console/hooks/useSkillVars.ts
+  cb73be6825dc0746 1-67
+apps/web-console/lib/api/audit.ts
+  cb73be6825dc0746 1-97
+apps/web-console/lib/ui.ts
+  cb73be6825dc0746 112-141
+services/api-server/tests/test_session_tags_and_role.py
+  cb73be6825dc0746 1-152
+apps/web-console/components/KbPanel.tsx
+  cb73be6825dc0746 7,43,219,252-257,311-313,316-317,320,355-358
+services/api-server/src/api_server/db/kb.py
+  cb73be6825dc0746 117-157
+services/api-server/tests/test_audit_routes.py
+  cb73be6825dc0746 1-170
+apps/web-console/app/page.tsx
+  cb73be6825dc0746 8,13,19-20,28-33,36,44-51,57,59-65,68-70,72,178-183,195-196,204-222,250-256,264
+apps/web-console/lib/api/me.ts
+  cb73be6825dc0746 1,13,27-63,75-79,92-109,112-136,155-159,164-174
+services/api-server/src/api_server/db/chat.py
+  cb73be6825dc0746 39,93-94,97-101,104,109-114,137,147-180,198-275
+apps/web-console/lib/types.ts
+  cb73be6825dc0746 9-14,19-31,169-170,190,238
+services/api-server/src/api_server/routes/kb.py
+  cb73be6825dc0746 14,24,29-30,33,38-46,257-298,302,305-308,314-325,342-378
+packages/schemas/src/schemas/chat.py
+  cb73be6825dc0746 10,12-21,24,43-45
+apps/web-console/components/MessageBubble.tsx
+  cb73be6825dc0746 23,29,32,36-73,135,197,203,240-247
+services/api-server/src/api_server/routes/keys.py
+  cb73be6825dc0746 1-197
+services/api-server/src/api_server/routes/skills.py
+  cb73be6825dc0746 18,23,26-34,107,130-138,195,210-217,224,232-238,250,274-282,286-332
+services/api-server/src/api_server/db/api_keys.py
+  cb73be6825dc0746 5-6,14-16,71-184
+services/api-server/tests/test_skill_versions.py
+  cb73be6825dc0746 1-98
+apps/web-console/components/Sidebar.tsx
+  cb73be6825dc0746 7,10,40-45,52-56,75,80,88-93,150-161,223-224,280-313,317-324,333,359,425-444,551-597,627,633,662-686,688-714
+services/gateway/src/gateway/__init__.py
+  cb73be6825dc0746 7,9-12
+apps/web-console/components/ChatPanel.tsx
+  cb73be6825dc0746 4,6-7,10,13,18-19,21-55,68-70,81-86,89-90,94,97,101-106,112,114-146,175-179,184-185,187,190-191,194-255,267-268,284-294,314-325,345,394-404,453-494,497,502-523,525-536,546-626,634-663,672-674,698,702-703,706,721-726,730,736-750,755-761,764-871,910,917-920,922-923,926-958
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "98c3bc0298beac80bd2413889e99e89d0820ce2e",
+  "prompts": {
+    "cb73be6825dc0746": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "42a1301f-b4b3-460f-be8d-c3dc86d05568",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "shaoqiu <shaoqiu.chen@xinfei.cn>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 8036,
+      "overriden_lines": 0,
+      "messages_url": "https://codeaiapi.xinfei-inc.cn/cas/f6b5473d2627b7d019c4d3075e08fc3e0f50523871352c27a99a1370113e2a7f"
+    },
+    "cf9687615c38e6c1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "98a3500d-b812-4ac5-9617-fe1b88390aa0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "shaoqiu <shaoqiu.chen@xinfei.cn>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 5999,
+      "overriden_lines": 0,
+      "messages_url": "https://codeaiapi.xinfei-inc.cn/cas/9545f190563ccada3d57ef5e0a45d6a3604bfcc27aff7264f68f487a2612bd9c"
+    },
+    "d6a1a62b71d69249": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bad26ecc-2391-4d99-bd18-dc4389aa7e1c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "RAG KMap <rag@mindblock.support>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2170,
+      "overriden_lines": 0,
+      "messages_url": "https://codeaiapi.xinfei-inc.cn/cas/b8a463d1e8153934c03c04fbb976252ea10a7944d0be5553fc71e4dda02dd90e"
+    }
+  }
+}
