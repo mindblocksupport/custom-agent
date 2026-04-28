@@ -2,6 +2,18 @@
 
 > MVP v0.2 · 2026-04-22 · **monorepo** + uv workspace
 
+## 📚 在线文档
+
+🔗 **GitHub Pages 知识地图入口**：https://mindblocksupport.github.io/custom-agent/
+
+含 3 本完整知识体系：
+
+| 文档 | 在线阅读 | 简介 |
+|---|---|---|
+| 🤖 **Agent 框架系统教程 + 全景手册** | [agent-frameworks.html](https://mindblocksupport.github.io/custom-agent/agent-frameworks.html) | LangChain + ReAct + LangGraph 三件套从原理讲透 + 16 大类生态全景手册（350 KB / 31 张 Mermaid / 254 节） |
+| 📚 **RAG 知识地图 v4** | [rag-knowledge-map.html](https://mindblocksupport.github.io/custom-agent/rag-knowledge-map.html) | 5 层企业架构 + 28 真实生产案例 + 60+ 面试题（17K 行） |
+| 🧠 **Agentic RAG 专题深度版** | [agentic-rag-knowledge-map.html](https://mindblocksupport.github.io/custom-agent/agentic-rag-knowledge-map.html) | 基于 Anthropic 五模式的智能体 RAG 全栈 |
+
 ## 工程结构
 
 ```
