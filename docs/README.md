@@ -68,15 +68,30 @@ DYLD_LIBRARY_PATH=/opt/homebrew/lib python3 scripts/html_to_pdf.py \
 
 ```
 docs/
-├── index.html                    # 入口 (重定向到主文档)
-├── rag-knowledge-map.html        # 主文档 (~950KB)
+├── index.html                    # 入口 (含三本书的卡片)
+├── rag-knowledge-map.html        # RAG 通用知识地图 (~950KB)
 ├── rag-knowledge-map.md          # Markdown 源 (~17K 行)
 ├── rag-knowledge-map.xmind       # XMind 思维导图
 ├── rag-knowledge-map.opml        # OPML (兼容 macOS Outliner)
-├── rag-knowledge-map.pdf         # PDF (A4, 9.6MB)
+├── rag-knowledge-map.pdf         # PDF (A4)
+├── agent-frameworks.md           # Agent 框架系统教程源 (Markdown)
+├── agent-frameworks.html         # Agent 框架系统教程 (单文件 HTML)
+├── agent-frameworks.pdf          # Agent 框架系统教程 PDF
 ├── sitemap.xml                   # SEO sitemap
 ├── robots.txt                    # 爬虫规则
 └── .nojekyll                     # GitHub Pages 跳过 Jekyll
+```
+
+## Agent 框架系统教程 (新增)
+
+[agent-frameworks.html](agent-frameworks.html) — 系统讲透 LangChain + ReAct + LangGraph 三件套 + 生态全景手册。
+
+构建命令:
+
+```bash
+python3 scripts/md_to_html.py docs/agent-frameworks.md docs/agent-frameworks.html
+DYLD_LIBRARY_PATH=/opt/homebrew/lib python3 scripts/html_to_pdf.py \
+  docs/agent-frameworks.html docs/agent-frameworks.pdf
 ```
 
 ## 反馈 / 贡献
