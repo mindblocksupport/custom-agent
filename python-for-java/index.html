@@ -1,0 +1,3262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Python 速通指南 · 给 Java 程序员的对比式教程</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/java.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/bash.min.js"></script>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-2: #1c2128;
+  --surface-3: #21262d;
+  --border: #30363d;
+  --border-soft: #21262d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --text-muted: #6e7681;
+  --accent: #58a6ff;
+  --accent-hover: #79b8ff;
+  --java: #f89820;
+  --java-bg: rgba(248, 152, 32, 0.08);
+  --python: #4584b6;
+  --python-yellow: #ffd43b;
+  --python-bg: rgba(69, 132, 182, 0.1);
+  --good: #3fb950;
+  --good-bg: rgba(63, 185, 80, 0.1);
+  --bad: #f85149;
+  --bad-bg: rgba(248, 81, 73, 0.1);
+  --warn: #d29922;
+  --warn-bg: rgba(210, 153, 34, 0.1);
+  --aha: #a371f7;
+  --aha-bg: rgba(163, 113, 247, 0.1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 70px; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+code, pre, .mono {
+  font-family: "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+/* ============ TOP BAR ============ */
+header.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 56px;
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--border);
+  z-index: 100;
+  display: flex; align-items: center;
+  padding: 0 24px;
+  gap: 24px;
+}
+header .brand {
+  font-size: 15px; font-weight: 600;
+  background: linear-gradient(90deg, var(--java) 0%, var(--python-yellow) 50%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+header .brand .sub { color: var(--text-dim); font-weight: 400; margin-left: 8px; -webkit-text-fill-color: var(--text-dim); }
+header .search {
+  flex: 1; max-width: 480px;
+  position: relative;
+}
+header .search input {
+  width: 100%;
+  padding: 8px 14px 8px 36px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+header .search input:focus { border-color: var(--accent); }
+header .search::before {
+  content: "⌕";
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--text-muted); font-size: 16px;
+}
+header .meta { color: var(--text-dim); font-size: 13px; }
+header nav { display: flex; gap: 8px; margin-left: 8px; }
+header nav a {
+  color: var(--text-dim); text-decoration: none; font-size: 13px;
+  padding: 6px 12px; border-radius: 6px; transition: all 0.15s;
+  border: 1px solid transparent;
+}
+header nav a:hover { color: var(--accent); background: var(--surface); border-color: var(--border); }
+header nav a.current { color: var(--accent); background: var(--surface); border-color: var(--border); }
+
+/* ============ LAYOUT ============ */
+.layout { display: grid; grid-template-columns: 280px 1fr; max-width: 1440px; margin: 0 auto; padding-top: 56px; }
+
+aside.toc {
+  position: sticky; top: 56px;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+  padding: 24px 8px 24px 24px;
+  border-right: 1px solid var(--border);
+  font-size: 13.5px;
+}
+aside.toc h3 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted); margin: 16px 0 8px 8px;
+}
+aside.toc h3:first-child { margin-top: 0; }
+aside.toc a {
+  display: block;
+  padding: 5px 12px;
+  color: var(--text-dim);
+  text-decoration: none;
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+}
+aside.toc a:hover { color: var(--text); background: var(--surface); }
+aside.toc a.active {
+  color: var(--accent);
+  background: var(--surface);
+  border-left-color: var(--accent);
+}
+aside.toc a.sub { padding-left: 24px; font-size: 12.5px; }
+
+main { padding: 40px 56px 120px; max-width: 980px; min-width: 0; }
+
+/* ============ HERO ============ */
+.hero {
+  margin-bottom: 56px;
+  padding: 32px 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+.hero h1 {
+  font-size: 2.4rem;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+}
+.hero h1 .highlight {
+  background: linear-gradient(90deg, var(--java), var(--python-yellow));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero p.lead { color: var(--text-dim); font-size: 17px; margin-bottom: 16px; }
+.hero .meta-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+.tag {
+  display: inline-block;
+  padding: 3px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.tag.java { color: var(--java); border-color: rgba(248, 152, 32, 0.3); }
+.tag.python { color: var(--python-yellow); border-color: rgba(255, 212, 59, 0.3); }
+
+/* ============ SECTIONS ============ */
+.chapter { margin-bottom: 80px; scroll-margin-top: 70px; }
+.chapter > h2 {
+  font-size: 1.85rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: baseline; gap: 16px;
+}
+.chapter > h2 .num {
+  display: inline-block;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+.chapter .lead {
+  color: var(--text-dim);
+  font-size: 15px;
+  margin-bottom: 32px;
+  padding-left: 16px;
+  border-left: 3px solid var(--accent);
+}
+.chapter h3 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 40px 0 12px;
+  scroll-margin-top: 70px;
+}
+.chapter h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 24px 0 10px;
+  color: var(--text);
+}
+.chapter p { margin-bottom: 14px; color: var(--text); }
+.chapter ul, .chapter ol { padding-left: 26px; margin-bottom: 16px; }
+.chapter li { margin-bottom: 6px; }
+.chapter a { color: var(--accent); }
+
+/* ============ INLINE CODE ============ */
+:not(pre) > code {
+  background: var(--surface-3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.88em;
+  color: #ffa657;
+  border: 1px solid var(--border-soft);
+}
+
+/* ============ CODE BLOCKS ============ */
+pre {
+  background: var(--surface) !important;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 13.5px;
+  line-height: 1.6;
+  margin: 12px 0;
+}
+pre code { background: none !important; padding: 0; }
+
+/* ============ COMPARE ============ */
+.compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+.compare-side {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.compare-side.java { border-top: 3px solid var(--java); }
+.compare-side.python { border-top: 3px solid var(--python-yellow); }
+.compare-label {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.compare-side.java .compare-label { color: var(--java); background: var(--java-bg); }
+.compare-side.python .compare-label { color: var(--python-yellow); background: var(--python-bg); }
+.compare-label .note { color: var(--text-muted); font-weight: 400; font-size: 11px; }
+.compare-side pre { margin: 0; border: none; border-radius: 0; }
+
+/* ============ CALLOUTS ============ */
+.callout {
+  margin: 20px 0;
+  padding: 14px 18px;
+  border-radius: 8px;
+  border-left: 4px solid;
+  background: var(--surface);
+}
+.callout-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+.callout-title::before {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: bold;
+}
+.callout p { margin: 0 0 6px 0; font-size: 14.5px; }
+.callout p:last-child { margin-bottom: 0; }
+.callout pre { margin: 8px 0; }
+
+.callout.tip { border-color: var(--good); background: var(--good-bg); }
+.callout.tip .callout-title { color: var(--good); }
+.callout.tip .callout-title::before { content: "[TIP]"; }
+
+.callout.warn { border-color: var(--warn); background: var(--warn-bg); }
+.callout.warn .callout-title { color: var(--warn); }
+.callout.warn .callout-title::before { content: "[!]"; }
+
+.callout.bad { border-color: var(--bad); background: var(--bad-bg); }
+.callout.bad .callout-title { color: var(--bad); }
+.callout.bad .callout-title::before { content: "[陷阱]"; }
+
+.callout.aha { border-color: var(--aha); background: var(--aha-bg); }
+.callout.aha .callout-title { color: var(--aha); }
+.callout.aha .callout-title::before { content: "[啊哈]"; }
+
+.callout.pythonic { border-color: var(--python-yellow); background: var(--python-bg); }
+.callout.pythonic .callout-title { color: var(--python-yellow); }
+.callout.pythonic .callout-title::before { content: "[Pythonic]"; }
+
+/* ============ TABLES ============ */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 14px;
+  background: var(--surface);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+th, td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+}
+th {
+  background: var(--surface-2);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--surface-2); }
+td code, th code { font-size: 12.5px; }
+
+/* ============ MIND SHIFT CARDS ============ */
+.shift-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.shift-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  transition: all 0.2s;
+}
+.shift-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.shift-card .num {
+  display: inline-block;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+  text-align: center;
+  line-height: 28px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.shift-card h4 { margin-top: 0; font-size: 1.05rem; }
+.shift-card p { font-size: 14px; color: var(--text-dim); margin-bottom: 0; }
+
+/* ============ DIFF ARROW ============ */
+.arrow {
+  display: inline-block;
+  margin: 0 8px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ============ KBD ============ */
+kbd {
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+}
+
+/* ============ PROGRESS DOT ============ */
+.dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+.dot.green { background: var(--good); }
+.dot.yellow { background: var(--warn); }
+.dot.red { background: var(--bad); }
+
+/* ============ FOOTER ============ */
+footer {
+  margin-top: 80px;
+  padding: 32px 0 0;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: 240px 1fr; }
+  main { padding: 32px 32px 100px; }
+}
+@media (max-width: 800px) {
+  .layout { grid-template-columns: 1fr; }
+  aside.toc { display: none; }
+  main { padding: 24px 16px 80px; }
+  .compare { grid-template-columns: 1fr; }
+  header .search { display: none; }
+}
+
+/* ============ HIGHLIGHTED SEARCH ============ */
+.search-hidden { display: none !important; }
+.search-highlight { background: rgba(255, 212, 59, 0.3); border-radius: 2px; padding: 0 2px; }
+
+/* ============ COPY BUTTON ============ */
+.code-wrap { position: relative; }
+.copy-btn {
+  position: absolute; top: 8px; right: 8px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.code-wrap:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { color: var(--text); }
+.copy-btn.copied { color: var(--good); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">PY · 给 Java 程序员的速通对比教程<span class="sub">v1.0</span></div>
+  <div class="search"><input id="searchBox" type="search" placeholder="搜索章节内容（如：装饰器、GIL、推导式）…" /></div>
+  <nav>
+    <a href="index.html" class="current">完整教程</a>
+    <a href="basics.html">基础对照</a>
+  </nav>
+  <div class="meta">14 章 + 速查表</div>
+</header>
+
+<div class="layout">
+
+<aside class="toc" id="toc">
+  <h3>开篇</h3>
+  <a href="#hero">前言 · 为什么需要这份教程</a>
+  <a href="#mindset">导言 · 5 个心智模型转变</a>
+
+  <h3>语法基础</h3>
+  <a href="#ch01">第 1 章 · 语法对照速通</a>
+  <a href="#ch02">第 2 章 · 字符串与格式化</a>
+  <a href="#ch03">第 3 章 · 数据结构（list/dict/set/tuple）</a>
+  <a href="#ch04">第 4 章 · 控制流与推导式</a>
+
+  <h3>函数与对象</h3>
+  <a href="#ch05">第 5 章 · 函数（一等公民）</a>
+  <a href="#ch06">第 6 章 · 面向对象深度对比</a>
+  <a href="#ch07">第 7 章 · 异常与上下文管理器</a>
+
+  <h3>工程与高级</h3>
+  <a href="#ch08">第 8 章 · 模块、包与工程化</a>
+  <a href="#ch09">第 9 章 · 并发（GIL/线程/asyncio）</a>
+  <a href="#ch10">第 10 章 · Pythonic 习语</a>
+
+  <h3>实战与陷阱</h3>
+  <a href="#ch11">第 11 章 · Java 程序员的 10 个陷阱</a>
+  <a href="#ch12">第 12 章 · 标准库速览</a>
+  <a href="#ch13">第 13 章 · 工程化对照（uv/pytest/FastAPI）</a>
+
+  <h3>附录</h3>
+  <a href="#cheatsheet">附录 A · 一页速查表</a>
+  <a href="#roadmap">附录 B · 30 天学习路径</a>
+</aside>
+
+<main>
+
+<!-- ====== HERO ====== -->
+<section id="hero" class="hero">
+  <h1>从 Java 到 <span class="highlight">Python</span> 的最快路径</h1>
+  <p class="lead">这不是一份"零基础 Python 入门"。这是一份专为 <strong>有 Java 经验的程序员</strong> 设计的对比式速通教程——通过左右对照、心智映射、陷阱前置，帮你在 30 天内从"能读懂 Python"到"能写 Pythonic 代码"。</p>
+  <div class="meta-tags">
+    <span class="tag java">Java 8+</span>
+    <span class="tag python">Python 3.10+</span>
+    <span class="tag">14 章节</span>
+    <span class="tag">120+ 对比示例</span>
+    <span class="tag">10 个陷阱清单</span>
+    <span class="tag">速查表</span>
+    <span class="tag">30 天路径</span>
+  </div>
+
+  <div class="callout aha" style="margin-top: 28px;">
+    <div class="callout-title">本教程的核心方法论</div>
+    <p>1. <strong>左右对照</strong>：每个概念左 Java 右 Python，眼睛一扫就能映射，加速肌肉记忆形成。</p>
+    <p>2. <strong>心智模型先行</strong>：先讲 5 个根本性认知差异，再讲语法。否则你会写出"看起来是 Python 但灵魂是 Java"的代码。</p>
+    <p>3. <strong>正反对比</strong>：不仅展示"怎么写"，还展示 <span style="color:var(--bad)">Java 程序员的写法</span> vs <span style="color:var(--python-yellow)">Pythonic 写法</span>。</p>
+    <p>4. <strong>陷阱集中</strong>：把 Java 程序员最常踩的 10 个坑专门集中一章，前置警示。</p>
+    <p>5. <strong>分层信息</strong>：每节都有 TL;DR → 代码对比 → 深入解释 → 陷阱提示，按需阅读。</p>
+  </div>
+</section>
+
+<!-- ====== MINDSET ====== -->
+<section id="mindset" class="chapter">
+  <h2><span class="num">导言</span>5 个心智模型转变（最重要！）</h2>
+  <p class="lead">这 5 条不是"语法差异"而是"思维差异"。理解了它们，后面所有的语法对照都顺理成章；不理解它们，你写一辈子 Python 都像在写 Java。</p>
+
+  <div class="shift-grid">
+    <div class="shift-card">
+      <div class="num">1</div>
+      <h4>一切皆对象（字面意义上）</h4>
+      <p>整数、函数、类、模块本身都是 <strong>一等对象</strong>，可赋值、传参、作返回值。Java 直到 8 才有 lambda，而 Python 从来如此。</p>
+    </div>
+    <div class="shift-card">
+      <div class="num">2</div>
+      <h4>动态类型 + 鸭子类型</h4>
+      <p>变量没有类型，<strong>对象</strong>有类型；不需要 <code>implements</code>，"看起来像鸭子就是鸭子"。接口被 <code>Protocol</code> 和"形状契约"取代。</p>
+    </div>
+    <div class="shift-card">
+      <div class="num">3</div>
+      <h4>变量是"标签"不是"盒子"</h4>
+      <p>赋值不复制内存，只是给对象贴标签。<code>a = b</code> 之后改 <code>b</code>，<code>a</code> 也会变（如果是可变对象）。这是引用语义。</p>
+    </div>
+    <div class="shift-card">
+      <div class="num">4</div>
+      <h4>EAFP &gt; LBYL（编程哲学）</h4>
+      <p><strong>Easier to Ask Forgiveness than Permission</strong>：先做、错了再说（<code>try/except</code>），而不是 Java 的"先检查再做"（<code>if/else</code>）。</p>
+    </div>
+    <div class="shift-card">
+      <div class="num">5</div>
+      <h4>缩进 = 语法</h4>
+      <p>不是风格建议，是 <strong>语法的一部分</strong>。错一个空格代码就跑不了。永远用 4 空格，永远不要混 Tab 和空格。</p>
+    </div>
+  </div>
+
+  <h3>实证演示：5 个心智差异在代码里长什么样</h3>
+
+  <h4>① 一切皆对象</h4>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java <span class="note">函数不是对象，方法引用是 8+ 才有</span></div>
+<pre><code class="language-java">// 函数无法赋值给变量
+// 必须包成 Function 或 Method Reference
+Function&lt;String, Integer&gt; f = String::length;
+int n = f.apply("hello");
+
+// 类不是对象，Class 是元信息
+Class&lt;?&gt; c = Dog.class;
+Dog d = (Dog) c.getDeclaredConstructor().newInstance();</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python <span class="note">函数、类、模块都是普通对象</span></div>
+<pre><code class="language-python">def greet(name): return f"Hi {name}"
+
+f = greet                    # 函数赋值给变量
+print(f("Tom"))              # 用别名调用
+
+class Dog: pass
+D = Dog                      # 类也是对象
+d = D()                      # 用别名 new 出实例
+
+import math
+m = math                     # 模块是对象
+print(m.pi)                  # 通过别名访问</code></pre>
+    </div>
+  </div>
+
+  <h4>② 鸭子类型 vs 接口</h4>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java <span class="note">必须 implements 才能用</span></div>
+<pre><code class="language-java">interface Readable {
+    String read();
+}
+
+class FileReader implements Readable {
+    public String read() { return "file"; }
+}
+
+void process(Readable r) {
+    System.out.println(r.read());
+}</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python <span class="note">不需要继承，"长得像就行"</span></div>
+<pre><code class="language-python">class FileReader:
+    def read(self): return "file"
+
+class StringSource:           # 完全不相关的类
+    def read(self): return "str"
+
+def process(r):               # 不约束类型
+    print(r.read())           # 只要有 .read() 就行
+
+process(FileReader())         # OK
+process(StringSource())       # OK 也行</code></pre>
+    </div>
+  </div>
+
+  <h4>③ 引用语义（变量是标签）</h4>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">// 基本类型按值
+int a = 1, b = a;
+b = 99;
+// a 还是 1
+
+// 对象按引用
+List&lt;Integer&gt; x = new ArrayList&lt;&gt;(List.of(1,2));
+List&lt;Integer&gt; y = x;
+y.add(3);
+// x 也变了：[1,2,3]</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python <span class="note">没有"基本类型"，全是对象</span></div>
+<pre><code class="language-python"># 不可变对象（int/str/tuple）行为像值
+a = 1; b = a
+b = 99
+# a 还是 1
+
+# 可变对象（list/dict/set）按引用
+x = [1, 2]
+y = x                         # 同一个标签
+y.append(3)
+print(x)                      # [1, 2, 3]  ← 也变了！
+
+# 想拷贝？
+y = x.copy()                  # 浅拷贝
+import copy; y = copy.deepcopy(x)  # 深拷贝</code></pre>
+    </div>
+  </div>
+
+  <h4>④ EAFP vs LBYL</h4>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java <span class="note">Look Before You Leap</span></div>
+<pre><code class="language-java">// 先检查再用
+if (map.containsKey(key)) {
+    Value v = map.get(key);
+    if (v.isValid()) {
+        use(v);
+    }
+}</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python <span class="note">Easier to Ask Forgiveness</span></div>
+<pre><code class="language-python"># 先做，错了再说
+try:
+    v = d[key]
+    use(v)
+except (KeyError, AttributeError):
+    handle_missing()
+
+# 异常很轻量，且天然处理并发竞态</code></pre>
+    </div>
+  </div>
+
+  <h4>⑤ 缩进即语法</h4>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java <span class="note">大括号定义块</span></div>
+<pre><code class="language-java">if (x &gt; 0) {
+    if (y &gt; 0) {
+        System.out.println("both positive");
+    }
+}</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python <span class="note">缩进定义块（必须 4 空格）</span></div>
+<pre><code class="language-python">if x &gt; 0:
+    if y &gt; 0:
+        print("both positive")
+
+# 错一个空格就 IndentationError
+# 永远用 4 空格，永远不要 Tab</code></pre>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-title">写在动手之前的一句话</div>
+    <p>整本教程最重要的一句话：<strong>不要用 Java 的设计模式硬套 Python</strong>。Python 里很多模式（Singleton、Factory、Strategy、Visitor）不需要专门的"模式"，因为模块级变量、函数对象、闭包、<code>functools.partial</code> 就够用了。学会"少即是多"的美学，比记住语法重要 10 倍。</p>
+  </div>
+</section>
+
+<!-- ====== CHAPTER 1 ====== -->
+<section id="ch01" class="chapter">
+  <h2><span class="num">第 1 章</span>语法对照速通</h2>
+  <p class="lead">这一章把 Java 程序员每天都要用的基础语法做完整映射。打印这张表贴电脑旁边，2 周内化完毕。</p>
+
+  <h3>1.1 完整语法对照表</h3>
+  <table>
+    <thead>
+      <tr><th style="width: 22%">概念</th><th style="width: 39%">Java</th><th style="width: 39%">Python</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>语句结束</td><td><code>;</code> 必须</td><td>换行（不要写 <code>;</code>）</td></tr>
+      <tr><td>代码块</td><td><code>{ }</code></td><td><code>:</code> + 缩进 4 空格</td></tr>
+      <tr><td>变量声明</td><td><code>int x = 1;</code></td><td><code>x = 1</code>（无类型声明）</td></tr>
+      <tr><td>常量</td><td><code>final int X = 1;</code></td><td><code>X = 1</code>（约定大写，无强制不可变）</td></tr>
+      <tr><td>空值</td><td><code>null</code></td><td><code>None</code>（首字母大写）</td></tr>
+      <tr><td>布尔值</td><td><code>true / false</code></td><td><code>True / False</code>（首字母大写）</td></tr>
+      <tr><td>逻辑运算</td><td><code>&amp;&amp;  ||  !</code></td><td><code>and  or  not</code></td></tr>
+      <tr><td>三元</td><td><code>cond ? a : b</code></td><td><code>a if cond else b</code> <strong>（语序变了！）</strong></td></tr>
+      <tr><td>自增</td><td><code>i++</code> / <code>++i</code></td><td><code>i += 1</code>（<strong>没有 ++</strong>）</td></tr>
+      <tr><td>整除</td><td><code>5 / 2 == 2</code></td><td><code>5 // 2 == 2</code>（<code>5/2 == 2.5</code>）</td></tr>
+      <tr><td>幂运算</td><td><code>Math.pow(2,10)</code></td><td><code>2 ** 10</code></td></tr>
+      <tr><td>取模</td><td><code>%</code></td><td><code>%</code></td></tr>
+      <tr><td>类型查询</td><td><code>x instanceof T</code></td><td><code>isinstance(x, T)</code></td></tr>
+      <tr><td>长度</td><td><code>arr.length</code> / <code>list.size()</code></td><td><code>len(x)</code> <strong>（全局函数，不是方法）</strong></td></tr>
+      <tr><td>this 引用</td><td><code>this.x</code></td><td><code>self.x</code>（且方法第一个参数必须显式写 <code>self</code>）</td></tr>
+      <tr><td>构造方法</td><td><code>public ClassName() {}</code></td><td><code>def __init__(self):</code></td></tr>
+      <tr><td>实例化</td><td><code>new Dog()</code></td><td><code>Dog()</code> <strong>（没有 new 关键字）</strong></td></tr>
+      <tr><td>命名规范</td><td><code>camelCase</code> 方法/变量</td><td><code>snake_case</code>（类名仍 <code>PascalCase</code>）</td></tr>
+      <tr><td>字符串拼接</td><td><code>"Hi " + name</code> / <code>String.format</code></td><td><code>f"Hi {name}"</code> <strong>（强烈推荐 f-string）</strong></td></tr>
+      <tr><td>注释</td><td><code>//</code> <code>/* */</code> <code>/** */</code></td><td><code>#</code> 单行 / <code>"""..."""</code> 多行/文档字符串</td></tr>
+      <tr><td>包导入</td><td><code>import java.util.List;</code></td><td><code>from typing import List</code></td></tr>
+      <tr><td>访问修饰符</td><td><code>public/private/protected</code></td><td>无关键字。约定：<code>_x</code>=内部，<code>__x</code>=名字改写（伪私有）</td></tr>
+      <tr><td>不可变集合</td><td><code>List.of(...)</code></td><td><code>tuple</code> 或 <code>frozenset</code></td></tr>
+      <tr><td>空检查</td><td><code>if (x != null)</code></td><td><code>if x is not None</code> <strong>（用 is，不用 ==）</strong></td></tr>
+      <tr><td>主入口</td><td><code>public static void main</code></td><td><code>if __name__ == "__main__":</code></td></tr>
+      <tr><td>switch</td><td><code>switch/case</code></td><td><code>match/case</code>（3.10+，叫"结构化模式匹配"，更强大）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>1.2 第一个程序对照</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java · Hello.java</div>
+<pre><code class="language-java">public class Hello {
+    public static void main(String[] args) {
+        String name = args.length &gt; 0 ? args[0] : "World";
+        for (int i = 0; i &lt; 3; i++) {
+            System.out.println("Hello, " + name + "! #" + (i + 1));
+        }
+    }
+}
+// javac Hello.java && java Hello Tom</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python · hello.py</div>
+<pre><code class="language-python">import sys
+
+def main():
+    name = sys.argv[1] if len(sys.argv) &gt; 1 else "World"
+    for i in range(3):
+        print(f"Hello, {name}! #{i + 1}")
+
+if __name__ == "__main__":
+    main()
+# python hello.py Tom</code></pre>
+    </div>
+  </div>
+
+  <div class="callout aha">
+    <div class="callout-title">观察这段对比里的 7 个差异</div>
+    <p>① 不需要 class 包裹 ② 不需要 <code>String[] args</code>，用 <code>sys.argv</code> ③ 三元语序反过来 ④ <code>for (int i...)</code> 变成 <code>for i in range()</code> ⑤ 字符串拼接用 f-string ⑥ <code>(i+1)</code> 直接嵌在 f-string 里 ⑦ <code>main</code> 不是入口约定，<code>if __name__ == "__main__"</code> 才是。</p>
+  </div>
+
+  <h3>1.3 数字与运算符的细节差异</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">int  a = 5 / 2;          // 2 （整除）
+double d = 5.0 / 2;      // 2.5
+int  m = 5 % 2;          // 1
+double p = Math.pow(2, 10);  // 1024.0
+int max = Math.max(3, 5);
+long big = 1_000_000_000L;
+// int 溢出会环绕，需要 BigInteger</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python</div>
+<pre><code class="language-python">a = 5 / 2          # 2.5  （/ 永远是真除法，结果 float）
+b = 5 // 2         # 2    （// 是整除）
+m = 5 % 2          # 1
+p = 2 ** 10        # 1024 （** 是幂）
+mx = max(3, 5)     # 内建函数
+big = 1_000_000_000   # 整数自动任意精度，不会溢出
+huge = 2 ** 1000   # 直接得到 300 位的整数，免费
+</code></pre>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-title">/ 和 // 务必分清</div>
+    <p>这是 Java 程序员最容易写错的运算符之一。Python 里 <code>5 / 2 == 2.5</code> 而不是 <code>2</code>。如果你想要 Java 里的"整数除法"，必须显式写 <code>//</code>。</p>
+  </div>
+
+  <h3>1.4 真假判断 · "Truthy" 概念</h3>
+  <p>Python 的 <code>if</code> 接受任何对象，会按"真值性"判断。这是 Java 没有的强大特性，也是常见 bug 来源。</p>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">if (list != null &amp;&amp; !list.isEmpty()) { ... }
+if (str != null &amp;&amp; !str.isEmpty()) { ... }
+if (n != 0) { ... }
+// if 必须接 boolean</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python</div>
+<pre><code class="language-python">if my_list:           # 非空列表 = True
+if my_str:            # 非空字符串 = True
+if n:                 # 非 0 数字 = True
+# 假值：False, None, 0, 0.0, "", [], {}, set(), ()
+# 其他全部为真</code></pre>
+    </div>
+  </div>
+
+  <div class="callout bad">
+    <div class="callout-title">真值性的常见陷阱</div>
+    <p><code>if x:</code> 看起来很 Pythonic，但当 <code>x</code> 是数字时要小心：<code>0</code> 也是假值。如果你想区分"未传参（None）"和"传了 0"，必须显式写 <code>if x is None:</code>。</p>
+  </div>
+
+</section>
+
+<!-- ====== CHAPTER 2 ====== -->
+<section id="ch02" class="chapter">
+  <h2><span class="num">第 2 章</span>字符串与格式化</h2>
+  <p class="lead">字符串是程序员每天用最多的东西。Python 的 f-string 是它最杀手级的工程化特性之一，比 Java 14 的文本块还强 10 倍。</p>
+
+  <h3>2.1 字符串字面量</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">String a = "hello";
+char c = 'a';                  // char 和 String 是不同类型
+String multi = """
+    line1
+    line2
+    """;                        // Java 14+ 文本块
+String esc = "C:\\Users\\me";  // 反斜杠要转义</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python</div>
+<pre><code class="language-python">a = "hello"
+b = 'hello'                    # 单双引号等价
+c = 'a'                        # 没有 char 类型，只有长度 1 的 str
+multi = """
+    line1
+    line2
+"""
+raw = r"C:\Users\me"           # 原始字符串，不转义
+bytes_str = b"hello"           # 字节串</code></pre>
+    </div>
+  </div>
+
+  <h3>2.2 f-string 详解（必学）</h3>
+<pre><code class="language-python">name, age = "Alice", 30
+
+# 基础插值
+f"{name} is {age}"             # 'Alice is 30'
+
+# 表达式
+f"{age * 2}"                   # '60'
+f"{name.upper()}"              # 'ALICE'
+f"{[1,2,3]}"                   # '[1, 2, 3]'
+
+# 格式说明符（: 后面）
+f"{3.14159:.2f}"               # '3.14'   保留 2 位小数
+f"{1234567:,}"                 # '1,234,567'  千分位
+f"{255:#x}"                    # '0xff'   16 进制
+f"{255:08b}"                   # '11111111'  8 位二进制
+f"{name:&gt;10}"                  # '     Alice'   右对齐，宽 10
+f"{name:&lt;10}|"                 # 'Alice     |'  左对齐
+f"{name:^10}|"                 # '  Alice   |'  居中
+f"{name:*^10}"                 # '**Alice***'   填充字符
+
+# 调试神器（3.8+）
+f"{name=}"                     # "name='Alice'"
+f"{age * 2=}"                  # 'age * 2=60'
+
+# 嵌套
+width = 10
+f"{name:&gt;{width}}"             # 宽度也能动态
+</code></pre>
+
+  <div class="callout pythonic">
+    <div class="callout-title">f-string 是 Python 工程实践的事实标准</div>
+    <p>能用 f-string 就别用其他字符串拼接方式。<code>+</code> 拼接、<code>%</code> 格式化、<code>.format()</code> 都是历史遗留，新代码一律用 f-string。性能也更好（Python 解释器特殊优化）。</p>
+  </div>
+
+  <h3>2.3 字符串方法对照</h3>
+  <table>
+    <thead><tr><th>意图</th><th>Java</th><th>Python</th></tr></thead>
+    <tbody>
+      <tr><td>长度</td><td><code>s.length()</code></td><td><code>len(s)</code></td></tr>
+      <tr><td>大小写</td><td><code>s.toUpperCase()</code></td><td><code>s.upper()</code></td></tr>
+      <tr><td>包含子串</td><td><code>s.contains("x")</code></td><td><code>"x" in s</code></td></tr>
+      <tr><td>查找位置</td><td><code>s.indexOf("x")</code></td><td><code>s.find("x")</code> / <code>s.index("x")</code>（找不到抛异常）</td></tr>
+      <tr><td>替换</td><td><code>s.replace("a","b")</code></td><td><code>s.replace("a","b")</code></td></tr>
+      <tr><td>分割</td><td><code>s.split(",")</code></td><td><code>s.split(",")</code></td></tr>
+      <tr><td>连接</td><td><code>String.join(",", arr)</code></td><td><code>",".join(arr)</code> <strong>（连接符调方法）</strong></td></tr>
+      <tr><td>去空白</td><td><code>s.trim()</code> / <code>s.strip()</code></td><td><code>s.strip()</code> / <code>s.lstrip()</code> / <code>s.rstrip()</code></td></tr>
+      <tr><td>开头/结尾</td><td><code>s.startsWith("a")</code></td><td><code>s.startswith("a")</code></td></tr>
+      <tr><td>判断数字</td><td><code>s.matches("\\d+")</code></td><td><code>s.isdigit()</code></td></tr>
+      <tr><td>转数字</td><td><code>Integer.parseInt(s)</code></td><td><code>int(s)</code> / <code>float(s)</code></td></tr>
+      <tr><td>格式化</td><td><code>String.format("%d", n)</code></td><td><code>f"{n}"</code></td></tr>
+      <tr><td>重复</td><td><code>"x".repeat(3)</code></td><td><code>"x" * 3</code> <strong>（运算符级支持）</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.4 字符串切片（Java 没有的杀器）</h3>
+  <p>字符串本质是字符序列，可以用切片语法 <code>s[start:stop:step]</code> 操作。比 Java 的 <code>substring()</code> 强大得多。</p>
+<pre><code class="language-python">s = "Hello, World"
+s[0]            # 'H'           索引
+s[-1]           # 'd'           倒数第一
+s[7:12]         # 'World'       从 7 到 12（不含）
+s[:5]           # 'Hello'       省略 = 0
+s[7:]           # 'World'       省略 = 末尾
+s[::2]          # 'Hlo ol'      步长 2
+s[::-1]         # 'dlroW ,olleH' 反转！
+s[-5:]          # 'World'       倒数 5 个
+</code></pre>
+
+  <div class="callout warn">
+    <div class="callout-title">字符串是不可变的</div>
+    <p><code>s[0] = 'h'</code> 会报错。<code>s.upper()</code> 不会修改 <code>s</code>，而是返回新字符串——这点和 Java 一致。需要频繁修改用 <code>list(s)</code> 转列表，最后 <code>"".join(...)</code> 拼回去。</p>
+  </div>
+
+</section>
+
+<!-- ====== CHAPTER 3 ====== -->
+<section id="ch03" class="chapter">
+  <h2><span class="num">第 3 章</span>数据结构（list / dict / set / tuple）</h2>
+  <p class="lead">Python 把 Java 里 <code>ArrayList / HashMap / HashSet</code> 简化成了 4 个内建类型，且全是字面量直接写。这是 Python 提升生产力的核心来源之一。</p>
+
+  <h3>3.1 四大内建类型对照</h3>
+  <table>
+    <thead><tr><th>Python</th><th>Java 对等</th><th>字面量</th><th>可变？</th><th>有序？</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td><code>list</code></td><td><code>ArrayList</code></td><td><code>[1,2,3]</code></td><td>可变</td><td>有序</td><td>动态数组</td></tr>
+      <tr><td><code>tuple</code></td><td><code>List.of(...)</code></td><td><code>(1,2,3)</code></td><td>不可变</td><td>有序</td><td>固定记录、多返回值</td></tr>
+      <tr><td><code>dict</code></td><td><code>LinkedHashMap</code></td><td><code>{"a":1}</code></td><td>可变</td><td>有序（3.7+）</td><td>键值映射</td></tr>
+      <tr><td><code>set</code></td><td><code>HashSet</code></td><td><code>{1,2,3}</code></td><td>可变</td><td>无序</td><td>去重、集合运算</td></tr>
+      <tr><td><code>frozenset</code></td><td><code>Set.of(...)</code></td><td><code>frozenset({1,2})</code></td><td>不可变</td><td>无序</td><td>可作 dict 键</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.2 list（最常用）</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">List&lt;Integer&gt; nums = new ArrayList&lt;&gt;();
+nums.add(1); nums.add(2); nums.add(3);
+nums.add(0, 99);              // 插入到开头
+nums.remove(0);
+nums.set(0, 100);
+int n = nums.get(0);
+boolean has = nums.contains(2);
+nums.sort(Comparator.reverseOrder());
+List&lt;Integer&gt; sub = nums.subList(1, 3);
+int sz = nums.size();</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python</div>
+<pre><code class="language-python">nums = []                     # 或 list()
+nums.append(1); nums.append(2); nums.append(3)
+nums.insert(0, 99)            # 插入到开头
+nums.pop(0)                   # 删除并返回
+nums[0] = 100                 # 修改
+n = nums[0]                   # 取
+has = 2 in nums               # in 运算符
+nums.sort(reverse=True)       # 原地排序
+sub = nums[1:3]               # 切片（返回新列表）
+sz = len(nums)                # 全局函数</code></pre>
+    </div>
+  </div>
+
+  <h4>list 的更多技巧</h4>
+<pre><code class="language-python">a = [1, 2, 3]
+
+# 字面量初始化
+a = [0] * 5                   # [0, 0, 0, 0, 0]
+a = list(range(5))            # [0, 1, 2, 3, 4]
+
+# 拼接
+a + [4, 5]                    # [1,2,3,4,5]   返回新列表
+a.extend([4, 5])              # 原地扩展
+a += [4, 5]                   # 等价于 extend
+
+# 反转、排序（原地 vs 返回新值）
+a.reverse()                   # 原地反转
+b = list(reversed(a))         # 返回新的
+a.sort()                      # 原地
+b = sorted(a, key=abs, reverse=True)  # 返回新的
+
+# 解包
+first, *middle, last = [1,2,3,4,5]  # first=1, middle=[2,3,4], last=5
+
+# 遍历同时拿索引
+for i, v in enumerate(a):
+    print(i, v)
+
+# 同时遍历多个
+for x, y in zip(a, b):
+    print(x, y)
+</code></pre>
+
+  <h3>3.3 tuple（不可变记录）</h3>
+  <p>Java 没有原生 tuple。Python 的 tuple 主要用于：① 多返回值 ② 固定结构的记录 ③ 字典的键。</p>
+<pre><code class="language-python">point = (3, 4)              # 字面量
+single = (5,)               # ⚠️ 单元素必须加逗号，否则就是 int
+empty = ()
+no_paren = 1, 2, 3          # 也是 tuple，括号可省略
+
+# 解包
+x, y = point
+x, y = y, x                 # 交换变量（Java: 需要临时变量）
+
+# 多返回值（极常用）
+def divmod_(a, b):
+    return a // b, a % b    # 实际返回的是 tuple
+
+q, r = divmod_(10, 3)       # 解包接收
+
+# 命名 tuple（更清晰）
+from typing import NamedTuple
+class Point(NamedTuple):
+    x: float
+    y: float
+
+p = Point(1, 2)
+p.x, p.y                    # 像对象一样访问
+</code></pre>
+
+  <h3>3.4 dict（HashMap 的现代替身）</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">Map&lt;String, Integer&gt; m = new HashMap&lt;&gt;();
+m.put("a", 1);
+m.put("b", 2);
+int v = m.get("a");
+int safe = m.getOrDefault("c", 0);
+m.computeIfAbsent("c", k -&gt; 0);
+boolean has = m.containsKey("a");
+m.remove("a");
+for (Map.Entry&lt;String,Integer&gt; e : m.entrySet()) {
+    System.out.println(e.getKey() + "=" + e.getValue());
+}</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python</div>
+<pre><code class="language-python">m = {"a": 1, "b": 2}              # 字面量
+m["c"] = 3                         # 增/改
+v = m["a"]                         # 取（缺失抛 KeyError）
+safe = m.get("c", 0)               # 安全取，默认 0
+m.setdefault("d", 0)               # 不存在则设为 0
+has = "a" in m                     # in 运算符
+del m["a"]                         # 删
+for k, v in m.items():             # 同时取键值
+    print(f"{k}={v}")
+for k in m: ...                    # 默认遍历键
+for v in m.values(): ...           # 遍历值</code></pre>
+    </div>
+  </div>
+
+  <h4>dict 高级技巧</h4>
+<pre><code class="language-python"># 合并字典（3.9+）
+a = {"x": 1}; b = {"y": 2}
+merged = a | b                    # {"x":1, "y":2}
+a |= b                            # 原地合并
+
+# 解构合并
+combined = {**a, **b, "z": 3}
+
+# 推导式
+sq = {n: n*n for n in range(5)}   # {0:0, 1:1, 2:4, 3:9, 4:16}
+
+# 反转 key / value
+inv = {v: k for k, v in sq.items()}
+
+# 计数（用 collections.Counter 更好）
+from collections import Counter
+c = Counter("mississippi")
+# Counter({'i': 4, 's': 4, 'p': 2, 'm': 1})
+
+# 默认值字典
+from collections import defaultdict
+groups = defaultdict(list)
+for word in ["apple", "banana", "avocado"]:
+    groups[word[0]].append(word)
+# {'a': ['apple', 'avocado'], 'b': ['banana']}
+</code></pre>
+
+  <h3>3.5 set（集合运算）</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">Set&lt;Integer&gt; a = new HashSet&lt;&gt;(List.of(1,2,3));
+Set&lt;Integer&gt; b = new HashSet&lt;&gt;(List.of(2,3,4));
+Set&lt;Integer&gt; u = new HashSet&lt;&gt;(a);
+u.addAll(b);                    // 并
+Set&lt;Integer&gt; i = new HashSet&lt;&gt;(a);
+i.retainAll(b);                 // 交
+Set&lt;Integer&gt; d = new HashSet&lt;&gt;(a);
+d.removeAll(b);                 // 差</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python <span class="note">运算符级支持</span></div>
+<pre><code class="language-python">a = {1, 2, 3}
+b = {2, 3, 4}
+u = a | b              # {1,2,3,4}  并集
+i = a &amp; b              # {2,3}      交集
+d = a - b              # {1}        差集
+sym = a ^ b            # {1, 4}     对称差
+sub = {1,2} &lt;= a       # True       子集判断
+# 还有 |=, &amp;=, -=, ^= 原地版本</code></pre>
+    </div>
+  </div>
+
+  <div class="callout pythonic">
+    <div class="callout-title">用 set 去重的两种姿势</div>
+<pre><code class="language-python"># 列表去重（不保留顺序）
+unique = list(set([1, 2, 2, 3, 3, 3]))   # [1, 2, 3]
+
+# 列表去重（保留顺序，3.7+ 利用 dict 有序）
+unique = list(dict.fromkeys([3, 1, 2, 2, 1, 3]))   # [3, 1, 2]
+</code></pre>
+  </div>
+
+</section>
+
+<!-- ====== CHAPTER 4 ====== -->
+<section id="ch04" class="chapter">
+  <h2><span class="num">第 4 章</span>控制流与推导式</h2>
+  <p class="lead">控制流的主体差异不大，但 Python 的"推导式"是一个 Java 完全没有的杀手级特性，能把 5 行 stream 链式调用变成一行表达式。</p>
+
+  <h3>4.1 if / elif / else</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">if (score &gt;= 90) {
+    grade = "A";
+} else if (score &gt;= 80) {
+    grade = "B";
+} else {
+    grade = "C";
+}
+
+// 三元
+String s = age &gt;= 18 ? "adult" : "minor";
+
+// 链式比较：必须拆开
+if (0 &lt; x &amp;&amp; x &lt; 10) ...</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python</div>
+<pre><code class="language-python">if score &gt;= 90:
+    grade = "A"
+elif score &gt;= 80:           # ← elif 不是 else if
+    grade = "B"
+else:
+    grade = "C"
+
+# 三元（语序变了！）
+s = "adult" if age &gt;= 18 else "minor"
+
+# 链式比较（数学写法直接支持）
+if 0 &lt; x &lt; 10: ...           # ← 这就能用！</code></pre>
+    </div>
+  </div>
+
+  <h3>4.2 for 循环（迭代器哲学）</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">// 传统 for
+for (int i = 0; i &lt; 10; i++) { ... }
+
+// 增强 for
+for (String s : list) { ... }
+
+// 索引 + 元素
+for (int i = 0; i &lt; list.size(); i++) {
+    String s = list.get(i);
+}
+
+// 跳出/继续
+break;
+continue;</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python</div>
+<pre><code class="language-python">for i in range(10): ...           # 0..9
+for i in range(2, 10): ...        # 2..9
+for i in range(0, 10, 2): ...     # 0,2,4,6,8
+
+for s in my_list: ...             # 直接遍历
+
+# 同时拿索引
+for i, s in enumerate(my_list): ...
+for i, s in enumerate(my_list, start=1): ...
+
+# 同时遍历多个
+for x, y in zip(list_a, list_b): ...
+
+break       # 一样
+continue    # 一样
+</code></pre>
+    </div>
+  </div>
+
+  <h4>Python 独有：for/while 的 else 子句</h4>
+<pre><code class="language-python"># for 正常结束（没 break）才会执行 else
+for x in items:
+    if x == target:
+        print("found")
+        break
+else:
+    print("not found")    # 只有循环没 break 才走这里
+</code></pre>
+
+  <h3>4.3 match / case（3.10+，结构化模式匹配）</h3>
+  <p>这是 Python 的"加强版 switch"。Java 的 switch 只能比较值，Python 的 match 可以解构对象、匹配类型、按形状匹配。</p>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java（17+ 模式匹配）</div>
+<pre><code class="language-java">switch (obj) {
+    case Integer i -&gt; System.out.println("int: " + i);
+    case String  s -&gt; System.out.println("str: " + s);
+    case null    -&gt; System.out.println("null");
+    default      -&gt; System.out.println("other");
+}</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python 3.10+</div>
+<pre><code class="language-python">match point:
+    case (0, 0):
+        print("origin")
+    case (x, 0):
+        print(f"on x-axis at {x}")
+    case (0, y):
+        print(f"on y-axis at {y}")
+    case (x, y) if x == y:
+        print("diagonal")
+    case Point(x=0, y=0):       # 类匹配 + 解构
+        print("Point origin")
+    case [_, *rest]:            # 列表模式
+        print(f"list, rest={rest}")
+    case _:                     # 默认
+        print("other")</code></pre>
+    </div>
+  </div>
+
+  <h3>4.4 推导式（重磅功能！）</h3>
+  <p>推导式 (Comprehension) 是 Python 表达"集合变换"的惯用方式。比 Java Stream 简洁得多，且可读性更强。</p>
+
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java Stream</div>
+<pre><code class="language-java">List&lt;Integer&gt; squares = nums.stream()
+    .filter(n -&gt; n &gt; 0)
+    .map(n -&gt; n * n)
+    .collect(Collectors.toList());
+
+Map&lt;String, Integer&gt; lengths = words.stream()
+    .collect(Collectors.toMap(
+        w -&gt; w,
+        String::length));
+
+Set&lt;Integer&gt; uniq = nums.stream()
+    .map(n -&gt; n * 2)
+    .collect(Collectors.toSet());</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python 推导式</div>
+<pre><code class="language-python">squares = [n*n for n in nums if n &gt; 0]
+
+lengths = {w: len(w) for w in words}
+
+uniq = {n*2 for n in nums}
+
+# 还有生成器表达式（惰性，省内存）
+gen = (n*n for n in nums if n &gt; 0)
+sum(n*n for n in nums)            # 直接传入函数
+</code></pre>
+    </div>
+  </div>
+
+  <h4>推导式语法模板</h4>
+<pre><code class="language-python"># [表达式 for 变量 in 可迭代 if 条件]
+
+# 基础
+[x*2 for x in range(5)]              # [0,2,4,6,8]
+
+# 带过滤
+[x for x in range(10) if x % 2 == 0]  # [0,2,4,6,8]
+
+# 嵌套循环（笛卡尔积）
+[(x, y) for x in [1,2] for y in ['a','b']]
+# [(1,'a'),(1,'b'),(2,'a'),(2,'b')]
+
+# 嵌套推导（矩阵）
+matrix = [[1,2,3], [4,5,6], [7,8,9]]
+flat = [x for row in matrix for x in row]   # [1,2,3,4,5,6,7,8,9]
+trans = [[row[i] for row in matrix] for i in range(3)]  # 转置
+
+# 三种推导
+[x for x in it]      # list
+{x for x in it}      # set
+{k: v for ...}       # dict
+(x for x in it)      # generator（圆括号 = 惰性求值）
+
+# 条件表达式（不是过滤）
+[x if x &gt; 0 else 0 for x in nums]    # 负数变 0
+
+# Walrus 运算符（3.8+，命名表达式）
+[y for x in data if (y := process(x)) is not None]
+</code></pre>
+
+  <div class="callout pythonic">
+    <div class="callout-title">何时用推导式，何时用 for 循环</div>
+    <p>推导式适合 <strong>数据变换</strong>（input → output 的映射），不适合 <strong>带副作用的操作</strong>（如打印、写文件）。如果一个推导式超过 80 字符或嵌套超过 2 层，请改回普通 for 循环——可读性优先。</p>
+  </div>
+
+</section>
+
+<!-- ====== CHAPTER 5 ====== -->
+<section id="ch05" class="chapter">
+  <h2><span class="num">第 5 章</span>函数（一等公民）</h2>
+  <p class="lead">Python 的函数比 Java 的方法强大得多——可赋值、可传递、可装饰、可生成。这一章是 Python "高生产力"的核心来源。</p>
+
+  <h3>5.1 函数定义对照</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">public int add(int a, int b) {
+    return a + b;
+}
+
+// 默认参数：必须用方法重载
+public int greet(String name) { ... }
+public int greet(String name, String prefix) { ... }
+
+// 可变参数
+public void log(String... msgs) { ... }</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python</div>
+<pre><code class="language-python">def add(a, b):
+    return a + b
+
+# 类型注解（3.5+，可选但推荐）
+def add(a: int, b: int) -&gt; int:
+    return a + b
+
+# 默认参数（关键字参数）
+def greet(name, prefix="Mr"):
+    return f"{prefix}. {name}"
+
+greet("Tom")              # 'Mr. Tom'
+greet("Tom", "Dr")        # 'Dr. Tom'
+greet("Tom", prefix="Dr") # 关键字传递更清晰
+</code></pre>
+    </div>
+  </div>
+
+  <h3>5.2 参数的 5 种形式（必须掌握）</h3>
+<pre><code class="language-python">def f(a, b, /, c, d, *, e, f):
+    """
+    a, b      → 仅位置参数（/ 之前）
+    c, d      → 普通参数（位置或关键字都行）
+    e, f      → 仅关键字参数（* 之后）
+    """
+    pass
+
+# 任意位置参数 *args（类似 Java 的 String...）
+def sum_all(*nums):
+    return sum(nums)
+sum_all(1, 2, 3, 4)              # nums = (1,2,3,4)
+
+# 任意关键字参数 **kwargs
+def configure(**options):
+    print(options)
+configure(host="localhost", port=8080)
+# {'host': 'localhost', 'port': 8080}
+
+# 全部混合
+def f(name, *args, prefix="Mr", **kwargs):
+    pass
+
+# 解包传参（极常用！）
+args = [1, 2, 3]
+sum_all(*args)                    # 等价于 sum_all(1, 2, 3)
+
+opts = {"host": "x", "port": 80}
+configure(**opts)                 # 等价于 configure(host="x", port=80)
+</code></pre>
+
+  <div class="callout warn">
+    <div class="callout-title">陷阱：可变默认参数</div>
+<pre><code class="language-python"># 错误！默认值在函数定义时只算一次
+def add_item(item, lst=[]):
+    lst.append(item)
+    return lst
+
+add_item(1)    # [1]
+add_item(2)    # [1, 2]   ← 不是 [2]！
+
+# 正确
+def add_item(item, lst=None):
+    if lst is None:
+        lst = []
+    lst.append(item)
+    return lst
+</code></pre>
+  </div>
+
+  <h3>5.3 多返回值</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java <span class="note">需要 record / Pair / 数组</span></div>
+<pre><code class="language-java">record DivResult(int quotient, int remainder) {}
+
+DivResult divmod(int a, int b) {
+    return new DivResult(a / b, a % b);
+}
+
+DivResult r = divmod(10, 3);
+int q = r.quotient(); int rem = r.remainder();</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python <span class="note">原生支持，本质是 tuple</span></div>
+<pre><code class="language-python">def divmod_(a, b):
+    return a // b, a % b   # 返回 tuple
+
+q, r = divmod_(10, 3)      # 解包接收
+
+# 想要命名访问？用 NamedTuple
+from typing import NamedTuple
+class DivResult(NamedTuple):
+    quotient: int
+    remainder: int
+
+def divmod_(a, b) -&gt; DivResult:
+    return DivResult(a // b, a % b)</code></pre>
+    </div>
+  </div>
+
+  <h3>5.4 lambda（匿名函数）</h3>
+<pre><code class="language-python"># lambda 参数: 表达式
+square = lambda x: x * x
+add    = lambda a, b: a + b
+
+# 常用于回调
+sorted(words, key=lambda w: len(w))
+list(filter(lambda n: n &gt; 0, nums))
+
+# Python 的 lambda 只能写一个表达式（不能多行/赋值）
+# 复杂逻辑请定义命名函数
+</code></pre>
+
+  <div class="callout pythonic">
+    <div class="callout-title">什么时候不用 lambda</div>
+    <p>如果 lambda 只是调用一个已有函数，就用函数本身：<code>map(str, nums)</code> 不要写成 <code>map(lambda x: str(x), nums)</code>。如果逻辑超过一个简单表达式，请定义命名函数——可读性永远优先。</p>
+  </div>
+
+  <h3>5.5 闭包与高阶函数</h3>
+<pre><code class="language-python"># 闭包：内层函数捕获外层变量
+def make_counter(start=0):
+    count = start
+    def increment():
+        nonlocal count    # ← 必须声明，否则 count 是新变量
+        count += 1
+        return count
+    return increment
+
+c = make_counter()
+c(); c(); c()             # 3
+
+# 高阶函数：函数作参数 / 返回值
+def apply(fn, x): return fn(x)
+apply(lambda n: n * 2, 5)   # 10
+
+# functools.partial：偏函数（Java 没有原生对等）
+from functools import partial
+def power(base, exp): return base ** exp
+square = partial(power, exp=2)
+cube = partial(power, exp=3)
+square(5)    # 25
+cube(3)      # 27
+</code></pre>
+
+  <h3>5.6 装饰器（重磅！Java 没有真正对等物）</h3>
+  <p>装饰器是"函数包装函数"。Java 注解只能"标记"，需要框架反射处理；Python 装饰器是 <strong>真的把原函数替换掉</strong>，运行时直接生效。</p>
+
+<pre><code class="language-python">import time
+from functools import wraps
+
+def timing(fn):
+    @wraps(fn)                    # 保留原函数元信息（必须！）
+    def wrapper(*args, **kwargs):
+        t = time.time()
+        result = fn(*args, **kwargs)
+        print(f"{fn.__name__} took {time.time()-t:.3f}s")
+        return result
+    return wrapper
+
+@timing                            # 等价于：slow = timing(slow)
+def slow(n):
+    time.sleep(n)
+    return n
+
+slow(1)
+# slow took 1.001s
+# 1
+</code></pre>
+
+  <h4>带参数的装饰器（三层函数）</h4>
+<pre><code class="language-python">def retry(times=3, delay=1):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            for i in range(times):
+                try:
+                    return fn(*args, **kwargs)
+                except Exception as e:
+                    if i == times - 1: raise
+                    time.sleep(delay)
+        return wrapper
+    return decorator
+
+@retry(times=5, delay=2)
+def fragile_call(): ...
+</code></pre>
+
+  <h4>常用装饰器（标准库自带）</h4>
+<pre><code class="language-python">from functools import lru_cache, cached_property
+
+@lru_cache(maxsize=128)
+def fib(n):
+    if n &lt; 2: return n
+    return fib(n-1) + fib(n-2)
+# 自动记忆化！fib(100) 瞬间出结果
+
+class Circle:
+    def __init__(self, r): self.r = r
+
+    @cached_property                 # 第一次访问后缓存
+    def area(self):
+        print("computing...")
+        return 3.14159 * self.r ** 2
+
+c = Circle(5)
+c.area    # computing... → 78.5
+c.area    # 78.5  （不再计算）
+</code></pre>
+
+  <h3>5.7 生成器与 yield（惰性序列）</h3>
+  <p>生成器是 Java 8 Stream 的"原生版本"，但更轻量、更灵活。<code>yield</code> 让函数变成可暂停/继续的迭代器。</p>
+
+<pre><code class="language-python">def fib():
+    a, b = 0, 1
+    while True:
+        yield a               # 暂停，返回值，下次 next() 从这里继续
+        a, b = b, a + b
+
+# 取前 10 个
+import itertools
+list(itertools.islice(fib(), 10))
+# [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
+
+# 处理大文件，不爆内存
+def lines_with(path, kw):
+    with open(path) as f:
+        for line in f:        # f 本身就是迭代器
+            if kw in line:
+                yield line
+
+# 调用方按需消费，最多只占一行内存
+for line in lines_with("huge.log", "ERROR"):
+    process(line)
+</code></pre>
+
+  <div class="callout aha">
+    <div class="callout-title">生成器 vs 普通函数的区别</div>
+    <p>普通函数 <code>return</code> 一次就结束。生成器函数遇到 <code>yield</code> 时 <strong>暂停并保留状态</strong>，调用方下次 <code>next()</code> 时从暂停处继续。这让你可以表达"无限序列"和"按需计算"。</p>
+  </div>
+
+</section>
+
+<!-- ====== CHAPTER 6 ====== -->
+<section id="ch06" class="chapter">
+  <h2><span class="num">第 6 章</span>面向对象深度对比</h2>
+  <p class="lead">这是 Java 程序员最容易"用 Java 思维写 Python"的领域。表面相似，实质差异巨大。读完本章你应该能避免 90% 的反模式。</p>
+
+  <h3>6.1 类的基本结构</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">public class Dog {
+    private static String species = "Canis";   // 类静态
+    private String name;                        // 实例字段
+    private int age;
+
+    public Dog(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String bark() {
+        return name + " says woof";
+    }
+
+    @Override
+    public String toString() {
+        return "Dog(" + name + ")";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof Dog d)) return false;
+        return name.equals(d.name);
+    }
+
+    @Override
+    public int hashCode() { return name.hashCode(); }
+}
+
+Dog d = new Dog("Rex", 3);</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python</div>
+<pre><code class="language-python">class Dog:
+    species = "Canis"             # 类属性（共享）
+
+    def __init__(self, name, age):
+        self.name = name           # 实例属性（必须 self.）
+        self.age = age
+
+    def bark(self):
+        return f"{self.name} says woof"
+
+    def __str__(self):             # toString 等价物
+        return f"Dog({self.name})"
+
+    def __eq__(self, other):       # equals 等价物
+        return isinstance(other, Dog) and self.name == other.name
+
+    def __hash__(self):            # hashCode 等价物
+        return hash(self.name)
+
+d = Dog("Rex", 3)                  # 没有 new！</code></pre>
+    </div>
+  </div>
+
+  <h3>6.2 self 的真相</h3>
+  <p>Java 的 <code>this</code> 是隐式注入的；Python 的 <code>self</code> <strong>必须显式声明</strong>，是方法的第一个参数。这暴露了一个本质：</p>
+<pre><code class="language-python"># 这两种调用是等价的
+d.bark()
+Dog.bark(d)        # ← 实际上 d 就是作为 self 传入的
+
+# 也就是说：实例方法 = 第一个参数为 self 的普通函数
+# Python 没有"绑定方法"的魔法，只有清晰的参数传递
+</code></pre>
+
+  <h3>6.3 三种方法：实例 / 类 / 静态</h3>
+<pre><code class="language-python">class Dog:
+    count = 0    # 类属性
+
+    def __init__(self, name):
+        self.name = name
+        Dog.count += 1
+
+    def bark(self):                    # 实例方法（第一参数 self）
+        return f"{self.name} woof"
+
+    @classmethod
+    def total(cls):                    # 类方法（第一参数 cls）
+        return cls.count
+
+    @staticmethod                       # 静态方法（无 self/cls）
+    def is_valid_name(name):
+        return name.isalpha() and len(name) &lt;= 20
+
+    @classmethod                        # 备用构造器（很 Pythonic）
+    def from_string(cls, s):
+        name, age = s.split(",")
+        return cls(name, int(age))
+
+d = Dog.from_string("Rex,3")
+Dog.total()                              # 1
+Dog.is_valid_name("Rex")                 # True
+</code></pre>
+
+  <h3>6.4 @property（替代 getter/setter）</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java <span class="note">getter/setter 满天飞</span></div>
+<pre><code class="language-java">public class User {
+    private int age;
+
+    public int getAge() { return age; }
+    public void setAge(int age) {
+        if (age &lt; 0) throw new IllegalArgumentException();
+        this.age = age;
+    }
+}
+
+User u = new User();
+u.setAge(30);
+int a = u.getAge();</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python <span class="note">像访问字段一样调用方法</span></div>
+<pre><code class="language-python">class User:
+    def __init__(self):
+        self._age = 0
+
+    @property
+    def age(self):
+        return self._age
+
+    @age.setter
+    def age(self, v):
+        if v &lt; 0: raise ValueError
+        self._age = v
+
+u = User()
+u.age = 30           # 看起来像字段，实际走 setter
+print(u.age)         # 看起来像字段，实际走 getter</code></pre>
+    </div>
+  </div>
+
+  <div class="callout pythonic">
+    <div class="callout-title">何时用 @property</div>
+    <p>Python 哲学：<strong>先用普通字段，需要时再改成 @property</strong>。Java 的"必须 getter/setter"是为了二进制兼容和反射框架；Python 没有这个约束，所以默认就用 <code>self.x = 0</code>。等到需要校验/计算/缓存时，再加 <code>@property</code> 包装，<strong>调用方代码完全不用改</strong>——这是 Python 优雅的地方。</p>
+  </div>
+
+  <h3>6.5 没有真正的 private</h3>
+<pre><code class="language-python">class Account:
+    def __init__(self):
+        self.public = 1            # 公开
+        self._protected = 2        # 约定：内部用，外部勿动（但语法上能访问）
+        self.__private = 3         # 名字改写为 _Account__private
+
+a = Account()
+a.public          # 1
+a._protected      # 2，能访问，但 IDE 会警告
+a.__private       # AttributeError
+a._Account__private  # 3，绕过去了（不要这么干）
+</code></pre>
+
+  <p>Python 哲学："我们都是成年人"。约定大于强制。<code>_</code> 前缀是社区共识——你看到 <code>_</code> 就知道"作者说这是内部的，别用"。</p>
+
+  <h3>6.6 dataclass（Lombok 终结者）</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java <span class="note">需要 Lombok 或 record</span></div>
+<pre><code class="language-java">// 用 record（Java 14+）
+public record Point(double x, double y) {}
+
+// 自动有 constructor, equals, hashCode, toString
+// 但默认不可变，且功能受限</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python <span class="note">标准库自带，更灵活</span></div>
+<pre><code class="language-python">from dataclasses import dataclass, field
+from typing import List
+
+@dataclass
+class Point:
+    x: float
+    y: float = 0.0           # 带默认值
+
+@dataclass(frozen=True)      # 不可变
+class FrozenPoint:
+    x: float
+    y: float
+
+@dataclass
+class Bag:
+    items: List[str] = field(default_factory=list)
+    # 不能写 items: List[str] = []（可变默认陷阱）
+
+p = Point(1, 2)
+print(p)        # Point(x=1, y=2)   自动 __repr__
+p == Point(1, 2)   # True            自动 __eq__</code></pre>
+    </div>
+  </div>
+
+  <h3>6.7 继承与多重继承（MRO）</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java <span class="note">单继承 + 多接口</span></div>
+<pre><code class="language-java">class Animal {
+    void eat() { System.out.println("eating"); }
+}
+
+interface Swimmer {
+    default void swim() { System.out.println("swimming"); }
+}
+
+class Fish extends Animal implements Swimmer { }</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python <span class="note">真·多重继承</span></div>
+<pre><code class="language-python">class Animal:
+    def eat(self): print("eating")
+
+class Swimmer:
+    def swim(self): print("swimming")
+
+class Fish(Animal, Swimmer):    # 真 · 多重继承
+    pass
+
+f = Fish()
+f.eat(); f.swim()
+
+# super() 走 MRO（C3 算法）
+class Cat(Animal):
+    def eat(self):
+        super().eat()           # 调父类版本
+        print("cat eats fish")
+
+print(Fish.__mro__)             # 看方法解析顺序</code></pre>
+    </div>
+  </div>
+
+  <h3>6.8 抽象类与协议（接口的两种替代）</h3>
+<pre><code class="language-python"># 方式 1: ABC（名义抽象类，类似 Java 抽象类）
+from abc import ABC, abstractmethod
+
+class Shape(ABC):
+    @abstractmethod
+    def area(self) -&gt; float: ...
+
+class Circle(Shape):
+    def __init__(self, r): self.r = r
+    def area(self): return 3.14 * self.r ** 2
+
+# Shape() 直接报错（抽象类不能实例化）
+
+# 方式 2: Protocol（结构子类型，类似 TypeScript 接口）
+from typing import Protocol
+
+class Drawable(Protocol):
+    def draw(self) -&gt; None: ...
+
+class Square:
+    def draw(self): print("drawing square")
+    # ↑ 不需要 implements Drawable
+
+def render(d: Drawable):
+    d.draw()
+
+render(Square())    # 通过！Square 长得像 Drawable
+</code></pre>
+
+  <h3>6.9 魔术方法（双下划线方法）</h3>
+  <p>魔术方法定义对象与 Python 语法的交互。Java 的 <code>toString/equals/hashCode/Comparable</code> 等接口的等价物，但范围广得多。</p>
+
+  <table>
+    <thead><tr><th>魔术方法</th><th>触发场景</th><th>Java 对等</th></tr></thead>
+    <tbody>
+      <tr><td><code>__init__</code></td><td>构造</td><td>构造方法</td></tr>
+      <tr><td><code>__del__</code></td><td>析构（不要依赖）</td><td><code>finalize()</code></td></tr>
+      <tr><td><code>__str__</code></td><td><code>str(x)</code> / <code>print(x)</code></td><td><code>toString()</code></td></tr>
+      <tr><td><code>__repr__</code></td><td>调试输出</td><td>无</td></tr>
+      <tr><td><code>__eq__</code></td><td><code>==</code></td><td><code>equals()</code></td></tr>
+      <tr><td><code>__hash__</code></td><td><code>hash(x)</code></td><td><code>hashCode()</code></td></tr>
+      <tr><td><code>__lt__</code> 等</td><td><code>&lt;</code> 等比较</td><td><code>compareTo()</code></td></tr>
+      <tr><td><code>__len__</code></td><td><code>len(x)</code></td><td><code>size()</code></td></tr>
+      <tr><td><code>__getitem__</code></td><td><code>x[i]</code></td><td><code>get()</code></td></tr>
+      <tr><td><code>__setitem__</code></td><td><code>x[i] = v</code></td><td><code>set()</code></td></tr>
+      <tr><td><code>__iter__</code></td><td><code>for ... in x</code></td><td><code>Iterable</code></td></tr>
+      <tr><td><code>__next__</code></td><td><code>next(x)</code></td><td><code>Iterator</code></td></tr>
+      <tr><td><code>__contains__</code></td><td><code>x in y</code></td><td><code>contains()</code></td></tr>
+      <tr><td><code>__call__</code></td><td><code>x()</code> 当函数用</td><td><code>Function.apply()</code></td></tr>
+      <tr><td><code>__enter__/__exit__</code></td><td><code>with x:</code></td><td><code>AutoCloseable</code></td></tr>
+      <tr><td><code>__add__</code> 等</td><td><code>+</code> 等运算符</td><td>无（运算符不可重载）</td></tr>
+    </tbody>
+  </table>
+
+  <h4>魔术方法实战：自定义容器</h4>
+<pre><code class="language-python">class Bag:
+    def __init__(self):
+        self._items = []
+
+    def __len__(self):           # 支持 len()
+        return len(self._items)
+
+    def __iter__(self):          # 支持 for 循环
+        return iter(self._items)
+
+    def __contains__(self, x):   # 支持 in
+        return x in self._items
+
+    def __getitem__(self, i):    # 支持 b[0]
+        return self._items[i]
+
+    def __repr__(self):
+        return f"Bag({self._items})"
+
+    def add(self, x):
+        self._items.append(x)
+
+b = Bag()
+b.add("apple"); b.add("banana")
+len(b)            # 2
+"apple" in b      # True
+b[0]              # 'apple'
+for item in b:    # 直接遍历
+    print(item)
+</code></pre>
+
+</section>
+
+<!-- ====== CHAPTER 7 ====== -->
+<section id="ch07" class="chapter">
+  <h2><span class="num">第 7 章</span>异常与上下文管理器</h2>
+  <p class="lead">异常处理基本相同，但 Python 多了 <code>else</code> 子句、上下文管理器（with），且 <strong>没有 checked exception</strong>——这影响 API 设计。</p>
+
+  <h3>7.1 try / except 对照</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">try {
+    risky();
+} catch (IOException e) {
+    handleIO(e);
+} catch (Exception e) {
+    handleOther(e);
+} finally {
+    cleanup();
+}
+
+// 必须声明 checked exception
+public void f() throws IOException { ... }</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python</div>
+<pre><code class="language-python">try:
+    risky()
+except IOError as e:
+    handle_io(e)
+except Exception as e:
+    handle_other(e)
+else:
+    # ← 仅在 try 没异常时执行
+    print("success")
+finally:
+    cleanup()
+
+# 不需要声明会抛什么异常（无 checked exception）
+def f(): ...</code></pre>
+    </div>
+  </div>
+
+  <h3>7.2 异常类层级</h3>
+<pre><code class="language-python"># 内建异常都继承 Exception
+ValueError, TypeError, KeyError, IndexError,
+FileNotFoundError, AttributeError, ZeroDivisionError,
+StopIteration, RuntimeError, NotImplementedError ...
+
+# 自定义异常：继承 Exception
+class InvalidUserError(Exception):
+    """用户数据无效"""
+    pass
+
+class NotEnoughBalance(Exception):
+    def __init__(self, current, needed):
+        self.current = current
+        self.needed = needed
+        super().__init__(f"need {needed}, have {current}")
+
+# 抛出
+raise InvalidUserError("missing email")
+
+# 链式：保留原异常
+try:
+    int("abc")
+except ValueError as e:
+    raise InvalidUserError("bad format") from e
+</code></pre>
+
+  <h3>7.3 上下文管理器（with）</h3>
+  <p>Java 7 的 <code>try-with-resources</code> 的强化版。Python 的 <code>with</code> 不仅管理资源，还能管理 <strong>任何带"进入/退出"语义的东西</strong>：锁、事务、临时目录、计时器、stdout 重定向…</p>
+
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">try (BufferedReader r = new BufferedReader(new FileReader("a.txt"))) {
+    String line = r.readLine();
+}
+
+// 多个资源
+try (var r = ...; var w = ...) { ... }</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python <span class="note">用途广得多</span></div>
+<pre><code class="language-python">with open("a.txt") as f:
+    data = f.read()
+# 退出 with 自动 close
+
+# 多资源
+with open("in") as r, open("out", "w") as w:
+    w.write(r.read())
+
+# 标准库自带的：
+import threading; lock = threading.Lock()
+with lock: ...                 # 自动加锁/解锁
+
+import tempfile
+with tempfile.TemporaryDirectory() as d:
+    print(d)                   # 退出后自动删除</code></pre>
+    </div>
+  </div>
+
+  <h4>自定义上下文管理器</h4>
+<pre><code class="language-python"># 方式 1: 类（实现两个魔术方法）
+class Timer:
+    def __enter__(self):
+        self.t0 = time.time()
+        return self
+
+    def __exit__(self, exc_type, exc_val, tb):
+        print(f"took {time.time()-self.t0:.3f}s")
+        return False    # False = 不吞异常
+
+with Timer():
+    slow_operation()
+
+# 方式 2: contextlib（更简洁，推荐）
+from contextlib import contextmanager
+
+@contextmanager
+def timer():
+    t0 = time.time()
+    try:
+        yield        # ← yield 之前 = enter，之后 = exit
+    finally:
+        print(f"took {time.time()-t0:.3f}s")
+
+with timer():
+    slow_operation()
+</code></pre>
+
+  <div class="callout pythonic">
+    <div class="callout-title">EAFP 模式实战</div>
+<pre><code class="language-python"># Java 风格（LBYL）— 不 Pythonic
+if "key" in d and isinstance(d["key"], dict) and "sub" in d["key"]:
+    use(d["key"]["sub"])
+
+# Python 风格（EAFP）— 推荐
+try:
+    use(d["key"]["sub"])
+except (KeyError, TypeError):
+    handle()
+</code></pre>
+    <p>EAFP 不仅代码短，还天然处理并发竞态：LBYL 在"检查通过"和"实际使用"之间值可能被改了。</p>
+  </div>
+
+</section>
+
+<!-- ====== CHAPTER 8 ====== -->
+<section id="ch08" class="chapter">
+  <h2><span class="num">第 8 章</span>模块、包与工程化</h2>
+  <p class="lead">Python 的模块系统比 Java 的简单得多，但也有自己的"潜规则"——尤其是包结构和虚拟环境。这是 Java 程序员最容易误解的地方之一。</p>
+
+  <h3>8.1 模块与导入</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">// 文件 com/example/util/StringUtils.java
+package com.example.util;
+
+public class StringUtils {
+    public static String capitalize(String s) { ... }
+}
+
+// 使用
+import com.example.util.StringUtils;
+StringUtils.capitalize("hello");
+
+// 或星号导入
+import com.example.util.*;</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python</div>
+<pre><code class="language-python"># 文件 string_utils.py
+def capitalize(s):
+    return s[0].upper() + s[1:]
+
+# 使用
+import string_utils
+string_utils.capitalize("hello")
+
+# 或导入特定符号
+from string_utils import capitalize
+capitalize("hello")
+
+# 别名
+import string_utils as su
+from string_utils import capitalize as cap
+
+# 一次导入多个
+from string_utils import capitalize, lowercase</code></pre>
+    </div>
+  </div>
+
+  <h3>8.2 包结构</h3>
+<pre><code class="language-bash">myproject/
+├── pyproject.toml          # 项目配置（替代 pom.xml）
+├── README.md
+├── src/
+│   └── myapp/
+│       ├── __init__.py     # 空文件即可，标记这是包
+│       ├── main.py
+│       ├── core/
+│       │   ├── __init__.py
+│       │   ├── auth.py
+│       │   └── db.py
+│       └── utils/
+│           ├── __init__.py
+│           └── strings.py
+└── tests/
+    ├── __init__.py
+    └── test_auth.py
+</code></pre>
+
+  <p>导入方式：<code>from myapp.core.auth import login</code>。<code>__init__.py</code> 在 3.3+ 不是必须，但保留它兼容性更好。</p>
+
+  <h3>8.3 主程序入口</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">public class App {
+    public static void main(String[] args) {
+        System.out.println("hello");
+    }
+}</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python</div>
+<pre><code class="language-python">def main():
+    print("hello")
+
+if __name__ == "__main__":
+    main()
+# 这个判断让文件既能直接运行，也能被 import
+# import 时 __name__ = 模块名，直接运行时 = "__main__"</code></pre>
+    </div>
+  </div>
+
+  <h3>8.4 虚拟环境（venv）</h3>
+  <p>Python 默认把所有依赖装到全局，多个项目互相污染。<strong>必须用虚拟环境</strong>——这是 Python 工程化的第一课。Java 的 Maven 自动给每个项目隔离，Python 需要你手动建立环境。</p>
+
+<pre><code class="language-bash"># 创建虚拟环境
+python -m venv .venv
+
+# 激活（macOS/Linux）
+source .venv/bin/activate
+
+# 激活（Windows）
+.venv\Scripts\activate
+
+# 现在 pip install 只装到这个环境
+pip install requests
+
+# 退出
+deactivate
+</code></pre>
+
+  <h3>8.5 现代包管理（uv，2024 年起的事实标准）</h3>
+  <p>uv 是 Rust 写的极速 Python 包管理器，比 pip 快 10-100 倍，自动管理虚拟环境，统一替代 <code>pip / venv / poetry / pipx / pyenv</code>。</p>
+
+<pre><code class="language-bash"># 安装 uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 创建新项目
+uv init my-project
+cd my-project
+
+# 添加依赖（自动管理 venv）
+uv add fastapi uvicorn pytest
+
+# 添加开发依赖
+uv add --dev ruff mypy
+
+# 运行
+uv run python main.py
+uv run pytest
+
+# 锁文件（uv.lock）确保跨机器一致
+</code></pre>
+
+  <h3>8.6 工具链对照表</h3>
+  <table>
+    <thead><tr><th>用途</th><th>Java</th><th>Python（推荐）</th></tr></thead>
+    <tbody>
+      <tr><td>包管理器</td><td>Maven / Gradle</td><td><strong>uv</strong>（新）/ poetry / pip</td></tr>
+      <tr><td>项目配置</td><td><code>pom.xml</code> / <code>build.gradle</code></td><td><code>pyproject.toml</code></td></tr>
+      <tr><td>包仓库</td><td>Maven Central</td><td>PyPI</td></tr>
+      <tr><td>包格式</td><td><code>.jar</code></td><td><code>.whl</code> (wheel)</td></tr>
+      <tr><td>类路径</td><td>CLASSPATH</td><td>PYTHONPATH + venv</td></tr>
+      <tr><td>测试框架</td><td>JUnit 5</td><td><strong>pytest</strong></td></tr>
+      <tr><td>Mock</td><td>Mockito</td><td><code>unittest.mock</code>（标准库）</td></tr>
+      <tr><td>代码格式化</td><td>google-java-format</td><td><strong>ruff format</strong> / black</td></tr>
+      <tr><td>静态检查</td><td>SpotBugs / CheckStyle</td><td><strong>ruff</strong> + <strong>mypy</strong>（类型）</td></tr>
+      <tr><td>Web 框架</td><td>Spring Boot</td><td><strong>FastAPI</strong>（现代）/ Django / Flask</td></tr>
+      <tr><td>ORM</td><td>Hibernate / JPA</td><td>SQLAlchemy</td></tr>
+      <tr><td>异步 Web</td><td>WebFlux</td><td>FastAPI / Starlette</td></tr>
+      <tr><td>HTTP 客户端</td><td>OkHttp</td><td>httpx / requests</td></tr>
+      <tr><td>日志</td><td>SLF4J + Logback</td><td>logging（标准库）/ structlog</td></tr>
+      <tr><td>序列化</td><td>Jackson</td><td>pydantic / msgspec</td></tr>
+      <tr><td>"Lombok"</td><td>Lombok</td><td><code>@dataclass</code>（标准库）</td></tr>
+      <tr><td>构建产物</td><td><code>target/</code></td><td><code>__pycache__/</code> + <code>dist/</code></td></tr>
+      <tr><td>JVM 参数</td><td><code>-Xmx</code></td><td>极少需要调</td></tr>
+    </tbody>
+  </table>
+
+</section>
+
+<!-- ====== CHAPTER 9 ====== -->
+<section id="ch09" class="chapter">
+  <h2><span class="num">第 9 章</span>并发（GIL / 线程 / asyncio）</h2>
+  <p class="lead">这是 Java 程序员最容易在 Python 里翻车的领域。Python 有 GIL（全局解释器锁），多线程对 CPU 密集任务 <strong>无效</strong>。你必须根据"IO 密集 vs CPU 密集"选用不同方案。</p>
+
+  <h3>9.1 GIL 真相</h3>
+  <div class="callout warn">
+    <div class="callout-title">GIL = Global Interpreter Lock</div>
+    <p>CPython 里同一时刻只有一个线程能执行 Python 字节码。多核 CPU 在跑纯 Python 代码时，<strong>多线程不能真并行</strong>。</p>
+    <p>但 IO 操作（读文件、网络请求、time.sleep）会释放 GIL，所以 IO 密集任务用多线程仍然有效。</p>
+    <p>3.13+ 有实验性的 "no-GIL" 版本，但生态还没普及。</p>
+  </div>
+
+  <h3>9.2 三种并发模型</h3>
+  <table>
+    <thead><tr><th>场景</th><th>方案</th><th>原理</th></tr></thead>
+    <tbody>
+      <tr><td><span class="dot green"></span>IO 密集（HTTP/DB/文件）</td><td><code>asyncio</code> 或 <code>threading</code></td><td>等待时切换</td></tr>
+      <tr><td><span class="dot yellow"></span>少量并发</td><td><code>concurrent.futures.ThreadPoolExecutor</code></td><td>线程池</td></tr>
+      <tr><td><span class="dot red"></span>CPU 密集（计算）</td><td><code>multiprocessing</code></td><td>多进程绕过 GIL</td></tr>
+      <tr><td><span class="dot green"></span>大规模 IO 并发</td><td><code>asyncio</code></td><td>单线程协程</td></tr>
+    </tbody>
+  </table>
+
+  <h3>9.3 threading（IO 密集场景）</h3>
+<pre><code class="language-python">import threading
+import requests
+
+def fetch(url):
+    return requests.get(url).status_code
+
+# 简单线程
+t = threading.Thread(target=fetch, args=("https://x.com",))
+t.start(); t.join()
+
+# 现代化：线程池
+from concurrent.futures import ThreadPoolExecutor
+
+urls = ["https://a.com", "https://b.com", "https://c.com"]
+with ThreadPoolExecutor(max_workers=10) as pool:
+    results = list(pool.map(fetch, urls))
+    # 或者
+    futures = [pool.submit(fetch, u) for u in urls]
+    for f in futures:
+        print(f.result())
+
+# 锁
+lock = threading.Lock()
+with lock:                  # 自动 acquire/release
+    shared_state += 1
+</code></pre>
+
+  <h3>9.4 asyncio（高并发 IO）</h3>
+  <p>Python 3.5+ 引入 <code>async/await</code>，是处理 <strong>大量并发 IO</strong> 的首选。比 Java 的 CompletableFuture 直观，但有个重要约束：<strong>同步代码和异步代码不能直接混用</strong>。</p>
+
+<pre><code class="language-python">import asyncio
+import aiohttp
+
+async def fetch(session, url):
+    async with session.get(url) as resp:
+        return await resp.text()
+
+async def main():
+    async with aiohttp.ClientSession() as s:
+        urls = ["https://a.com", "https://b.com"]
+        # 并发执行
+        results = await asyncio.gather(*[fetch(s, u) for u in urls])
+        return results
+
+# 启动 event loop
+results = asyncio.run(main())
+</code></pre>
+
+  <h4>async/await 的核心规则</h4>
+<pre><code class="language-python"># 1. async 函数返回 coroutine（不是结果）
+async def f(): return 1
+f()              # &lt;coroutine object f&gt;
+asyncio.run(f()) # 1
+
+# 2. 只能在 async 函数里 await
+async def caller():
+    result = await f()    # OK
+
+def sync_caller():
+    result = await f()    # SyntaxError！
+
+# 3. 并发执行用 asyncio.gather
+async def parallel():
+    a, b, c = await asyncio.gather(
+        fetch1(),
+        fetch2(),
+        fetch3(),
+    )
+
+# 4. 等待第一个完成
+done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+</code></pre>
+
+  <h3>9.5 multiprocessing（CPU 密集）</h3>
+<pre><code class="language-python">from concurrent.futures import ProcessPoolExecutor
+
+def cpu_heavy(n):
+    return sum(i * i for i in range(n))
+
+if __name__ == "__main__":
+    with ProcessPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(cpu_heavy, [10**6] * 8))
+    # 真 · 多核并行
+</code></pre>
+
+  <div class="callout warn">
+    <div class="callout-title">multiprocessing 的代价</div>
+    <p>每个进程独立内存空间，对象通过 pickle 序列化传递。所以：① 启动慢 ② 不能传不可序列化的对象（lambda、文件句柄）③ 共享数据要走 <code>Queue/Pipe/Manager</code>。</p>
+  </div>
+
+</section>
+
+<!-- ====== CHAPTER 10 ====== -->
+<section id="ch10" class="chapter">
+  <h2><span class="num">第 10 章</span>Pythonic 习语（核心生产力）</h2>
+  <p class="lead">这一章是把"会写 Python"提升到"写得像 Python 程序员"的关键。每条习语都有 Java 风格 vs Pythonic 的对比，看完你就明白为什么 Python 代码能那么短。</p>
+
+  <h3>10.1 解包艺术</h3>
+<pre><code class="language-python"># 多变量赋值
+a, b, c = 1, 2, 3
+
+# 交换变量（不需要临时变量！）
+a, b = b, a
+
+# 星号收集
+first, *rest = [1, 2, 3, 4]      # first=1, rest=[2,3,4]
+*head, last = [1, 2, 3, 4]       # head=[1,2,3], last=4
+a, *mid, z = [1, 2, 3, 4, 5]     # a=1, mid=[2,3,4], z=5
+
+# 嵌套解包
+((a, b), c) = ((1, 2), 3)
+
+# 字典解包
+config = {"host": "localhost", "port": 8080}
+def connect(host, port): ...
+connect(**config)                # 等价于 connect(host="localhost", port=8080)
+
+# 列表解包传参
+def f(a, b, c): ...
+args = [1, 2, 3]
+f(*args)                          # 等价于 f(1, 2, 3)
+
+# 合并
+a = [1, 2]; b = [3, 4]
+combined = [*a, *b, 5]            # [1, 2, 3, 4, 5]
+
+c = {"x": 1}; d = {"y": 2}
+merged = {**c, **d, "z": 3}       # {"x": 1, "y": 2, "z": 3}
+</code></pre>
+
+  <h3>10.2 链式比较</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">Java</div>
+<pre><code class="language-java">if (0 &lt; x &amp;&amp; x &lt; 10) ...
+if (a == b &amp;&amp; b == c) ...</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">Python</div>
+<pre><code class="language-python">if 0 &lt; x &lt; 10: ...
+if a == b == c: ...
+if low &lt;= score &lt; high: ...</code></pre>
+    </div>
+  </div>
+
+  <h3>10.3 enumerate / zip / range</h3>
+<pre><code class="language-python"># 取索引和元素
+for i, v in enumerate(items):
+    print(i, v)
+
+# 从 1 开始计数
+for i, v in enumerate(items, start=1):
+    print(i, v)
+
+# 同时遍历多个序列
+for name, age in zip(names, ages):
+    print(name, age)
+
+# 三个序列
+for a, b, c in zip(list1, list2, list3): ...
+
+# 反向遍历
+for x in reversed(items): ...
+
+# 排序遍历
+for x in sorted(items): ...
+
+# 配合 dict
+for k, v in d.items(): ...
+for v in d.values(): ...
+for k in d: ...                    # 默认遍历键
+</code></pre>
+
+  <h3>10.4 any / all（一行替代循环）</h3>
+<pre><code class="language-python"># 任意一个满足
+if any(x &gt; 100 for x in nums): ...
+
+# 全部满足
+if all(x &gt; 0 for x in nums): ...
+
+# 检查列表是否非空
+if any(my_list): ...               # 等价于 if my_list
+
+# 这两个函数接受任何可迭代对象（生成器最佳）
+</code></pre>
+
+  <h3>10.5 collections 模块（必学）</h3>
+<pre><code class="language-python">from collections import Counter, defaultdict, deque, OrderedDict
+
+# Counter: 计数神器
+c = Counter("mississippi")
+# Counter({'i': 4, 's': 4, 'p': 2, 'm': 1})
+c.most_common(2)                   # [('i', 4), ('s', 4)]
+
+# defaultdict: 默认值字典（替代 setdefault）
+groups = defaultdict(list)
+for word in words:
+    groups[word[0]].append(word)
+# 不需要先检查键是否存在
+
+# deque: 双端队列（O(1) 两端操作）
+d = deque([1, 2, 3])
+d.appendleft(0)                    # 左侧添加
+d.popleft()                        # 左侧弹出
+d = deque(maxlen=10)               # 限长队列（自动丢老的）
+</code></pre>
+
+  <h3>10.6 itertools 模块（迭代器神器）</h3>
+<pre><code class="language-python">import itertools as it
+
+# 笛卡尔积
+list(it.product([1,2], ['a','b']))
+# [(1,'a'),(1,'b'),(2,'a'),(2,'b')]
+
+# 排列组合
+list(it.permutations([1,2,3], 2))    # 排列 P(3,2)
+list(it.combinations([1,2,3], 2))    # 组合 C(3,2)
+
+# 链接多个序列
+list(it.chain([1,2], [3,4], [5,6]))  # [1,2,3,4,5,6]
+
+# 累积
+list(it.accumulate([1,2,3,4]))        # [1,3,6,10]   累加
+list(it.accumulate([1,2,3,4], func=max))  # [1,2,3,4]  累计最大
+
+# 分组（数据要先排序）
+data = [("a", 1), ("a", 2), ("b", 3)]
+for key, group in it.groupby(data, key=lambda x: x[0]):
+    print(key, list(group))
+
+# 取前 N 个
+list(it.islice(infinite_gen, 10))
+
+# 重复
+list(it.repeat(0, 5))                 # [0,0,0,0,0]
+</code></pre>
+
+  <h3>10.7 functools 模块</h3>
+<pre><code class="language-python">from functools import lru_cache, partial, reduce, wraps, cached_property
+
+# 记忆化
+@lru_cache(maxsize=None)
+def fib(n): return n if n &lt; 2 else fib(n-1) + fib(n-2)
+
+# 偏函数
+log = partial(print, "[INFO]")
+log("started")                        # [INFO] started
+
+# 累积归并
+total = reduce(lambda a, b: a + b, [1, 2, 3, 4])   # 10
+# （但 sum() 通常更好）
+</code></pre>
+
+  <h3>10.8 pathlib（取代 os.path）</h3>
+<pre><code class="language-python">from pathlib import Path
+
+p = Path("/Users/me/docs/a.txt")
+p.exists()
+p.is_file(); p.is_dir()
+p.parent                              # Path('/Users/me/docs')
+p.name                                # 'a.txt'
+p.stem                                # 'a'
+p.suffix                              # '.txt'
+
+# 路径拼接（用 / 运算符！）
+home = Path.home()
+config = home / ".config" / "app.toml"
+
+# 读写
+text = p.read_text()
+p.write_text("hello")
+
+# 遍历目录
+for f in Path(".").rglob("*.py"):     # 递归找所有 .py
+    print(f)
+</code></pre>
+
+  <h3>10.9 一行 = 一个想法</h3>
+  <div class="callout pythonic">
+    <div class="callout-title">Pythonic 重构示例：把 Java 风格代码改成 Python 风格</div>
+<pre><code class="language-python"># 反 Pythonic（Java 思维）
+def process(items):
+    result = []
+    for i in range(len(items)):
+        item = items[i]
+        if item is not None and item.get("valid") == True:
+            value = item.get("value")
+            if value &gt; 0:
+                result.append(value * 2)
+    return result
+
+# Pythonic
+def process(items):
+    return [
+        item["value"] * 2
+        for item in items
+        if item and item.get("valid") and item.get("value", 0) &gt; 0
+    ]
+</code></pre>
+  </div>
+
+</section>
+
+<!-- ====== CHAPTER 11 ====== -->
+<section id="ch11" class="chapter">
+  <h2><span class="num">第 11 章</span>Java 程序员的 10 个陷阱</h2>
+  <p class="lead">这一章集中列出 Java 背景的人最容易踩的 10 个坑。每个坑都附带"为什么"和"正确做法"。请收藏。</p>
+
+  <h3>陷阱 1：可变默认参数</h3>
+  <div class="callout bad">
+    <div class="callout-title">最常见的 Python 陷阱，必须记住</div>
+<pre><code class="language-python">def add(item, lst=[]):     # ⚠️ lst 在函数定义时只创建一次
+    lst.append(item)
+    return lst
+
+add(1)    # [1]
+add(2)    # [1, 2]   ← 不是 [2]！
+
+# ✅ 正确
+def add(item, lst=None):
+    if lst is None:
+        lst = []
+    lst.append(item)
+    return lst</code></pre>
+  </div>
+
+  <h3>陷阱 2：== vs is</h3>
+<pre><code class="language-python">a = [1, 2]; b = [1, 2]
+a == b      # True   值相等
+a is b      # False  不是同一个对象
+
+x = None
+if x == None: ...    # 能工作但不 Pythonic
+if x is None: ...    # ✅ 推荐：更快、语义明确
+
+# 整数缓存陷阱
+a = 256; b = 256
+a is b      # True   小整数(-5..256)被缓存
+a = 257; b = 257
+a is b      # False  超出缓存范围
+
+# 规则：
+# - 比较值用 ==
+# - 比较身份（None、True、False、单例）用 is
+</code></pre>
+
+  <h3>陷阱 3：变量是标签（引用语义）</h3>
+<pre><code class="language-python">a = [1, 2, 3]
+b = a               # b 和 a 指向同一个对象
+b.append(4)
+print(a)            # [1, 2, 3, 4]   ← a 也变了！
+
+# ✅ 想要拷贝
+b = a.copy()        # 浅拷贝
+b = list(a)         # 浅拷贝（另一种）
+b = a[:]            # 浅拷贝（切片）
+
+# 嵌套对象用深拷贝
+import copy
+b = copy.deepcopy(a)
+</code></pre>
+
+  <h3>陷阱 4：循环里的闭包是"晚绑定"</h3>
+<pre><code class="language-python"># ⚠️ 这不会得到 [0, 1, 2]
+funcs = [lambda: i for i in range(3)]
+[f() for f in funcs]    # [2, 2, 2]
+
+# 原因：lambda 引用的是变量名 i，不是当时的值
+# 循环结束后 i = 2，所有 lambda 都返回 2
+
+# ✅ 修复：把 i 绑成默认参数（在定义时求值）
+funcs = [lambda i=i: i for i in range(3)]
+[f() for f in funcs]    # [0, 1, 2]
+</code></pre>
+
+  <h3>陷阱 5：类属性 vs 实例属性混淆</h3>
+<pre><code class="language-python">class Bag:
+    items = []          # ⚠️ 类属性！所有实例共享
+
+    def add(self, x):
+        self.items.append(x)
+
+a = Bag(); b = Bag()
+a.add(1); b.add(2)
+print(a.items)          # [1, 2]   ← 共享了！
+
+# ✅ 应该在 __init__ 里初始化实例属性
+class Bag:
+    def __init__(self):
+        self.items = []     # 每个实例独立
+</code></pre>
+
+  <h3>陷阱 6：True/False 也是数字</h3>
+<pre><code class="language-python">True + True         # 2  （bool 是 int 的子类）
+sum([True, False, True])  # 2   计数神器
+
+# 但要小心
+[1, 2, 3].count(True)    # 1  （True == 1）
+{True: "a", 1: "b"}      # {True: "b"}  键冲突
+</code></pre>
+
+  <h3>陷阱 7：try / except 太宽泛</h3>
+<pre><code class="language-python"># ⚠️ 不要 catch all
+try:
+    do_stuff()
+except:                # 连 KeyboardInterrupt 都吞掉
+    pass
+
+# ⚠️ 也别这样
+try:
+    do_stuff()
+except Exception:      # 太宽，掩盖 bug
+    pass
+
+# ✅ 只 catch 你预期的异常
+try:
+    n = int(s)
+except ValueError:
+    handle()
+</code></pre>
+
+  <h3>陷阱 8：浮点数精度</h3>
+<pre><code class="language-python">0.1 + 0.2       # 0.30000000000000004
+0.1 + 0.2 == 0.3    # False !
+
+# ✅ 浮点比较
+import math
+math.isclose(0.1 + 0.2, 0.3)    # True
+
+# ✅ 精确十进制（货币计算）
+from decimal import Decimal
+Decimal("0.1") + Decimal("0.2") == Decimal("0.3")    # True
+</code></pre>
+
+  <h3>陷阱 9：循环修改正在迭代的集合</h3>
+<pre><code class="language-python"># ⚠️ 这会出 bug
+for x in nums:
+    if x &lt; 0:
+        nums.remove(x)        # 边迭代边改
+
+# ✅ 方案 1：复制一份
+for x in nums.copy():
+    if x &lt; 0:
+        nums.remove(x)
+
+# ✅ 方案 2：推导式生成新列表（更 Pythonic）
+nums = [x for x in nums if x &gt;= 0]
+
+# dict 同理
+for k in list(d.keys()):       # 必须先 list 化
+    if condition:
+        del d[k]
+</code></pre>
+
+  <h3>陷阱 10：导入循环 / 路径错误</h3>
+<pre><code class="language-python"># 循环导入：a.py 导入 b，b 又导入 a → ImportError
+# ✅ 解决：把共享部分提取到 c.py
+# 或者把 import 移到函数内部（延迟导入）
+
+# 模块路径混乱
+# Python 找模块的顺序：当前目录 → PYTHONPATH → 标准库 → site-packages
+# ✅ 用 venv 隔离，用 uv 管理依赖
+# ✅ 用绝对导入：from myapp.utils import x
+# 而不是：from ..utils import x（相对导入容易出错）
+</code></pre>
+
+</section>
+
+<!-- ====== CHAPTER 12 ====== -->
+<section id="ch12" class="chapter">
+  <h2><span class="num">第 12 章</span>标准库速览（90% 任务靠它）</h2>
+  <p class="lead">Python "battery included" 的传统让标准库非常丰富。下面这 12 个模块覆盖了日常 90% 的需求。</p>
+
+  <table>
+    <thead><tr><th>模块</th><th>用途</th><th>关键 API</th></tr></thead>
+    <tbody>
+      <tr><td><code>pathlib</code></td><td>文件路径</td><td><code>Path / .read_text() / .glob()</code></td></tr>
+      <tr><td><code>json</code></td><td>JSON 序列化</td><td><code>json.dumps / loads / dump / load</code></td></tr>
+      <tr><td><code>re</code></td><td>正则表达式</td><td><code>re.match / search / findall / sub</code></td></tr>
+      <tr><td><code>datetime</code></td><td>日期时间</td><td><code>datetime.now() / strftime / strptime</code></td></tr>
+      <tr><td><code>collections</code></td><td>高级容器</td><td><code>Counter / defaultdict / deque</code></td></tr>
+      <tr><td><code>itertools</code></td><td>迭代器组合</td><td><code>chain / product / groupby / islice</code></td></tr>
+      <tr><td><code>functools</code></td><td>函数工具</td><td><code>lru_cache / partial / reduce / wraps</code></td></tr>
+      <tr><td><code>typing</code></td><td>类型注解</td><td><code>List / Dict / Optional / Union / Protocol</code></td></tr>
+      <tr><td><code>dataclasses</code></td><td>数据类</td><td><code>@dataclass / field</code></td></tr>
+      <tr><td><code>contextlib</code></td><td>上下文管理</td><td><code>@contextmanager / suppress</code></td></tr>
+      <tr><td><code>logging</code></td><td>日志</td><td><code>getLogger / basicConfig</code></td></tr>
+      <tr><td><code>argparse</code></td><td>命令行参数</td><td><code>ArgumentParser / add_argument</code></td></tr>
+      <tr><td><code>os / sys</code></td><td>系统接口</td><td><code>os.environ / sys.argv / sys.exit</code></td></tr>
+      <tr><td><code>subprocess</code></td><td>子进程</td><td><code>subprocess.run</code></td></tr>
+      <tr><td><code>asyncio</code></td><td>异步</td><td><code>asyncio.run / gather / sleep</code></td></tr>
+      <tr><td><code>concurrent.futures</code></td><td>线程/进程池</td><td><code>ThreadPoolExecutor / ProcessPoolExecutor</code></td></tr>
+      <tr><td><code>hashlib</code></td><td>哈希</td><td><code>md5 / sha256</code></td></tr>
+      <tr><td><code>secrets</code></td><td>安全随机</td><td><code>token_urlsafe / choice</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>实战：常见任务一行代码</h3>
+<pre><code class="language-python">import json, re
+from pathlib import Path
+from datetime import datetime, timedelta
+
+# 读 JSON
+data = json.loads(Path("config.json").read_text())
+
+# 写 JSON（带格式化）
+Path("out.json").write_text(json.dumps(data, indent=2, ensure_ascii=False))
+
+# 日期格式化
+now = datetime.now()
+print(now.strftime("%Y-%m-%d %H:%M:%S"))
+yesterday = now - timedelta(days=1)
+
+# 正则
+emails = re.findall(r'[\w.]+@[\w.]+', text)
+cleaned = re.sub(r'\s+', ' ', text)
+
+# 文件遍历
+for py_file in Path("src").rglob("*.py"):
+    print(py_file, py_file.stat().st_size)
+
+# 环境变量
+import os
+api_key = os.environ.get("API_KEY", "default")
+
+# 命令行参数
+import sys
+arg = sys.argv[1] if len(sys.argv) &gt; 1 else None
+
+# 执行命令
+import subprocess
+result = subprocess.run(["git", "status"], capture_output=True, text=True)
+print(result.stdout)
+</code></pre>
+
+</section>
+
+<!-- ====== CHAPTER 13 ====== -->
+<section id="ch13" class="chapter">
+  <h2><span class="num">第 13 章</span>工程化对照（uv / pytest / FastAPI）</h2>
+  <p class="lead">这一章把 Java 工程化实践完整映射到 Python。如果你能熟练掌握这一章，你就能在 Python 项目里独立工作了。</p>
+
+  <h3>13.1 项目骨架（用 uv）</h3>
+<pre><code class="language-bash"># 1. 初始化
+uv init my-api
+cd my-api
+
+# 2. 添加依赖
+uv add fastapi uvicorn pydantic
+uv add --dev pytest pytest-asyncio ruff mypy
+
+# 3. 运行
+uv run uvicorn main:app --reload
+uv run pytest
+uv run ruff check .
+
+# 4. 锁定依赖
+# uv.lock 自动生成，提交到 git
+</code></pre>
+
+  <h3>13.2 pyproject.toml（替代 pom.xml）</h3>
+<pre><code class="language-python">[project]
+name = "my-api"
+version = "0.1.0"
+description = "My API"
+requires-python = "&gt;=3.11"
+dependencies = [
+    "fastapi&gt;=0.110",
+    "uvicorn[standard]&gt;=0.27",
+    "pydantic&gt;=2.6",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest&gt;=8.0",
+    "ruff&gt;=0.3",
+    "mypy&gt;=1.9",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+strict = true
+</code></pre>
+
+  <h3>13.3 测试：pytest（比 JUnit 简洁 10 倍）</h3>
+  <div class="compare">
+    <div class="compare-side java">
+      <div class="compare-label">JUnit 5</div>
+<pre><code class="language-java">import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class CalcTest {
+    @Test
+    void testAdd() {
+        assertEquals(3, Calc.add(1, 2));
+    }
+
+    @Test
+    void testDivByZero() {
+        assertThrows(ArithmeticException.class,
+            () -&gt; Calc.div(1, 0));
+    }
+}</code></pre>
+    </div>
+    <div class="compare-side python">
+      <div class="compare-label">pytest（无样板代码）</div>
+<pre><code class="language-python"># test_calc.py
+import pytest
+from calc import add, div
+
+def test_add():
+    assert add(1, 2) == 3
+
+def test_div_by_zero():
+    with pytest.raises(ZeroDivisionError):
+        div(1, 0)
+
+# 参数化（远比 JUnit 简洁）
+@pytest.mark.parametrize("a,b,expected", [
+    (1, 2, 3),
+    (0, 0, 0),
+    (-1, 1, 0),
+])
+def test_add_many(a, b, expected):
+    assert add(a, b) == expected</code></pre>
+    </div>
+  </div>
+
+  <h3>13.4 Web 框架：FastAPI（替代 Spring Boot）</h3>
+<pre><code class="language-python">from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class User(BaseModel):
+    id: int
+    name: str
+    email: str
+
+@app.get("/users/{uid}")
+async def get_user(uid: int) -&gt; User:
+    user = await db.find_user(uid)
+    if not user:
+        raise HTTPException(404, "not found")
+    return user
+
+@app.post("/users")
+async def create(user: User) -&gt; User:
+    return await db.save(user)
+
+# 启动: uvicorn main:app --reload
+# 自动生成 OpenAPI 文档: http://localhost:8000/docs
+</code></pre>
+
+  <p>FastAPI 的优势：① 类型注解直接做请求/响应校验 ② 自动生成 OpenAPI/Swagger ③ async/await 原生支持 ④ Pydantic 自动 JSON 序列化。比 Spring Boot 简洁 5 倍。</p>
+
+  <h3>13.5 类型检查（mypy）</h3>
+  <p>Python 是动态类型的，但通过 <code>typing</code> 模块可以加注解，再用 <code>mypy</code> 做静态检查。在大型项目里强烈推荐。</p>
+
+<pre><code class="language-python">from typing import Optional, Union, Protocol
+
+def greet(name: str, age: int) -&gt; str:
+    return f"{name}, {age}"
+
+# Optional[X] = Union[X, None]
+def find(uid: int) -&gt; Optional[User]: ...
+
+# Union（3.10+ 可写成 X | Y）
+def parse(x: int | str) -&gt; int: ...
+
+# 泛型
+from typing import TypeVar, Generic
+T = TypeVar("T")
+class Stack(Generic[T]):
+    def push(self, x: T) -&gt; None: ...
+    def pop(self) -&gt; T: ...
+
+# 协议（结构子类型）
+class Greetable(Protocol):
+    def greet(self) -&gt; str: ...
+</code></pre>
+
+  <h3>13.6 日志（logging）</h3>
+<pre><code class="language-python">import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
+logger = logging.getLogger(__name__)
+
+logger.debug("详细")
+logger.info("正常")
+logger.warning("警告")
+logger.error("错误", exc_info=True)
+logger.critical("严重")
+</code></pre>
+
+</section>
+
+<!-- ====== APPENDIX A: CHEATSHEET ====== -->
+<section id="cheatsheet" class="chapter">
+  <h2><span class="num">附录 A</span>一页速查表（打印贴墙上）</h2>
+
+  <h3>A.1 语法对照</h3>
+  <table>
+    <thead><tr><th>意图</th><th>Java</th><th>Python</th></tr></thead>
+    <tbody>
+      <tr><td>变量声明</td><td><code>int x = 1;</code></td><td><code>x = 1</code></td></tr>
+      <tr><td>判等</td><td><code>x.equals(y)</code></td><td><code>x == y</code></td></tr>
+      <tr><td>比身份</td><td><code>x == y</code></td><td><code>x is y</code></td></tr>
+      <tr><td>三元</td><td><code>cond ? a : b</code></td><td><code>a if cond else b</code></td></tr>
+      <tr><td>长度</td><td><code>arr.length</code></td><td><code>len(arr)</code></td></tr>
+      <tr><td>类型查询</td><td><code>x instanceof T</code></td><td><code>isinstance(x, T)</code></td></tr>
+      <tr><td>遍历带索引</td><td><code>for(int i;...)</code></td><td><code>for i, v in enumerate(...)</code></td></tr>
+      <tr><td>列表</td><td><code>List.of(1,2,3)</code></td><td><code>[1,2,3]</code></td></tr>
+      <tr><td>map 字面量</td><td><code>Map.of("a",1)</code></td><td><code>{"a": 1}</code></td></tr>
+      <tr><td>set 字面量</td><td><code>Set.of(1,2)</code></td><td><code>{1, 2}</code></td></tr>
+      <tr><td>map filter collect</td><td>3 行 stream</td><td><code>[f(x) for x in xs if g(x)]</code></td></tr>
+      <tr><td>字符串拼接</td><td><code>String.format</code></td><td><code>f"{x}"</code></td></tr>
+      <tr><td>静态方法</td><td><code>public static</code></td><td><code>@staticmethod</code></td></tr>
+      <tr><td>构造</td><td><code>new Dog()</code></td><td><code>Dog()</code></td></tr>
+      <tr><td>this</td><td><code>this</code></td><td><code>self</code>（必须显式参数）</td></tr>
+      <tr><td>抛异常</td><td><code>throw new X()</code></td><td><code>raise X()</code></td></tr>
+      <tr><td>资源管理</td><td><code>try-with-resources</code></td><td><code>with</code></td></tr>
+      <tr><td>异步</td><td><code>CompletableFuture</code></td><td><code>async/await</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>A.2 集合操作速查</h3>
+<pre><code class="language-python"># list
+xs = [1, 2, 3]
+xs.append(4)               xs.extend([5,6])         xs.insert(0, 0)
+xs.pop()                   xs.pop(0)                xs.remove(2)
+xs.sort()                  xs.reverse()             sorted(xs); reversed(xs)
+2 in xs                    xs.index(2)              xs.count(2)
+xs[1:3]    xs[:-1]    xs[::-1]    xs[::2]            # 切片
+
+# dict
+d = {"a": 1}
+d["b"] = 2                 d.get("c", 0)            d.setdefault("c", 0)
+"a" in d                   del d["a"]               d.pop("a", None)
+d.keys()    d.values()    d.items()
+{**d1, **d2}    d1 | d2                              # 合并
+
+# set
+s = {1, 2, 3}
+s.add(4)    s.discard(0)    s.remove(1)              # remove 找不到会抛异常
+s | t    s &amp; t    s - t    s ^ t                     # 并交差对称差
+
+# 推导式
+[x*2 for x in xs if x &gt; 0]
+{x*2 for x in xs}
+{k: v*2 for k, v in d.items()}
+(x*2 for x in xs)          # 生成器
+</code></pre>
+
+  <h3>A.3 函数速查</h3>
+<pre><code class="language-python"># 参数
+def f(a, b=10, *args, kw=20, **kwargs): ...
+f(1, 2, 3, 4, kw=5, x=6, y=7)
+
+# 解包
+f(*[1,2,3], **{"kw":5})
+
+# 类型注解
+def f(x: int, y: list[str]) -&gt; dict[str, int]: ...
+
+# Lambda
+sq = lambda x: x*x
+
+# 装饰器
+@decorator
+def f(): ...
+# 等价于: f = decorator(f)
+
+# 生成器
+def gen():
+    yield 1
+    yield 2
+</code></pre>
+
+  <h3>A.4 类速查</h3>
+<pre><code class="language-python">class Foo:
+    cls_attr = 0                     # 类属性
+
+    def __init__(self, x):
+        self.x = x                    # 实例属性
+
+    def method(self): ...             # 实例方法
+    @classmethod
+    def cm(cls): ...                  # 类方法
+    @staticmethod
+    def sm(): ...                     # 静态方法
+
+    @property
+    def doubled(self): return self.x * 2
+
+    def __str__(self): return f"Foo({self.x})"
+    def __eq__(self, o): return self.x == o.x
+    def __hash__(self): return hash(self.x)
+    def __len__(self): return self.x
+    def __iter__(self): return iter(range(self.x))
+</code></pre>
+
+  <h3>A.5 内建函数速查</h3>
+<pre><code class="language-python">len(x)              # 长度
+type(x)             # 类型
+isinstance(x, T)    # 类型判断
+print(x)            # 打印
+input("? ")         # 读输入
+range(0, 10, 2)     # 数字序列
+enumerate(xs)       # 索引+元素
+zip(xs, ys)         # 并行迭代
+map(f, xs)          # 应用函数
+filter(f, xs)       # 过滤
+sorted(xs)          # 排序
+reversed(xs)        # 反转
+sum(xs); min(xs); max(xs); abs(x); round(x, 2)
+any(xs); all(xs)
+int("1"); float("1.5"); str(123); bool(0)
+list(x); tuple(x); set(x); dict(x)
+open(path)          # 打开文件
+</code></pre>
+
+</section>
+
+<!-- ====== APPENDIX B: ROADMAP ====== -->
+<section id="roadmap" class="chapter">
+  <h2><span class="num">附录 B</span>30 天学习路径</h2>
+  <p class="lead">基于 Java 经验设计的速通路径。每天 1-2 小时，30 天后能写 Pythonic 代码并独立做项目。</p>
+
+  <h3>第 1 周：心智 + 语法（每天 1.5h）</h3>
+  <ul>
+    <li><strong>Day 1</strong>: 装好 Python 3.12 + uv + VS Code + Python 插件，跑通第一个程序</li>
+    <li><strong>Day 2</strong>: 读完本教程的 <a href="#mindset">导言</a>（5 个心智模型）+ 第 1 章（语法对照）</li>
+    <li><strong>Day 3</strong>: 第 2 章 + 第 3 章（数据结构），把 Java 项目里的字符串/集合操作"翻译"成 Python</li>
+    <li><strong>Day 4</strong>: 第 4 章（控制流 + 推导式），写 30 个推导式练习</li>
+    <li><strong>Day 5</strong>: 第 5 章（函数）前半部分，重点 lambda、装饰器</li>
+    <li><strong>Day 6</strong>: 第 5 章（函数）后半部分，重点生成器、闭包</li>
+    <li><strong>Day 7</strong>: 复习 + 用 Python 重写一个你以前的 Java 小工具（CLI 解析、文件处理等）</li>
+  </ul>
+
+  <h3>第 2 周：OOP + 工程化（每天 1.5h）</h3>
+  <ul>
+    <li><strong>Day 8-9</strong>: 第 6 章 OOP 全部，重点 dataclass、@property、Protocol</li>
+    <li><strong>Day 10</strong>: 第 7 章 异常 + with，自己写一个上下文管理器</li>
+    <li><strong>Day 11</strong>: 第 8 章 模块和包，按教程结构搭一个项目骨架</li>
+    <li><strong>Day 12</strong>: 学 pytest，给上面项目写测试</li>
+    <li><strong>Day 13</strong>: 学 ruff + mypy，加到项目里</li>
+    <li><strong>Day 14</strong>: 复习 + 把第 11 章 10 个陷阱再过一遍，确认每个都理解</li>
+  </ul>
+
+  <h3>第 3 周：标准库 + Pythonic（每天 1.5h）</h3>
+  <ul>
+    <li><strong>Day 15-16</strong>: 第 12 章 标准库，重点 collections、itertools、functools、pathlib</li>
+    <li><strong>Day 17</strong>: 第 10 章 Pythonic 习语，把第 7 天的项目用习语重构一次</li>
+    <li><strong>Day 18-19</strong>: 学 typing 全部，给项目所有函数加类型注解，用 mypy --strict 检查</li>
+    <li><strong>Day 20</strong>: 学 logging + argparse，把项目改成完整 CLI 工具</li>
+    <li><strong>Day 21</strong>: 读 <code>requests</code> 或 <code>httpx</code> 源码（不超过 1000 行），学习真实代码风格</li>
+  </ul>
+
+  <h3>第 4 周：并发 + 框架（每天 1.5h）</h3>
+  <ul>
+    <li><strong>Day 22</strong>: 第 9 章 并发：GIL + threading + ProcessPoolExecutor</li>
+    <li><strong>Day 23-24</strong>: asyncio 深入，写一个并发爬虫</li>
+    <li><strong>Day 25-27</strong>: 选一个方向深入：</li>
+    <ul>
+      <li>Web → FastAPI 教程，做一个完整 CRUD API</li>
+      <li>数据 → pandas + numpy 入门，处理一个真实数据集</li>
+      <li>AI → Anthropic SDK / LangChain，做一个聊天机器人</li>
+      <li>自动化 → 写一个完整的运维脚本</li>
+    </ul>
+    <li><strong>Day 28-29</strong>: 把这个项目做完整：测试、CI、文档、README</li>
+    <li><strong>Day 30</strong>: 庆祝！你已经是合格的 Python 开发者了</li>
+  </ul>
+
+  <h3>必读书单（按优先级）</h3>
+  <ol>
+    <li><strong>《Fluent Python》第 2 版</strong>（流畅的 Python）—— <strong>专为有经验的程序员写的</strong>。读 1/3 你就会脱胎换骨。</li>
+    <li>官方文档 <code>docs.python.org</code>——比 Java 文档可读性强得多</li>
+    <li><strong>《Effective Python》第 2 版</strong>——90 条最佳实践</li>
+    <li>Real Python 网站的高质量教程</li>
+  </ol>
+
+  <h3>必跟项目（学习 Python 风格）</h3>
+  <ul>
+    <li><strong>requests / httpx</strong> —— 学 API 设计</li>
+    <li><strong>FastAPI</strong> —— 现代 Python 框架的典范</li>
+    <li><strong>pydantic</strong> —— 学如何用类型系统</li>
+    <li><strong>rich</strong> —— 优雅的 CLI 输出</li>
+    <li><strong>uv</strong> —— 学如何写工业级工具</li>
+  </ul>
+
+  <div class="callout aha">
+    <div class="callout-title">最重要的一条建议</div>
+    <p>不要试图把 Java 的设计模式硬搬到 Python。Python 里很多模式（Singleton、Factory、Strategy、Visitor）不需要专门的"模式"——模块级变量、函数对象、<code>functools.partial</code>、闭包就够用了。<strong>学会"少即是多"的美学，比记住语法重要 10 倍</strong>。</p>
+  </div>
+
+</section>
+
+<footer>
+  <p>给 Java 程序员的 Python 速通对比教程 v1.0 · 全部内容基于 Python 3.10+ / Java 17+</p>
+  <p style="margin-top: 8px;">本教程在浏览器本地渲染。Cmd/Ctrl + F 全文搜索，左侧目录可跳转。</p>
+</footer>
+
+</main>
+</div>
+
+<script>
+// ============ TOC ACTIVE HIGHLIGHT ============
+const tocLinks = document.querySelectorAll('aside.toc a');
+const sections = document.querySelectorAll('section[id]');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const id = e.target.id;
+      tocLinks.forEach(a => a.classList.remove('active'));
+      const link = document.querySelector(`aside.toc a[href="#${id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-30% 0px -60% 0px', threshold: 0 });
+
+sections.forEach(s => observer.observe(s));
+
+// ============ SYNTAX HIGHLIGHTING ============
+hljs.highlightAll();
+
+// ============ COPY CODE BUTTONS ============
+document.querySelectorAll('pre').forEach(pre => {
+  const wrap = document.createElement('div');
+  wrap.className = 'code-wrap';
+  pre.parentNode.insertBefore(wrap, pre);
+  wrap.appendChild(pre);
+
+  const btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.textContent = 'Copy';
+  wrap.appendChild(btn);
+
+  btn.addEventListener('click', async () => {
+    const code = pre.querySelector('code')?.textContent || pre.textContent;
+    try {
+      await navigator.clipboard.writeText(code);
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 1500);
+    } catch (e) {
+      btn.textContent = 'Failed';
+    }
+  });
+});
+
+// ============ SEARCH ============
+const searchBox = document.getElementById('searchBox');
+searchBox?.addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase().trim();
+
+  document.querySelectorAll('.chapter').forEach(ch => {
+    if (!q) {
+      ch.classList.remove('search-hidden');
+      return;
+    }
+    const text = ch.textContent.toLowerCase();
+    if (text.includes(q)) {
+      ch.classList.remove('search-hidden');
+    } else {
+      ch.classList.add('search-hidden');
+    }
+  });
+
+  // 更新 TOC：被隐藏的章节链接变灰
+  document.querySelectorAll('aside.toc a').forEach(a => {
+    const href = a.getAttribute('href');
+    if (!href || href === '#') return;
+    const target = document.querySelector(href);
+    if (!target) return;
+    a.style.opacity = (target.classList.contains('search-hidden')) ? '0.3' : '1';
+  });
+});
+
+// ============ SMOOTH SCROLL ============
+document.querySelectorAll('aside.toc a').forEach(a => {
+  a.addEventListener('click', (e) => {
+    const href = a.getAttribute('href');
+    if (href?.startsWith('#')) {
+      e.preventDefault();
+      document.querySelector(href)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      history.pushState(null, '', href);
+    }
+  });
+});
+</script>
+</body>
+</html>

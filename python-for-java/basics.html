@@ -1,0 +1,2737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>基础语法逐条对照 · Java vs Python</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/java.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-2: #1c2128;
+  --surface-3: #21262d;
+  --border: #30363d;
+  --border-soft: #21262d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --text-muted: #6e7681;
+  --accent: #58a6ff;
+  --java: #f89820;
+  --java-bg: rgba(248, 152, 32, 0.08);
+  --python: #4584b6;
+  --python-yellow: #ffd43b;
+  --python-bg: rgba(69, 132, 182, 0.1);
+  --good: #3fb950;
+  --bad: #f85149;
+  --warn: #d29922;
+  --aha: #a371f7;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; scroll-padding-top: 70px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+code, pre, .mono {
+  font-family: "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* ============ TOP BAR ============ */
+header.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 56px;
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--border);
+  z-index: 100;
+  display: flex; align-items: center;
+  padding: 0 24px;
+  gap: 24px;
+}
+header .brand {
+  font-size: 15px; font-weight: 600;
+  background: linear-gradient(90deg, var(--java) 0%, var(--python-yellow) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+header .brand .sub { color: var(--text-dim); font-weight: 400; margin-left: 8px; -webkit-text-fill-color: var(--text-dim); }
+header nav { margin-left: auto; display: flex; gap: 16px; }
+header nav a {
+  color: var(--text-dim); text-decoration: none; font-size: 13.5px;
+  padding: 6px 12px; border-radius: 6px; transition: all 0.15s;
+}
+header nav a:hover { color: var(--accent); background: var(--surface); }
+header nav a.current { color: var(--accent); background: var(--surface); }
+
+/* ============ LAYOUT ============ */
+.layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1500px; margin: 0 auto; padding-top: 56px; }
+
+aside.toc {
+  position: sticky; top: 56px;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+  padding: 24px 8px 24px 24px;
+  border-right: 1px solid var(--border);
+  font-size: 13px;
+}
+aside.toc h3 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted); margin: 16px 0 6px 8px;
+}
+aside.toc h3:first-child { margin-top: 0; }
+aside.toc a {
+  display: block; padding: 4px 12px;
+  color: var(--text-dim); text-decoration: none;
+  border-radius: 6px; border-left: 2px solid transparent;
+}
+aside.toc a:hover { color: var(--text); background: var(--surface); }
+aside.toc a.active {
+  color: var(--accent); background: var(--surface);
+  border-left-color: var(--accent);
+}
+
+main { padding: 32px 40px 120px; min-width: 0; }
+
+/* ============ HERO ============ */
+.hero {
+  margin-bottom: 32px;
+  padding: 24px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+.hero h1 {
+  font-size: 1.85rem; font-weight: 700; margin-bottom: 8px;
+}
+.hero h1 .accent {
+  background: linear-gradient(90deg, var(--java), var(--python-yellow));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero p { color: var(--text-dim); font-size: 14.5px; }
+
+/* ============ CHAPTER ============ */
+.chapter { margin-bottom: 56px; scroll-margin-top: 70px; }
+.chapter > h2 {
+  font-size: 1.5rem; font-weight: 700;
+  margin-bottom: 6px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: baseline; gap: 12px;
+}
+.chapter > h2 .num {
+  display: inline-block; font-size: 0.8rem;
+  color: var(--text-muted); font-weight: 500;
+}
+.chapter > .lead {
+  color: var(--text-dim); font-size: 13.5px;
+  margin-bottom: 20px; padding-left: 12px;
+  border-left: 3px solid var(--accent);
+}
+
+/* ============ CONCEPT CARD ============ */
+.concept {
+  margin: 14px 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.concept-head {
+  padding: 8px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.concept-head .topic { color: var(--accent); font-weight: 500; font-size: 12px; letter-spacing: 0.04em; }
+.concept-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.concept-side {
+  padding: 0;
+  position: relative;
+}
+.concept-side.java { border-right: 1px solid var(--border); }
+.concept-side .label {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--border-soft);
+}
+.concept-side.java .label { color: var(--java); background: var(--java-bg); }
+.concept-side.python .label { color: var(--python-yellow); background: var(--python-bg); }
+.concept-side pre {
+  margin: 0; padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  background: transparent !important;
+  border: none;
+  border-radius: 0;
+  overflow-x: auto;
+}
+.concept-side pre code { background: none !important; padding: 0; }
+.concept-note {
+  padding: 8px 14px;
+  background: var(--surface-3);
+  font-size: 13px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border-soft);
+}
+.concept-note strong { color: var(--warn); }
+.concept-note .key { color: var(--aha); font-weight: 600; }
+
+/* ============ INLINE ============ */
+:not(pre) > code {
+  background: var(--surface-3);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.88em;
+  color: #ffa657;
+  border: 1px solid var(--border-soft);
+}
+
+/* ============ CALLOUT ============ */
+.callout {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border-left: 4px solid;
+  background: var(--surface);
+  font-size: 14px;
+}
+.callout-title {
+  font-weight: 600; margin-bottom: 4px;
+  font-size: 13px; letter-spacing: 0.02em;
+}
+.callout.warn { border-color: var(--warn); background: rgba(210,153,34,0.08); }
+.callout.warn .callout-title { color: var(--warn); }
+.callout.warn .callout-title::before { content: "[!] "; }
+.callout.tip { border-color: var(--good); background: rgba(63,185,80,0.08); }
+.callout.tip .callout-title { color: var(--good); }
+.callout.tip .callout-title::before { content: "[TIP] "; }
+.callout.aha { border-color: var(--aha); background: rgba(163,113,247,0.08); }
+.callout.aha .callout-title { color: var(--aha); }
+.callout.aha .callout-title::before { content: "[啊哈] "; }
+
+/* ============ TABLE ============ */
+table {
+  width: 100%; border-collapse: collapse;
+  margin: 14px 0; font-size: 13.5px;
+  background: var(--surface);
+  border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--border);
+}
+th, td {
+  padding: 8px 12px; text-align: left;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+}
+th { background: var(--surface-2); font-weight: 600; font-size: 12.5px; }
+tbody tr:last-child td { border-bottom: none; }
+td code, th code { font-size: 12px; }
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  aside.toc { display: none; }
+  main { padding: 20px 16px 80px; }
+  .concept-body { grid-template-columns: 1fr; }
+  .concept-side.java { border-right: none; border-bottom: 1px solid var(--border); }
+}
+
+footer {
+  margin-top: 60px; padding: 24px 0 0;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted); font-size: 13px; text-align: center;
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">基础语法逐条对照<span class="sub">每个概念一张卡片</span></div>
+  <nav>
+    <a href="index.html">完整教程</a>
+    <a href="basics.html" class="current">基础对照</a>
+  </nav>
+</header>
+
+<div class="layout">
+
+<aside class="toc" id="toc">
+  <h3>变量与类型</h3>
+  <a href="#var">1 · 变量声明</a>
+  <a href="#type">2 · 基本类型</a>
+  <a href="#convert">3 · 类型转换</a>
+  <a href="#null">4 · null / None</a>
+
+  <h3>运算符</h3>
+  <a href="#arith">5 · 算术运算</a>
+  <a href="#cmp">6 · 比较与逻辑</a>
+  <a href="#assign">7 · 赋值与三元</a>
+
+  <h3>字符串</h3>
+  <a href="#str">8 · 字符串操作</a>
+
+  <h3>控制流</h3>
+  <a href="#if">9 · 条件语句</a>
+  <a href="#for">10 · 循环</a>
+  <a href="#switch">11 · switch / match</a>
+
+  <h3>函数 / 方法</h3>
+  <a href="#fn-def">12 · 函数定义</a>
+  <a href="#fn-arg">13 · 参数</a>
+  <a href="#fn-ret">14 · 返回值</a>
+  <a href="#fn-fc">15 · 一等函数</a>
+
+  <h3>类</h3>
+  <a href="#cls-def">16 · 类定义</a>
+  <a href="#cls-field">17 · 字段</a>
+  <a href="#cls-ctor">18 · 构造方法</a>
+  <a href="#cls-method">19 · 方法（实例/类/静态）</a>
+  <a href="#cls-access">20 · 访问控制</a>
+  <a href="#cls-prop">21 · 属性 (getter/setter)</a>
+  <a href="#cls-inherit">22 · 继承</a>
+  <a href="#cls-iface">23 · 接口 / 抽象类</a>
+  <a href="#cls-magic">24 · 常用魔术方法</a>
+  <a href="#cls-instance">25 · 实例化与 instanceof</a>
+
+  <h3>异常</h3>
+  <a href="#exc">26 · 异常处理</a>
+
+  <h3>集合（速查）</h3>
+  <a href="#coll">27 · 集合基础</a>
+
+  <h3>I/O</h3>
+  <a href="#io">28 · 输入输出与文件</a>
+
+  <h3>速查</h3>
+  <a href="#summary">29 · 速查总结表</a>
+</aside>
+
+<main>
+
+<section class="hero">
+  <h1>基础语法 <span class="accent">逐条对照</span></h1>
+  <p>29 个最基础的语法概念，每个一张独立卡片，左 Java 右 Python，附关键差异说明。专为打开就能查、查完就能用而设计。</p>
+</section>
+
+<!-- ====== 1. 变量声明 ====== -->
+<section id="var" class="chapter">
+  <h2><span class="num">01</span>变量声明</h2>
+  <p class="lead">Java 必须显式声明类型；Python 直接赋值，类型由值决定。这是最根本的差异之一。</p>
+
+  <div class="concept">
+    <div class="concept-head">基本声明并赋值 <span class="topic">VARIABLE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">int    x = 10;
+double y = 3.14;
+String s = "hi";
+boolean b = true;</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">x = 10        # 自动是 int
+y = 3.14      # 自动是 float
+s = "hi"      # 自动是 str
+b = True      # 自动是 bool</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">无类型声明，无 <code>;</code>。变量的"类型"是它当前指向对象的类型，不是变量本身的属性。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">类型注解（可选） <span class="topic">VARIABLE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java <span style="color:var(--text-muted);font-weight:400">类型必须</span></div>
+<pre><code class="language-java">int x = 10;
+String s = "hi";
+List&lt;Integer&gt; xs = new ArrayList&lt;&gt;();</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python <span style="color:var(--text-muted);font-weight:400">类型可选</span></div>
+<pre><code class="language-python">x: int = 10
+s: str = "hi"
+xs: list[int] = []
+# 注解只是给 IDE 和 mypy 看的
+# 运行时不强制</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">Python 的类型注解 <strong>不影响运行</strong>，只用于静态检查。<code>x: int = "abc"</code> 不会报错。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">声明但未初始化 <span class="topic">VARIABLE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">int x;          // 默认 0
+String s;       // 默认 null
+// 局部变量必须显式赋值才能用</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">x = None        # 必须给值
+# 单纯写 x 会 NameError
+# 一般用 None 表示"未初始化"</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">Python 没有"声明但不赋值"的概念。变量第一次赋值就是创建。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">多重赋值 / 交换 <span class="topic">VARIABLE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">int a = 1, b = 2, c = 3;
+
+// 交换需要临时变量
+int tmp = a;
+a = b;
+b = tmp;</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">a, b, c = 1, 2, 3
+
+# 交换：一行搞定
+a, b = b, a
+
+# 多变量来自函数
+x, y = get_pair()</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">常量 <span class="topic">VARIABLE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">final int MAX = 100;     // 不可改
+static final int CAPACITY = 10;</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">MAX = 100        # 约定：大写 = 常量
+# 但语法上仍可改！
+
+# 想要"真常量"用 typing.Final
+from typing import Final
+CAPACITY: Final = 10</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">Python <strong>没有真正的不可变变量</strong>，全靠命名约定（大写）。<code>Final</code> 只是给 mypy 看的。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">作用域 <span class="topic">VARIABLE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">if (cond) {
+    int x = 1;     // x 仅在 {} 内可见
+}
+// x 这里访问不到</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">if cond:
+    x = 1          # x 在函数级别可见
+print(x)           # 这里照样能用！</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><strong>Python 没有块作用域</strong>。变量作用域是 <strong>函数级别</strong>（或模块级别）。<code>if/for/while</code> 不会创建新作用域。这是 Java 程序员常踩的坑。</div>
+  </div>
+</section>
+
+<!-- ====== 2. 基本类型 ====== -->
+<section id="type" class="chapter">
+  <h2><span class="num">02</span>基本数据类型</h2>
+  <p class="lead">Python 没有"基本类型"（primitive），所有值都是对象。<code>int</code> 也是对象，可以调方法。</p>
+
+  <div class="concept">
+    <div class="concept-head">整数 <span class="topic">TYPE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">byte  b = 127;          // 8 位
+short s = 32000;        // 16 位
+int   i = 2000000000;   // 32 位
+long  l = 9000000000L;  // 64 位
+// 溢出会环绕，要大数用 BigInteger</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">x = 100
+big = 10 ** 100     # 永远不溢出
+huge = 2 ** 1000    # 任意精度，免费
+
+# 数字下划线分隔（可读）
+million = 1_000_000
+
+# 不同进制
+hex_n = 0xff
+bin_n = 0b1010
+oct_n = 0o17</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">Python 的 <code>int</code> 是 <strong>任意精度</strong>，永远不溢出。Java 需要 <code>BigInteger</code>。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">浮点数 <span class="topic">TYPE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">float  f = 3.14F;     // 32 位
+double d = 3.14;      // 64 位
+// 默认字面量是 double</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">x = 3.14            # float（统一是 64 位）
+y = 1.5e3           # 1500.0
+z = float('inf')    # 无穷大
+n = float('nan')    # 非数
+
+# 没有 float 类型
+# 浮点精度问题一样存在
+0.1 + 0.2  # 0.30000000000000004</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">只有一种浮点类型（相当于 Java 的 double）。精确十进制用 <code>Decimal</code>。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">布尔 <span class="topic">TYPE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">boolean b = true;
+boolean done = false;
+// 必须 boolean 才能用在 if</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">b = True            # 注意首字母大写
+done = False
+
+# Python 中 bool 是 int 的子类！
+True + True         # 2
+True == 1           # True
+
+# 任何对象都能用在 if（真值判断）</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">Python 里 <code>True / False</code> 首字母大写，且 <code>bool</code> 继承自 <code>int</code>，所以 <code>True == 1</code>。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">字符 <span class="topic">TYPE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">char c = 'A';        // 单引号
+char d = '中';
+int code = (int) c;  // 65</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">c = 'A'             # 单双引号都行
+d = '中'
+# 没有 char 类型！
+# 'A' 就是长度为 1 的 str
+type('A')           # &lt;class 'str'&gt;
+ord('A')            # 65
+chr(65)             # 'A'</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">Python 没有 char 类型，单字符就是长度 1 的字符串。</div>
+  </div>
+</section>
+
+<!-- ====== 3. 类型转换 ====== -->
+<section id="convert" class="chapter">
+  <h2><span class="num">03</span>类型转换</h2>
+
+  <div class="concept">
+    <div class="concept-head">数字与字符串互转 <span class="topic">CONVERT</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">int n = Integer.parseInt("123");
+double d = Double.parseDouble("1.5");
+String s = Integer.toString(123);
+String x = String.valueOf(1.5);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">n = int("123")       # 123
+d = float("1.5")     # 1.5
+s = str(123)         # '123'
+x = str(1.5)         # '1.5'
+
+# int 还可以转换其他进制
+int("ff", 16)        # 255
+int("1010", 2)       # 10</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">Python 用类型名当函数：<code>int()</code>、<code>str()</code>、<code>float()</code>、<code>bool()</code>、<code>list()</code>。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">数字间转换 <span class="topic">CONVERT</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">int    i = (int) 3.7;       // 3 截断
+double d = (double) 5;       // 5.0
+long   l = (long) i;</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">i = int(3.7)        # 3 截断
+d = float(5)        # 5.0
+# 没有 long，int 自动扩展</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 4. null / None ====== -->
+<section id="null" class="chapter">
+  <h2><span class="num">04</span>null / None 对照</h2>
+
+  <div class="concept">
+    <div class="concept-head">空值表示 <span class="topic">NULL</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">String s = null;
+if (s == null) ...
+if (s != null &amp;&amp; !s.isEmpty()) ...
+
+// 现代代码用 Optional
+Optional&lt;String&gt; o = Optional.empty();</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">s = None            # ← 注意大写！
+if s is None: ...    # ← 用 is，不用 ==
+if s is not None: ...
+if s: ...            # 同时检查非 None 和非空字符串
+                     # （但 0/空集合也是假，要小心）</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">关键</span>：和 <code>None</code> 比较 <strong>一定用 <code>is</code></strong>，不用 <code>==</code>。<code>None</code> 是单例，<code>is</code> 比 <code>==</code> 快且更明确。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">可空类型注解 <span class="topic">NULL</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">@Nullable String name;
+Optional&lt;User&gt; findUser(int id);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">from typing import Optional
+
+name: Optional[str] = None    # 等价于 str | None
+def find_user(uid: int) -&gt; Optional[User]: ...
+
+# 3.10+ 推荐用管道
+name: str | None = None
+def find_user(uid: int) -&gt; User | None: ...</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 5. 算术运算 ====== -->
+<section id="arith" class="chapter">
+  <h2><span class="num">05</span>算术运算</h2>
+  <p class="lead">大部分运算符相同，但 <code>/</code>、<code>**</code>、<code>++</code> 有重要差异。</p>
+
+  <div class="concept">
+    <div class="concept-head">基本四则 <span class="topic">ARITH</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">int sum = 5 + 3;     // 8
+int sub = 5 - 3;     // 2
+int mul = 5 * 3;     // 15
+int div = 5 / 2;     // 2 ← 整数相除是整除
+double d = 5.0 / 2;  // 2.5
+int mod = 5 % 2;     // 1</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">sum = 5 + 3      # 8
+sub = 5 - 3      # 2
+mul = 5 * 3      # 15
+div = 5 / 2      # 2.5  ← / 永远是真除法！
+fdiv = 5 // 2    # 2    ← // 才是整除
+mod = 5 % 2      # 1</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">关键</span>：Python 的 <code>/</code> 永远返回 <code>float</code>，<code>//</code> 才是整除。这是最常见的差异。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">幂、绝对值、最值 <span class="topic">ARITH</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">double p = Math.pow(2, 10);    // 1024.0
+int    a = Math.abs(-5);
+int    m = Math.max(3, 5);
+int    n = Math.min(3, 5);
+double r = Math.sqrt(2);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">p = 2 ** 10       # 1024 ← 内建运算符
+a = abs(-5)       # 5  ← 内建函数
+m = max(3, 5)
+n = min(3, 5)
+
+import math
+r = math.sqrt(2)</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">自增自减 <span class="topic">ARITH</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">i++;    // 后置自增
+++i;    // 前置自增
+i--;
+i += 1;   // 也行</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python"># Python 没有 ++ / --！
+i += 1     # 必须这样
+i -= 1
+i *= 2
+i //= 3
+i **= 2</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><strong>Python 没有 ++ 运算符</strong>。只能用 <code>i += 1</code>。新手最常踩这个坑。</div>
+  </div>
+</section>
+
+<!-- ====== 6. 比较与逻辑 ====== -->
+<section id="cmp" class="chapter">
+  <h2><span class="num">06</span>比较与逻辑运算</h2>
+
+  <div class="concept">
+    <div class="concept-head">比较运算 <span class="topic">COMPARE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">a == b;   // 基本类型比值；对象比引用！
+a != b;
+a &lt; b;  a &gt; b;  a &lt;= b;  a &gt;= b;
+
+// 对象比内容
+str1.equals(str2);
+list1.equals(list2);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">a == b      # 比内容（默认）
+a != b
+a &lt; b; a &gt; b; a &lt;= b; a &gt;= b
+
+# 比身份（是否同一个对象）
+a is b
+a is not b
+
+# 链式比较（Java 没有！）
+if 0 &lt; x &lt; 100: ...
+if a == b == c: ...</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">关键</span>：<code>==</code> 在 Java 比对象引用，在 Python 比内容（调 <code>__eq__</code>）。Python 想比身份用 <code>is</code>。<br>另外 Python 的 <strong>链式比较</strong> 是杀手特性：<code>0 &lt; x &lt; 100</code> 直接可用。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">逻辑运算 <span class="topic">LOGIC</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">a &amp;&amp; b
+a || b
+!a
+
+// 必须 boolean 类型</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">a and b
+a or b
+not a
+
+# 任何对象都能用，按真值判断
+# 短路求值，返回值不是 bool
+
+x = name or "default"   # 常用模式
+x = a and a.field        # 安全访问</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">Python 的 <code>and / or</code> 返回的是 <strong>原对象</strong>，不是 bool。<code>"" or "fallback"</code> 返回 <code>"fallback"</code>。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">成员判断 <span class="topic">LOGIC</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">list.contains(x)
+str.contains("a")
+map.containsKey(k)
+set.contains(x)</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">x in list_      # 通用！
+"a" in str_
+k in dict_      # 检查键
+x in set_
+
+# 否定
+x not in list_</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><code>in</code> 是运算符，不是方法，对所有可迭代/容器都适用。</div>
+  </div>
+</section>
+
+<!-- ====== 7. 赋值与三元 ====== -->
+<section id="assign" class="chapter">
+  <h2><span class="num">07</span>赋值与三元表达式</h2>
+
+  <div class="concept">
+    <div class="concept-head">三元表达式 <span class="topic">CONDITION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">String s = (age &gt;= 18) ? "adult" : "minor";
+
+int max = (a &gt; b) ? a : b;</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">s = "adult" if age &gt;= 18 else "minor"
+
+max_v = a if a &gt; b else b</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">关键</span>：Python 的三元 <strong>语序不同</strong>：<code>值1 if 条件 else 值2</code>。读起来更像英语。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">复合赋值 <span class="topic">ASSIGN</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">a += 1;
+a -= 1;
+a *= 2;
+a /= 2;
+a %= 3;</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">a += 1
+a -= 1
+a *= 2
+a /= 2
+a //= 2     # 整除赋值
+a %= 3
+a **= 2     # 幂赋值</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">海象运算符 := （3.8+） <span class="topic">ASSIGN</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">// 类似但更受限
+String line;
+while ((line = reader.readLine()) != null) {
+    process(line);
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python"># 在表达式里赋值
+while (chunk := f.read(1024)):
+    process(chunk)
+
+# 推导式里更有用
+[y for x in data if (y := f(x)) &gt; 0]</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 8. 字符串 ====== -->
+<section id="str" class="chapter">
+  <h2><span class="num">08</span>字符串操作</h2>
+
+  <div class="concept">
+    <div class="concept-head">字符串字面量 <span class="topic">STRING</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">String a = "hello";
+char   c = 'a';   // ← 不同类型
+
+String multi = """
+    line1
+    line2
+    """;        // 14+
+
+String esc = "C:\\Users";  // 需转义</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">a = "hello"
+b = 'hello'        # 单双引号等价
+c = 'a'            # 还是 str（无 char 类型）
+
+multi = """
+    line1
+    line2
+"""
+
+raw = r"C:\Users"  # 原始字符串，不转义
+fstr = f"Hi {a}"   # f-string</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">字符串拼接 <span class="topic">STRING</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">String s = "Hello, " + name + "! Age: " + age;
+String t = String.format("Hi %s, age %d", name, age);
+StringBuilder sb = new StringBuilder()
+    .append("a").append("b");</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">s = "Hello, " + name + "! Age: " + str(age)   # 必须先转 str
+s = f"Hello, {name}! Age: {age}"   # ← 推荐！
+s = "Hi {}, age {}".format(name, age)         # 老式
+
+# 大量拼接用 join
+result = "".join(parts)</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">推荐</span>：永远用 <code>f-string</code>。Python 字符串拼接 <code>+</code> 时数字必须先转 <code>str()</code>，f-string 自动处理。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">f-string 格式说明符 <span class="topic">STRING</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">String.format("%.2f", 3.14159);    // "3.14"
+String.format("%10s", "ab");       // "        ab"
+String.format("%-10s|", "ab");     // "ab        |"
+String.format("%,d", 1234567);     // "1,234,567"</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">f"{3.14159:.2f}"     # '3.14'
+f"{'ab':&gt;10}"        # '        ab'
+f"{'ab':&lt;10}|"       # 'ab        |'
+f"{'ab':^10}|"       # '    ab    |'  居中
+f"{1234567:,}"       # '1,234,567'
+f"{255:#x}"          # '0xff'
+f"{255:08b}"         # '11111111'
+
+# 调试神器
+x = 42
+f"{x=}"              # 'x=42'</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">长度、大小写、查找、替换 <span class="topic">STRING</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">s.length();
+s.toUpperCase();
+s.toLowerCase();
+s.contains("x");
+s.indexOf("x");
+s.replace("a", "b");
+s.startsWith("a");
+s.endsWith("z");
+s.trim();
+s.split(",");
+String.join(",", arr);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">len(s)               # 全局函数！
+s.upper()
+s.lower()
+"x" in s             # in 运算符
+s.find("x")          # 找不到返回 -1
+s.replace("a", "b")
+s.startswith("a")
+s.endswith("z")
+s.strip()
+s.split(",")
+",".join(arr)        # ← 连接符调方法！</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">注意</span>：<code>len()</code> 是 <strong>全局函数</strong>，不是方法。<code>join</code> 是 <strong>连接符（字符串）</strong> 调方法，不是列表。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">字符串切片（Java 没有） <span class="topic">STRING</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">s.substring(1, 4);          // 1..4 (不含 4)
+s.substring(0, s.length()-1);
+String reversed = new StringBuilder(s).reverse().toString();
+s.charAt(0);
+s.charAt(s.length() - 1);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">s[1:4]            # 1..4 (不含 4)
+s[:-1]            # 去掉最后一个字符
+s[::-1]           # 反转！
+s[0]              # 第一个字符
+s[-1]             # 最后一个字符
+s[::2]            # 每隔一个取
+s[-3:]            # 最后 3 个</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">杀器</span>：切片语法 <code>s[start:stop:step]</code> 比 <code>substring</code> 强大得多，且支持负索引。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">字符串重复 <span class="topic">STRING</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">"abc".repeat(3);          // "abcabcabc"</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">"abc" * 3           # 'abcabcabc'  ← 运算符！
+"-" * 50            # 画分割线</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 9. 条件语句 ====== -->
+<section id="if" class="chapter">
+  <h2><span class="num">09</span>条件语句</h2>
+
+  <div class="concept">
+    <div class="concept-head">if / else <span class="topic">CONTROL</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">if (x &gt; 0) {
+    System.out.println("positive");
+} else {
+    System.out.println("non-positive");
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">if x &gt; 0:
+    print("positive")
+else:
+    print("non-positive")
+# 1. 条件不要括号
+# 2. 用 :  + 缩进，不用 {}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">if / else if / else <span class="topic">CONTROL</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">if (score &gt;= 90) {
+    grade = "A";
+} else if (score &gt;= 80) {
+    grade = "B";
+} else if (score &gt;= 60) {
+    grade = "C";
+} else {
+    grade = "F";
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">if score &gt;= 90:
+    grade = "A"
+elif score &gt;= 80:        # ← elif，不是 else if
+    grade = "B"
+elif score &gt;= 60:
+    grade = "C"
+else:
+    grade = "F"</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">用 <code>elif</code>，不是 <code>else if</code>。</div>
+  </div>
+</section>
+
+<!-- ====== 10. 循环 ====== -->
+<section id="for" class="chapter">
+  <h2><span class="num">10</span>循环</h2>
+
+  <div class="concept">
+    <div class="concept-head">基本 for（C 风格） <span class="topic">LOOP</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">for (int i = 0; i &lt; 10; i++) {
+    System.out.println(i);
+}
+
+for (int i = 5; i &lt; 20; i += 2) {
+    System.out.println(i);
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">for i in range(10):       # 0..9
+    print(i)
+
+for i in range(5, 20, 2): # 5,7,9,...,19
+    print(i)
+
+# 倒序
+for i in range(9, -1, -1): print(i)</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">Python 没有 C 风格 for。用 <code>range(start, stop, step)</code>。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">遍历集合 <span class="topic">LOOP</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">for (String s : list) {
+    System.out.println(s);
+}
+
+for (Map.Entry&lt;String, Integer&gt; e : map.entrySet()) {
+    System.out.println(e.getKey() + "=" + e.getValue());
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">for s in my_list:
+    print(s)
+
+for k, v in my_dict.items():    # 解包
+    print(f"{k}={v}")
+
+for k in my_dict:        # 默认遍历键
+    print(k)
+for v in my_dict.values():
+    print(v)</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">同时取索引和元素 <span class="topic">LOOP</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">for (int i = 0; i &lt; list.size(); i++) {
+    String s = list.get(i);
+    System.out.println(i + ": " + s);
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">for i, s in enumerate(my_list):
+    print(f"{i}: {s}")
+
+# 从 1 开始计数
+for i, s in enumerate(my_list, start=1):
+    print(f"{i}: {s}")</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><code>enumerate</code> 是 Python 必学函数，比手动维护索引优雅 10 倍。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">同时遍历多个序列 <span class="topic">LOOP</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">for (int i = 0; i &lt; names.size(); i++) {
+    String name = names.get(i);
+    int    age  = ages.get(i);
+    System.out.println(name + ": " + age);
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">for name, age in zip(names, ages):
+    print(f"{name}: {age}")
+
+# 任意多个
+for a, b, c in zip(list1, list2, list3): ...</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">while <span class="topic">LOOP</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">while (running) {
+    doStuff();
+}
+
+do {
+    doStuff();
+} while (cond);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">while running:
+    do_stuff()
+
+# Python 没有 do-while！
+# 模拟：
+while True:
+    do_stuff()
+    if not cond:
+        break</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">break / continue / 循环 else <span class="topic">LOOP</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">for (int i : nums) {
+    if (i &lt; 0) continue;
+    if (i &gt; 100) break;
+    process(i);
+}
+// Java 没有循环 else</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">for i in nums:
+    if i &lt; 0: continue
+    if i &gt; 100: break
+    process(i)
+else:
+    # 仅在循环正常结束（没 break）才执行
+    print("all processed")</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">独有</span>：Python 的 <code>for/while else</code>，只有循环正常结束（没 <code>break</code>）才执行。常用于"找到了就 break，没找到就 else"。</div>
+  </div>
+</section>
+
+<!-- ====== 11. switch / match ====== -->
+<section id="switch" class="chapter">
+  <h2><span class="num">11</span>switch / match</h2>
+
+  <div class="concept">
+    <div class="concept-head">基本分支 <span class="topic">SWITCH</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">switch (day) {
+    case 1: name = "Mon"; break;
+    case 2: name = "Tue"; break;
+    case 3: name = "Wed"; break;
+    default: name = "?";
+}
+
+// Java 14+ 表达式形式
+String name = switch (day) {
+    case 1 -&gt; "Mon";
+    case 2 -&gt; "Tue";
+    default -&gt; "?";
+};</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python 3.10+</div>
+<pre><code class="language-python">match day:
+    case 1: name = "Mon"
+    case 2: name = "Tue"
+    case 3: name = "Wed"
+    case _: name = "?"     # _ = 默认
+
+# Python 的 match 比 Java switch 强大：
+match point:
+    case (0, 0): print("origin")
+    case (x, 0): print(f"x-axis: {x}")
+    case (x, y) if x == y: print("diagonal")
+    case [_, *rest]: print(f"list, rest={rest}")</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">Python <code>match</code> 是"<strong>结构化模式匹配</strong>"，可以解构对象/列表/字典，比 <code>switch</code> 强大得多。</div>
+  </div>
+</section>
+
+<!-- ====== 12. 函数定义 ====== -->
+<section id="fn-def" class="chapter">
+  <h2><span class="num">12</span>函数定义</h2>
+  <p class="lead">Python 用 <code>def</code> 定义函数，无类型声明，可加可选注解。</p>
+
+  <div class="concept">
+    <div class="concept-head">最简函数 <span class="topic">FUNCTION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java（必须在类里）</div>
+<pre><code class="language-java">public class Util {
+    public static int add(int a, int b) {
+        return a + b;
+    }
+}
+
+int n = Util.add(1, 2);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python（顶层即可）</div>
+<pre><code class="language-python">def add(a, b):
+    return a + b
+
+n = add(1, 2)
+
+# 可选类型注解
+def add(a: int, b: int) -&gt; int:
+    return a + b</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">Python 函数不需要包在类里。文件本身就是模块。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">无返回值 <span class="topic">FUNCTION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public static void log(String msg) {
+    System.out.println(msg);
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">def log(msg):
+    print(msg)
+    # 无 return 等价于 return None
+
+# 类型注解写 None
+def log(msg: str) -&gt; None:
+    print(msg)</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">文档字符串（替代 Javadoc） <span class="topic">FUNCTION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">/**
+ * 加法
+ * @param a 第一个数
+ * @param b 第二个数
+ * @return 和
+ */
+public int add(int a, int b) { ... }</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">def add(a, b):
+    """
+    加法
+
+    Args:
+        a: 第一个数
+        b: 第二个数
+    Returns:
+        和
+    """
+    return a + b
+
+help(add)    # 显示 docstring</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 13. 参数 ====== -->
+<section id="fn-arg" class="chapter">
+  <h2><span class="num">13</span>函数参数（5 种形式）</h2>
+
+  <div class="concept">
+    <div class="concept-head">默认参数 <span class="topic">PARAM</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java <span style="color:var(--text-muted);font-weight:400">需重载</span></div>
+<pre><code class="language-java">public String greet(String name) {
+    return greet(name, "Mr");
+}
+public String greet(String name, String prefix) {
+    return prefix + ". " + name;
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">def greet(name, prefix="Mr"):
+    return f"{prefix}. {name}"
+
+greet("Tom")              # 'Mr. Tom'
+greet("Tom", "Dr")        # 'Dr. Tom'
+greet("Tom", prefix="Dr") # 关键字传递</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">Python 默认参数 = 不需要重载。<strong>但默认值必须是不可变对象</strong>（陷阱：<code>def f(x=[])</code> 是 bug）。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">关键字参数 <span class="topic">PARAM</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java <span style="color:var(--text-muted);font-weight:400">不支持</span></div>
+<pre><code class="language-java">// 只能按位置
+connect("localhost", 8080, true, 30);
+// 可读性差！必须看签名才知道每个参数啥意思</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">def connect(host, port, ssl=False, timeout=30):
+    ...
+
+# 按关键字传，可读性极佳
+connect(host="localhost", port=8080, ssl=True, timeout=30)
+connect("localhost", 8080, ssl=True)   # 混合也行</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">可变参数 *args <span class="topic">PARAM</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public int sum(int... nums) {
+    int total = 0;
+    for (int n : nums) total += n;
+    return total;
+}
+sum(1, 2, 3, 4);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">def sum_all(*nums):
+    total = 0
+    for n in nums:
+        total += n
+    return total
+
+sum_all(1, 2, 3, 4)    # nums = (1,2,3,4) tuple</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">关键字可变参数 **kwargs <span class="topic">PARAM</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">// 没有原生对等，要传 Map
+public void config(Map&lt;String, Object&gt; opts) { ... }
+config(Map.of("host", "x", "port", 80));</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">def config(**opts):
+    print(opts)
+
+config(host="x", port=80)
+# {'host': 'x', 'port': 80}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">完整参数顺序 <span class="topic">PARAM</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">// 受限：只能位置参数 + 末尾 ...
+public void f(int a, int b, int... rest) { ... }</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python（极灵活）</div>
+<pre><code class="language-python">def f(a, b, *args, kw=10, **kwargs):
+    print(a, b, args, kw, kwargs)
+
+f(1, 2, 3, 4, kw=5, x=6, y=7)
+# 1 2 (3, 4) 5 {'x': 6, 'y': 7}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">解包传参 <span class="topic">PARAM</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">// 数组传给可变参数
+int[] arr = {1, 2, 3};
+sum(arr);          // OK</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">def f(a, b, c): ...
+
+args = [1, 2, 3]
+f(*args)           # 等价于 f(1, 2, 3)
+
+opts = {"a": 1, "b": 2, "c": 3}
+f(**opts)          # 等价于 f(a=1, b=2, c=3)</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 14. 返回值 ====== -->
+<section id="fn-ret" class="chapter">
+  <h2><span class="num">14</span>返回值（多返回值！）</h2>
+
+  <div class="concept">
+    <div class="concept-head">多返回值 <span class="topic">RETURN</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java <span style="color:var(--text-muted);font-weight:400">需要 record/Pair</span></div>
+<pre><code class="language-java">record Pair(int q, int r) {}
+
+Pair divmod(int a, int b) {
+    return new Pair(a / b, a % b);
+}
+
+Pair p = divmod(10, 3);
+int q = p.q();
+int r = p.r();</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python（原生支持）</div>
+<pre><code class="language-python">def divmod_(a, b):
+    return a // b, a % b   # 返回 tuple
+
+q, r = divmod_(10, 3)      # 解包接收
+
+# 或单独取
+result = divmod_(10, 3)
+q = result[0]
+r = result[1]</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">提前 return <span class="topic">RETURN</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public Result process(Input x) {
+    if (x == null) return Result.empty();
+    if (!x.valid()) return Result.error();
+    return doWork(x);
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">def process(x):
+    if x is None: return None
+    if not x.valid: return Result.error()
+    return do_work(x)</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 15. 一等函数 ====== -->
+<section id="fn-fc" class="chapter">
+  <h2><span class="num">15</span>函数是一等公民</h2>
+
+  <div class="concept">
+    <div class="concept-head">函数赋值给变量 <span class="topic">FUNCTION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java <span style="color:var(--text-muted);font-weight:400">需 Function 接口</span></div>
+<pre><code class="language-java">Function&lt;Integer, Integer&gt; sq = x -&gt; x * x;
+sq.apply(5);    // 25
+
+Function&lt;String, Integer&gt; len = String::length;</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">def square(x): return x * x
+
+sq = square              # 直接赋值
+sq(5)                    # 25
+
+# 函数有属性
+sq.__name__              # 'square'</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">lambda <span class="topic">FUNCTION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java 8+</div>
+<pre><code class="language-java">Function&lt;Integer, Integer&gt; sq = x -&gt; x * x;
+BiFunction&lt;Integer, Integer, Integer&gt; add = (a, b) -&gt; a + b;
+
+list.sort((a, b) -&gt; a - b);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">sq = lambda x: x * x
+add = lambda a, b: a + b
+
+list_.sort(key=lambda x: x.age)
+# Python lambda 只能写一个表达式！
+# 多语句必须定义命名函数</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">函数作参数 / 返回值 <span class="topic">FUNCTION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">int apply(Function&lt;Integer, Integer&gt; fn, int x) {
+    return fn.apply(x);
+}
+apply(n -&gt; n * 2, 5);    // 10
+
+Function&lt;Integer, Integer&gt; doubler() {
+    return n -&gt; n * 2;
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">def apply(fn, x):
+    return fn(x)
+apply(lambda n: n * 2, 5)    # 10
+
+def make_doubler():
+    def f(n): return n * 2
+    return f                  # 返回函数
+
+doubler = make_doubler()
+doubler(5)                    # 10</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 16. 类定义 ====== -->
+<section id="cls-def" class="chapter">
+  <h2><span class="num">16</span>类的基本定义</h2>
+
+  <div class="concept">
+    <div class="concept-head">最简类 <span class="topic">CLASS</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public class Dog {
+    // 类成员
+}
+
+Dog d = new Dog();</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">class Dog:
+    pass     # 占位符（空实现）
+
+d = Dog()    # 没有 new！</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">关键</span>：<strong>没有 <code>new</code> 关键字</strong>。直接调用类名即可。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">命名规范 <span class="topic">CLASS</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">// 类: PascalCase
+public class UserAccount { }
+
+// 方法/字段: camelCase
+public void doSomething() { }
+private String firstName;
+
+// 常量: UPPER_SNAKE
+public static final int MAX_SIZE = 100;</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python"># 类: PascalCase（同 Java）
+class UserAccount:
+    pass
+
+# 方法/变量: snake_case
+def do_something(): pass
+first_name = "Tom"
+
+# 常量: UPPER_SNAKE（同 Java）
+MAX_SIZE = 100
+
+# 模块文件名: snake_case
+# user_account.py</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 17. 字段 ====== -->
+<section id="cls-field" class="chapter">
+  <h2><span class="num">17</span>字段（实例 vs 类）</h2>
+
+  <div class="concept">
+    <div class="concept-head">实例字段 vs 类字段 <span class="topic">FIELD</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public class Dog {
+    static String species = "Canis";   // 类字段
+    String name;                        // 实例字段
+
+    public Dog(String name) {
+        this.name = name;               // 必须 this.
+    }
+}
+
+Dog.species          // 类字段访问
+new Dog("Rex").name  // 实例字段访问</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">class Dog:
+    species = "Canis"      # 类属性（在类体里直接写）
+
+    def __init__(self, name):
+        self.name = name    # 实例属性（self.X = Y）
+
+Dog.species              # 类属性
+Dog("Rex").name          # 实例属性</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">陷阱</span>：类属性是 <strong>所有实例共享的</strong>。如果是可变对象（list/dict），所有实例共用一份！实例属性必须在 <code>__init__</code> 里写 <code>self.x = ...</code>。</div>
+  </div>
+</section>
+
+<!-- ====== 18. 构造方法 ====== -->
+<section id="cls-ctor" class="chapter">
+  <h2><span class="num">18</span>构造方法</h2>
+
+  <div class="concept">
+    <div class="concept-head">基本构造 <span class="topic">CTOR</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public class Dog {
+    String name;
+    int age;
+
+    public Dog(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+}
+
+Dog d = new Dog("Rex", 3);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">class Dog:
+    def __init__(self, name, age):
+        self.name = name        # 必须显式写 self.
+        self.age = age
+
+d = Dog("Rex", 3)               # 没有 new</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><code>__init__</code> 是构造方法。第一个参数永远是 <code>self</code>（相当于 <code>this</code>）。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">默认值 <span class="topic">CTOR</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java <span style="color:var(--text-muted);font-weight:400">需要重载</span></div>
+<pre><code class="language-java">public Dog(String name) { this(name, 1); }
+public Dog(String name, int age) {
+    this.name = name;
+    this.age = age;
+}
+
+new Dog("Rex");
+new Dog("Rex", 3);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">class Dog:
+    def __init__(self, name, age=1):    # 默认参数
+        self.name = name
+        self.age = age
+
+Dog("Rex")             # age 默认 1
+Dog("Rex", 3)
+Dog("Rex", age=3)      # 关键字</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">备用构造方法（@classmethod） <span class="topic">CTOR</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public class Dog {
+    public static Dog fromString(String s) {
+        String[] parts = s.split(",");
+        return new Dog(parts[0], Integer.parseInt(parts[1]));
+    }
+}
+
+Dog d = Dog.fromString("Rex,3");</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">class Dog:
+    def __init__(self, name, age):
+        self.name = name; self.age = age
+
+    @classmethod
+    def from_string(cls, s):
+        name, age = s.split(",")
+        return cls(name, int(age))
+
+d = Dog.from_string("Rex,3")</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><code>@classmethod</code> 装饰的方法第一个参数是 <code>cls</code>（类本身），常用作"备用构造器"。比 Java 静态工厂方法更常用。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">dataclass（自动生成构造） <span class="topic">CTOR</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java 14+ record</div>
+<pre><code class="language-java">public record Point(double x, double y) {}
+// 自动有 constructor, equals, hashCode, toString
+
+Point p = new Point(1, 2);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python @dataclass</div>
+<pre><code class="language-python">from dataclasses import dataclass
+
+@dataclass
+class Point:
+    x: float
+    y: float = 0.0      # 带默认值
+
+p = Point(1, 2)
+print(p)        # Point(x=1, y=2)  自动 __repr__
+p == Point(1, 2)   # True   自动 __eq__</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 19. 方法 ====== -->
+<section id="cls-method" class="chapter">
+  <h2><span class="num">19</span>方法（实例 / 类 / 静态）</h2>
+
+  <div class="concept">
+    <div class="concept-head">实例方法 <span class="topic">METHOD</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public class Dog {
+    String name;
+
+    public String bark() {
+        return name + " says woof";
+    }
+}
+
+Dog d = new Dog();
+d.bark();</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">class Dog:
+    def __init__(self, name):
+        self.name = name
+
+    def bark(self):              # ← self 必须是第一个参数！
+        return f"{self.name} says woof"
+
+d = Dog("Rex")
+d.bark()</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">关键</span>：每个实例方法第一个参数必须是 <code>self</code>。调用时 <code>d.bark()</code>，Python 自动把 <code>d</code> 作为 <code>self</code> 传入。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">静态方法 <span class="topic">METHOD</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public class Math2 {
+    public static int square(int x) {
+        return x * x;
+    }
+}
+
+Math2.square(5);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">class Math2:
+    @staticmethod
+    def square(x):
+        return x * x
+
+Math2.square(5)
+# 也可实例调用，但不推荐：
+Math2().square(5)</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">类方法（cls 而非 self） <span class="topic">METHOD</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java <span style="color:var(--text-muted);font-weight:400">无原生对等</span></div>
+<pre><code class="language-java">// Java 没有"类方法"概念
+// 通过反射可访问 Class&lt;?&gt;
+public static void doWith(Class&lt;?&gt; cls) { ... }</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">class Counter:
+    count = 0
+
+    @classmethod
+    def total(cls):              # cls = 类本身
+        return cls.count
+
+    @classmethod
+    def reset(cls):
+        cls.count = 0
+
+Counter.total()
+Counter.reset()</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">三种方法对比 <span class="topic">METHOD</span></div>
+    <div class="concept-body">
+      <div class="concept-side python" style="grid-column: 1 / -1; border-right: none;"><div class="label">Python · 三种方法的区别</div>
+<pre><code class="language-python">class Foo:
+    def instance(self):       # 接收实例
+        return self
+
+    @classmethod
+    def klass(cls):            # 接收类
+        return cls
+
+    @staticmethod
+    def static():              # 不接收任何特殊参数
+        return "static"
+
+# 调用方式
+f = Foo()
+f.instance()         # &lt;Foo at ...&gt;
+Foo.klass()          # &lt;class 'Foo'&gt;
+Foo.static()         # 'static'
+
+# 区别速记：
+#   instance method → self → 操作具体对象
+#   class method    → cls  → 操作类（如备用构造器、类级状态）
+#   static method   → 无    → 普通函数，碰巧放类里组织</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 20. 访问控制 ====== -->
+<section id="cls-access" class="chapter">
+  <h2><span class="num">20</span>访问控制（没有真正的 private！）</h2>
+
+  <div class="concept">
+    <div class="concept-head">访问修饰符 <span class="topic">ACCESS</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public class Account {
+    public    int x;     // 公开
+    protected int y;     // 子类/包内可访问
+    private   int z;     // 仅本类
+              int w;     // 包私有
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python <span style="color:var(--text-muted);font-weight:400">全靠约定</span></div>
+<pre><code class="language-python">class Account:
+    def __init__(self):
+        self.public = 1       # 公开
+        self._protected = 2   # 约定：内部用（仍可访问）
+        self.__private = 3    # 名字改写为 _Account__private
+
+a = Account()
+a.public          # 1
+a._protected      # 2  能访问，但 IDE 警告
+a.__private       # AttributeError
+a._Account__private  # 3  绕过去了（不要这么干）</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">哲学差异</span>：Python 信奉"我们都是成年人"。<code>_</code> 前缀只是约定，没有真正的访问控制。<code>__</code> 双下划线会触发"<strong>name mangling</strong>"（名字改写），变得难以从外部访问，但仍可绕过。</div>
+  </div>
+</section>
+
+<!-- ====== 21. 属性（getter/setter） ====== -->
+<section id="cls-prop" class="chapter">
+  <h2><span class="num">21</span>属性（@property 替代 getter/setter）</h2>
+
+  <div class="concept">
+    <div class="concept-head">getter/setter 模式 <span class="topic">PROPERTY</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java（标准做法）</div>
+<pre><code class="language-java">public class User {
+    private int age;
+
+    public int getAge() { return age; }
+    public void setAge(int age) {
+        if (age &lt; 0) throw new IllegalArgumentException();
+        this.age = age;
+    }
+}
+
+User u = new User();
+u.setAge(30);
+int a = u.getAge();</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python（用 @property）</div>
+<pre><code class="language-python">class User:
+    def __init__(self):
+        self._age = 0
+
+    @property
+    def age(self):                # 看似字段，实为方法
+        return self._age
+
+    @age.setter
+    def age(self, v):
+        if v &lt; 0:
+            raise ValueError
+        self._age = v
+
+u = User()
+u.age = 30        # ← 像访问字段，实际走 setter
+print(u.age)      # ← 像访问字段，实际走 getter</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">Python 哲学</span>：先用普通字段 <code>self.x = 0</code>，需要校验/计算时再加 <code>@property</code>，<strong>调用方代码完全不用改</strong>。Java 必须一开始就 getter/setter。</div>
+  </div>
+</section>
+
+<!-- ====== 22. 继承 ====== -->
+<section id="cls-inherit" class="chapter">
+  <h2><span class="num">22</span>继承</h2>
+
+  <div class="concept">
+    <div class="concept-head">基本继承 <span class="topic">INHERIT</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public class Animal {
+    public void eat() {
+        System.out.println("eating");
+    }
+}
+
+public class Dog extends Animal {
+    public void bark() {
+        System.out.println("woof");
+    }
+}
+
+Dog d = new Dog();
+d.eat();
+d.bark();</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">class Animal:
+    def eat(self):
+        print("eating")
+
+class Dog(Animal):    # ← 括号里是父类
+    def bark(self):
+        print("woof")
+
+d = Dog()
+d.eat()
+d.bark()</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">重写 + 调用父类 <span class="topic">INHERIT</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public class Cat extends Animal {
+    @Override
+    public void eat() {
+        super.eat();       // 调父类
+        System.out.println("cat eats fish");
+    }
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">class Cat(Animal):
+    def eat(self):
+        super().eat()      # 调父类（无 @Override）
+        print("cat eats fish")
+
+# Python 没有 @Override 注解
+# 重写就是定义同名方法</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">构造方法的继承 <span class="topic">INHERIT</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public class Dog extends Animal {
+    private int age;
+
+    public Dog(String name, int age) {
+        super(name);     // 必须在第一行
+        this.age = age;
+    }
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">class Dog(Animal):
+    def __init__(self, name, age):
+        super().__init__(name)    # 调父类构造
+        self.age = age</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">多重继承 <span class="topic">INHERIT</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java <span style="color:var(--text-muted);font-weight:400">不支持</span></div>
+<pre><code class="language-java">// 单继承 + 多接口
+class Fish extends Animal implements Swimmer, Edible {
+    // ...
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python <span style="color:var(--text-muted);font-weight:400">真·多重继承</span></div>
+<pre><code class="language-python">class Animal: ...
+class Swimmer: ...
+class Edible: ...
+
+class Fish(Animal, Swimmer, Edible):    # 真多继承
+    pass
+
+# 看方法解析顺序（MRO，C3 算法）
+print(Fish.__mro__)</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">独有</span>：Python 真支持多重继承，方法查找按 <strong>MRO</strong>（C3 线性化）顺序。Java 用接口绕过菱形问题。</div>
+  </div>
+</section>
+
+<!-- ====== 23. 接口 / 抽象类 ====== -->
+<section id="cls-iface" class="chapter">
+  <h2><span class="num">23</span>接口 / 抽象类</h2>
+
+  <div class="concept">
+    <div class="concept-head">抽象类 <span class="topic">ABSTRACT</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public abstract class Shape {
+    public abstract double area();
+
+    public void describe() {       // 普通方法
+        System.out.println("area: " + area());
+    }
+}
+
+public class Circle extends Shape {
+    private double r;
+    public Circle(double r) { this.r = r; }
+    public double area() { return 3.14 * r * r; }
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python（用 ABC）</div>
+<pre><code class="language-python">from abc import ABC, abstractmethod
+
+class Shape(ABC):
+    @abstractmethod
+    def area(self) -&gt; float: ...
+
+    def describe(self):           # 普通方法
+        print(f"area: {self.area()}")
+
+class Circle(Shape):
+    def __init__(self, r): self.r = r
+    def area(self): return 3.14 * self.r ** 2
+
+Shape()       # TypeError: 抽象类不能实例化</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">接口 <span class="topic">INTERFACE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public interface Drawable {
+    void draw();        // 抽象方法
+    default void clear() {       // Java 8+ 默认方法
+        System.out.println("clear");
+    }
+}
+
+public class Square implements Drawable {
+    public void draw() { System.out.println("draw"); }
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python（Protocol，结构子类型）</div>
+<pre><code class="language-python">from typing import Protocol
+
+class Drawable(Protocol):
+    def draw(self) -&gt; None: ...
+
+class Square:
+    def draw(self): print("draw")
+    # ← 不需要 implements Drawable
+
+def render(d: Drawable):
+    d.draw()
+
+render(Square())   # 通过！只要有 draw() 方法</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">关键</span>：Python 的 <code>Protocol</code> 是 <strong>结构子类型</strong>，"长得像就行"，不需要继承声明。这就是"鸭子类型"的形式化版本。</div>
+  </div>
+</section>
+
+<!-- ====== 24. 魔术方法 ====== -->
+<section id="cls-magic" class="chapter">
+  <h2><span class="num">24</span>常用魔术方法（双下划线方法）</h2>
+
+  <div class="concept">
+    <div class="concept-head">toString / equals / hashCode <span class="topic">MAGIC</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public class Dog {
+    String name;
+
+    @Override
+    public String toString() {
+        return "Dog(" + name + ")";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof Dog d)) return false;
+        return name.equals(d.name);
+    }
+
+    @Override
+    public int hashCode() {
+        return name.hashCode();
+    }
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">class Dog:
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):              # 等于 toString
+        return f"Dog({self.name})"
+
+    def __repr__(self):              # 调试用，更详细
+        return f"Dog(name={self.name!r})"
+
+    def __eq__(self, other):         # 等于 equals
+        return isinstance(other, Dog) and self.name == other.name
+
+    def __hash__(self):              # 等于 hashCode
+        return hash(self.name)</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">支持 len() / in / 索引 <span class="topic">MAGIC</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">// 必须实现 Iterable, Collection 等接口
+public class Bag implements Iterable&lt;String&gt; {
+    private List&lt;String&gt; items = new ArrayList&lt;&gt;();
+    public int size() { return items.size(); }
+    public boolean contains(String s) { return items.contains(s); }
+    public String get(int i) { return items.get(i); }
+    public Iterator&lt;String&gt; iterator() { return items.iterator(); }
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python（魔术方法）</div>
+<pre><code class="language-python">class Bag:
+    def __init__(self): self._items = []
+
+    def __len__(self):                     # 支持 len(bag)
+        return len(self._items)
+
+    def __contains__(self, x):             # 支持 x in bag
+        return x in self._items
+
+    def __getitem__(self, i):              # 支持 bag[0]
+        return self._items[i]
+
+    def __iter__(self):                    # 支持 for x in bag
+        return iter(self._items)
+
+b = Bag()
+len(b);  "x" in b;  b[0];  for x in b: ...</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">运算符重载 <span class="topic">MAGIC</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java <span style="color:var(--text-muted);font-weight:400">不支持</span></div>
+<pre><code class="language-java">// Java 不支持运算符重载
+// 必须用方法
+Vector v3 = v1.add(v2);
+Vector s  = v1.scale(2);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python（重载几乎所有运算符）</div>
+<pre><code class="language-python">class Vector:
+    def __init__(self, x, y): self.x, self.y = x, y
+
+    def __add__(self, other):              # +
+        return Vector(self.x + other.x, self.y + other.y)
+
+    def __sub__(self, other):              # -
+        return Vector(self.x - other.x, self.y - other.y)
+
+    def __mul__(self, k):                  # *
+        return Vector(self.x * k, self.y * k)
+
+    def __eq__(self, other):               # ==
+        return self.x == other.x and self.y == other.y
+
+v3 = v1 + v2     # 像数学公式一样
+v4 = v1 * 2</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">魔术方法速查 <span class="topic">MAGIC</span></div>
+    <div class="concept-body">
+      <div class="concept-side python" style="grid-column: 1 / -1; border-right: none;"><div class="label">Python · 完整对照</div>
+<pre><code class="language-python">__init__       # 构造方法
+__del__        # 析构（不要依赖）
+__str__        # str(x), print(x) → 用户友好
+__repr__       # repr(x) → 调试详细
+__eq__         # ==
+__lt__ __gt__  # &lt;  &gt;
+__hash__       # hash(x)
+__len__        # len(x)
+__iter__       # for ... in x
+__next__       # next(x)
+__contains__   # x in y
+__getitem__    # x[i]
+__setitem__    # x[i] = v
+__delitem__    # del x[i]
+__call__       # x()  让对象可调用
+__enter__ __exit__   # with x:
+__add__ __sub__ __mul__ __truediv__   # + - * /</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 25. 实例化与 isinstance ====== -->
+<section id="cls-instance" class="chapter">
+  <h2><span class="num">25</span>实例化与 instanceof</h2>
+
+  <div class="concept">
+    <div class="concept-head">创建对象 <span class="topic">INSTANCE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">Dog d = new Dog("Rex", 3);
+Dog d2 = new Dog();     // 默认构造</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">d = Dog("Rex", 3)       # 没有 new
+d2 = Dog()              # 调 __init__ 默认参数</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">类型判断 <span class="topic">INSTANCE</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">if (obj instanceof Dog) {
+    Dog d = (Dog) obj;
+    d.bark();
+}
+
+// Java 16+ 模式匹配
+if (obj instanceof Dog d) {
+    d.bark();
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">if isinstance(obj, Dog):
+    obj.bark()           # 不需要类型转换！
+
+# 检查多个类型
+if isinstance(obj, (Dog, Cat)):
+    ...
+
+# 取得类型对象
+type(obj)               # &lt;class 'Dog'&gt;
+type(obj) is Dog        # True，但不考虑继承
+type(obj).__name__      # 'Dog'</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">Python 不需要类型转换（强转），因为变量本来就没有静态类型。</div>
+  </div>
+</section>
+
+<!-- ====== 26. 异常 ====== -->
+<section id="exc" class="chapter">
+  <h2><span class="num">26</span>异常处理</h2>
+
+  <div class="concept">
+    <div class="concept-head">try / catch / finally <span class="topic">EXCEPTION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">try {
+    risky();
+} catch (IOException e) {
+    handleIO(e);
+} catch (Exception e) {
+    handleOther(e);
+} finally {
+    cleanup();
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">try:
+    risky()
+except IOError as e:           # ← except，不是 catch
+    handle_io(e)
+except Exception as e:
+    handle_other(e)
+else:
+    print("no exception")       # ← Python 独有
+finally:
+    cleanup()</code></pre>
+      </div>
+    </div>
+    <div class="concept-note">关键字是 <code>except</code>（不是 <code>catch</code>），多了 <code>else</code> 子句（仅在 try 没异常时执行）。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">抛出异常 <span class="topic">EXCEPTION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">throw new IllegalArgumentException("bad");
+throw new RuntimeException("oops");
+
+// 必须声明 checked
+public void f() throws IOException { ... }</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">raise ValueError("bad")
+raise RuntimeError("oops")
+
+# Python 没有 checked exception
+# 不需要声明会抛什么</code></pre>
+      </div>
+    </div>
+    <div class="concept-note"><span class="key">关键</span>：Python <strong>没有 checked exception</strong>。所有异常都是运行时的，编译器不强制处理。</div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">自定义异常 <span class="topic">EXCEPTION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">public class InvalidUserError extends Exception {
+    public InvalidUserError(String msg) {
+        super(msg);
+    }
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">class InvalidUserError(Exception):
+    """用户数据无效"""
+    pass
+
+# 带额外字段
+class NotEnoughBalance(Exception):
+    def __init__(self, current, needed):
+        self.current = current
+        self.needed = needed
+        super().__init__(f"need {needed}, have {current}")</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">资源管理（try-with-resources / with） <span class="topic">EXCEPTION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java 7+</div>
+<pre><code class="language-java">try (BufferedReader r = new BufferedReader(new FileReader("a.txt"))) {
+    String line = r.readLine();
+}
+// 自动关闭</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">with open("a.txt") as f:
+    data = f.read()
+# 自动 close
+
+# 多资源
+with open("in") as r, open("out", "w") as w:
+    w.write(r.read())</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 27. 集合 ====== -->
+<section id="coll" class="chapter">
+  <h2><span class="num">27</span>集合操作（速查）</h2>
+
+  <div class="concept">
+    <div class="concept-head">List / ArrayList <span class="topic">COLLECTION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">List&lt;Integer&gt; xs = new ArrayList&lt;&gt;();
+xs.add(1);
+xs.add(0, 99);          // 插入到开头
+int n = xs.get(0);
+xs.set(0, 100);
+xs.remove(0);
+boolean has = xs.contains(2);
+xs.size();
+xs.sort(null);
+List&lt;Integer&gt; sub = xs.subList(1, 3);</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">xs = []
+xs.append(1)
+xs.insert(0, 99)
+n = xs[0]
+xs[0] = 100
+xs.pop(0)             # 删除 + 返回
+2 in xs               # in 运算符
+len(xs)
+xs.sort()
+sub = xs[1:3]         # 切片返回新列表
+
+# 推导式（Java Stream 等价）
+[x*2 for x in xs if x &gt; 0]</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">Map / dict <span class="topic">COLLECTION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">Map&lt;String, Integer&gt; m = new HashMap&lt;&gt;();
+m.put("a", 1);
+int v = m.get("a");
+int s = m.getOrDefault("c", 0);
+m.containsKey("a");
+m.remove("a");
+for (var e : m.entrySet()) {
+    System.out.println(e.getKey() + "=" + e.getValue());
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">m = {"a": 1}
+m["b"] = 2                # put
+v = m["a"]                # get（缺失抛 KeyError）
+s = m.get("c", 0)         # 安全 get
+"a" in m                  # 检查键
+del m["a"]
+for k, v in m.items():
+    print(f"{k}={v}")</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">Set / HashSet <span class="topic">COLLECTION</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">Set&lt;Integer&gt; s = new HashSet&lt;&gt;(List.of(1, 2, 3));
+s.add(4);
+s.contains(1);
+s.remove(1);
+
+// 集合运算
+Set&lt;Integer&gt; u = new HashSet&lt;&gt;(a);
+u.addAll(b);    // 并集</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python（运算符级）</div>
+<pre><code class="language-python">s = {1, 2, 3}             # 字面量
+s.add(4)
+1 in s
+s.remove(1)               # 找不到抛异常
+s.discard(1)              # 找不到无操作
+
+# 集合运算（运算符）
+a | b      # 并集
+a &amp; b      # 交集
+a - b      # 差集
+a ^ b      # 对称差</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 28. I/O ====== -->
+<section id="io" class="chapter">
+  <h2><span class="num">28</span>输入输出与文件</h2>
+
+  <div class="concept">
+    <div class="concept-head">控制台输入输出 <span class="topic">IO</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">System.out.println("hello");
+System.out.print("no newline");
+System.out.printf("%d %s\n", 1, "x");
+
+Scanner sc = new Scanner(System.in);
+String line = sc.nextLine();
+int n = sc.nextInt();</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">print("hello")            # 自动换行
+print("no newline", end="")
+print("multiple", "args", sep=" - ")
+print(f"{1} {'x'}")
+
+line = input("prompt: ")
+n = int(input())          # 必须显式转</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">读文件 <span class="topic">IO</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">String all = Files.readString(Path.of("a.txt"));
+List&lt;String&gt; lines = Files.readAllLines(Path.of("a.txt"));
+
+// 流式
+try (var br = Files.newBufferedReader(Path.of("a.txt"))) {
+    String line;
+    while ((line = br.readLine()) != null) { ... }
+}</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python"># 一次性读
+text = open("a.txt").read()
+
+# 推荐：with 自动关闭
+with open("a.txt") as f:
+    text = f.read()
+    # 或逐行
+    for line in f:
+        process(line)
+
+# 用 pathlib 更现代
+from pathlib import Path
+text = Path("a.txt").read_text()
+lines = Path("a.txt").read_text().splitlines()</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head">写文件 <span class="topic">IO</span></div>
+    <div class="concept-body">
+      <div class="concept-side java"><div class="label">Java</div>
+<pre><code class="language-java">Files.writeString(Path.of("out.txt"), "hello");
+Files.write(Path.of("out.txt"), List.of("line1", "line2"));</code></pre>
+      </div>
+      <div class="concept-side python"><div class="label">Python</div>
+<pre><code class="language-python">with open("out.txt", "w") as f:
+    f.write("hello")
+
+# pathlib
+Path("out.txt").write_text("hello")
+
+# 写多行
+with open("out.txt", "w") as f:
+    f.writelines(["line1\n", "line2\n"])</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 29. 速查总结 ====== -->
+<section id="summary" class="chapter">
+  <h2><span class="num">29</span>速查总结表</h2>
+  <p class="lead">最易混淆的差异一页对照。</p>
+
+  <table>
+    <thead><tr><th>概念</th><th>Java</th><th>Python</th><th>关键差异</th></tr></thead>
+    <tbody>
+      <tr><td>变量声明</td><td><code>int x = 1;</code></td><td><code>x = 1</code></td><td>无类型，无 <code>;</code></td></tr>
+      <tr><td>常量</td><td><code>final</code></td><td>大写约定</td><td>Python 没有真常量</td></tr>
+      <tr><td>空值</td><td><code>null</code></td><td><code>None</code></td><td>首字母大写</td></tr>
+      <tr><td>布尔</td><td><code>true / false</code></td><td><code>True / False</code></td><td>首字母大写，bool 是 int 子类</td></tr>
+      <tr><td>除法</td><td><code>/</code> 整除</td><td><code>/</code> 真除，<code>//</code> 整除</td><td>极易踩坑</td></tr>
+      <tr><td>幂</td><td><code>Math.pow</code></td><td><code>**</code></td><td>Python 是运算符</td></tr>
+      <tr><td>自增</td><td><code>i++</code></td><td><code>i += 1</code></td><td>Python 没有 ++</td></tr>
+      <tr><td>逻辑</td><td><code>&amp;&amp; \|\| !</code></td><td><code>and or not</code></td><td>关键字</td></tr>
+      <tr><td>三元</td><td><code>c ? a : b</code></td><td><code>a if c else b</code></td><td>语序变了</td></tr>
+      <tr><td>等于</td><td><code>.equals()</code></td><td><code>==</code></td><td>调 <code>__eq__</code></td></tr>
+      <tr><td>身份比较</td><td><code>==</code> (对象)</td><td><code>is</code></td><td><code>None</code> 比较必用 <code>is</code></td></tr>
+      <tr><td>类型判断</td><td><code>instanceof</code></td><td><code>isinstance(x, T)</code></td><td>函数</td></tr>
+      <tr><td>长度</td><td><code>.length</code> / <code>.size()</code></td><td><code>len(x)</code></td><td>全局函数</td></tr>
+      <tr><td>包含</td><td><code>.contains()</code></td><td><code>in</code></td><td>运算符</td></tr>
+      <tr><td>列表字面量</td><td><code>List.of(1,2,3)</code></td><td><code>[1,2,3]</code></td><td>原生</td></tr>
+      <tr><td>map 字面量</td><td><code>Map.of("a",1)</code></td><td><code>{"a": 1}</code></td><td>原生</td></tr>
+      <tr><td>set 字面量</td><td><code>Set.of(1,2)</code></td><td><code>{1, 2}</code></td><td>原生</td></tr>
+      <tr><td>遍历带索引</td><td><code>for(int i...)</code></td><td><code>enumerate(x)</code></td><td>更优雅</td></tr>
+      <tr><td>多返回值</td><td>需 record</td><td>原生 tuple</td><td><code>a, b = f()</code></td></tr>
+      <tr><td>默认参数</td><td>需重载</td><td>原生</td><td>注意可变默认值陷阱</td></tr>
+      <tr><td>this</td><td><code>this</code></td><td><code>self</code></td><td>必须显式参数</td></tr>
+      <tr><td>构造</td><td><code>new Dog()</code></td><td><code>Dog()</code></td><td>无 new</td></tr>
+      <tr><td>构造方法</td><td>同类名</td><td><code>__init__</code></td><td>魔术方法</td></tr>
+      <tr><td>静态方法</td><td><code>static</code></td><td><code>@staticmethod</code></td><td>装饰器</td></tr>
+      <tr><td>类方法</td><td>无</td><td><code>@classmethod</code></td><td>独有</td></tr>
+      <tr><td>getter/setter</td><td>显式方法</td><td><code>@property</code></td><td>透明替换</td></tr>
+      <tr><td>访问控制</td><td><code>public/private</code></td><td><code>_</code> 约定</td><td>无强制</td></tr>
+      <tr><td>继承</td><td><code>extends</code></td><td><code>class C(P):</code></td><td>支持多继承</td></tr>
+      <tr><td>调父类</td><td><code>super()</code></td><td><code>super().__init__()</code></td><td>显式调</td></tr>
+      <tr><td>接口</td><td><code>interface</code></td><td><code>Protocol</code></td><td>结构子类型</td></tr>
+      <tr><td>抽象类</td><td><code>abstract class</code></td><td><code>ABC</code></td><td>需要继承</td></tr>
+      <tr><td>抛异常</td><td><code>throw new X</code></td><td><code>raise X()</code></td><td>无 new</td></tr>
+      <tr><td>checked exception</td><td>有</td><td>无</td><td>不需要 throws</td></tr>
+      <tr><td>资源管理</td><td><code>try-with-resources</code></td><td><code>with</code></td><td>用途更广</td></tr>
+      <tr><td>主入口</td><td><code>main(String[])</code></td><td><code>if __name__ == "__main__"</code></td><td>约定</td></tr>
+      <tr><td>注释</td><td><code>// /* */</code></td><td><code>#</code> / <code>"""..."""</code></td><td>三引号是 docstring</td></tr>
+      <tr><td>命名</td><td><code>camelCase</code></td><td><code>snake_case</code></td><td>类仍 PascalCase</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout aha">
+    <div class="callout-title">最重要的 5 句话</div>
+    <ol style="margin-top:8px;">
+      <li>变量没有类型，<strong>对象</strong>有类型——所以不需要声明类型。</li>
+      <li>函数/类/模块都是对象——可以赋值、传参、返回。</li>
+      <li>变量是"标签"不是"盒子"——<code>a = b</code> 不复制，改 <code>b</code> 会影响 <code>a</code>（如果可变）。</li>
+      <li><code>self</code> 是显式参数，不是隐式 <code>this</code>——所有方法第一个参数都是它。</li>
+      <li><code>None</code> 用 <code>is</code> 比，<code>/</code> 是真除，<code>i++</code> 不存在——三个最常见的"想当然错误"。</li>
+    </ol>
+  </div>
+</section>
+
+<footer>
+  <p>基础语法逐条对照 · 配合 <a href="index.html" style="color:var(--accent);">完整教程</a> 使用</p>
+</footer>
+
+</main>
+</div>
+
+<script>
+const tocLinks = document.querySelectorAll('aside.toc a');
+const sections = document.querySelectorAll('section[id]');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const id = e.target.id;
+      tocLinks.forEach(a => a.classList.remove('active'));
+      const link = document.querySelector(`aside.toc a[href="#${id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-30% 0px -60% 0px', threshold: 0 });
+
+sections.forEach(s => observer.observe(s));
+
+hljs.highlightAll();
+
+document.querySelectorAll('aside.toc a').forEach(a => {
+  a.addEventListener('click', (e) => {
+    const href = a.getAttribute('href');
+    if (href?.startsWith('#')) {
+      e.preventDefault();
+      document.querySelector(href)?.scrollIntoView({ behavior: 'smooth' });
+      history.pushState(null, '', href);
+    }
+  });
+});
+</script>
+</body>
+</html>
