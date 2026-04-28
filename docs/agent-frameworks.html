@@ -592,7 +592,7 @@ h3:hover::before, h4:hover::before {
 <li class="toc-h3"><a href="#83">§8.3 接入点决策矩阵</a></li>
 <li class="toc-h3"><a href="#84-rag-skills-sessions-kb">§8.4 与现有 RAG / Skills / Sessions / KB 的关系</a></li>
 <li class="toc-h3"><a href="#85-3">§8.5 渐进式迁移路径：3 步走</a></li>
-<li class="toc-h3"><a href="#86">§8.6 部署形态四选一</a></li>
+<li class="toc-h3"><a href="#86">§8.6 部署形态四选一（架构权衡深度）</a></li>
 <li class="toc-h3"><a href="#87-sessions-thread_id">§8.7 Sessions 与 thread_id 映射设计</a></li>
 <li class="toc-h3"><a href="#88-skills-langgraph">§8.8 Skills 与 LangGraph 节点 / 子图的关系</a></li>
 <li class="toc-h3"><a href="#89-api-restful-langgraph">§8.9 API 兼容层设计：既有 RESTful 接口怎么挂 LangGraph</a></li>
@@ -702,14 +702,14 @@ h3:hover::before, h4:hover::before {
 <li class="toc-h3"><a href="#langchain-lcel">LangChain LCEL 速查</a></li>
 <li class="toc-h3"><a href="#langgraph-stategraph">LangGraph StateGraph 速查</a></li>
 <li class="toc-h2"><a href="#b">附录 B — 参考链接</a></li>
-<li class="toc-h3"><a href="#_268">论文</a></li>
-<li class="toc-h3"><a href="#_269">官方文档</a></li>
-<li class="toc-h3"><a href="#_270">业界博客</a></li>
+<li class="toc-h3"><a href="#_271">论文</a></li>
+<li class="toc-h3"><a href="#_272">官方文档</a></li>
+<li class="toc-h3"><a href="#_273">业界博客</a></li>
 <li class="toc-h2"><a href="#c">附录 C — 各章反模式汇总速查</a></li>
 <li class="toc-h2"><a href="#d">附录 D — 版本时间线</a></li>
 <li class="toc-h3"><a href="#langchain_2">LangChain</a></li>
 <li class="toc-h3"><a href="#langgraph_5">LangGraph</a></li>
-<li class="toc-h3"><a href="#_271">生态里程碑</a></li>
+<li class="toc-h3"><a href="#_274">生态里程碑</a></li>
 <li class="toc-h2"><a href="#e-202604">附录 E — 完整生态版本快照表（2026.04）</a></li>
 <li class="toc-h2"><a href="#f">附录 F — 中外生态对比表</a></li>
 <li class="toc-h2"><a href="#g-mermaid-31">附录 G — Mermaid 索引（31 张）</a></li>
@@ -730,17 +730,17 @@ h3:hover::before, h4:hover::before {
 <li class="toc-h3"><a href="#3parallelization">模式 3：并行化（Parallelization）</a></li>
 <li class="toc-h3"><a href="#4-orchestrator-workers">模式 4：协调-工作者（Orchestrator-Workers）</a></li>
 <li class="toc-h3"><a href="#5-evaluator-optimizer">模式 5：评估-优化（Evaluator-Optimizer）</a></li>
-<li class="toc-h3"><a href="#_272">五模式组合</a></li>
+<li class="toc-h3"><a href="#_275">五模式组合</a></li>
 <li class="toc-h2"><a href="#j-langchain-langgraph">附录 J — LangChain → LangGraph 迁移速查表</a></li>
 <li class="toc-h3"><a href="#api">API 对照</a></li>
 <li class="toc-h3"><a href="#memory-checkpointer">Memory → Checkpointer 迁移</a></li>
-<li class="toc-h3"><a href="#_273">完整迁移示例</a></li>
+<li class="toc-h3"><a href="#_276">完整迁移示例</a></li>
 <li class="toc-h2"><a href="#k-openai-anthropic-google">附录 K — OpenAI / Anthropic / Google 工具调用三家协议对照</a></li>
 <li class="toc-h3"><a href="#openai-function-calling202306-tools202311">OpenAI Function Calling（2023.06）/ Tools（2023.11）</a></li>
 <li class="toc-h3"><a href="#anthropic-tool-use202405">Anthropic Tool Use（2024.05）</a></li>
 <li class="toc-h3"><a href="#google-function-declarations2024">Google Function Declarations（2024）</a></li>
-<li class="toc-h3"><a href="#_274">字段对照表</a></li>
-<li class="toc-h3"><a href="#_275">跨厂商兼容工具（推荐）</a></li></ul>
+<li class="toc-h3"><a href="#_277">字段对照表</a></li>
+<li class="toc-h3"><a href="#_278">跨厂商兼容工具（推荐）</a></li></ul>
 </nav>
 <main id="content">
 <h1 id="agent"><span class="pron">Agent<span class="ipa">/ˈeɪdʒənt/</span><button class="speak-btn" onclick="speak('Agent')" title="点击朗读 Agent">🔊</button></span> 框架系统教程 + 全景手册</h1>
@@ -14720,48 +14720,158 @@ Step 3: LangGraph + Checkpoint + HITL
 </code></pre>
 <p><strong>小结一行</strong>：3 步路径每步 2-3 周，1-2 个月可从直接 SDK 演进到生产级 LangGraph 智能体。</p>
 <hr />
-<h3 id="86">§8.6 部署形态四选一</h3>
+<h3 id="86">§8.6 部署形态四选一（架构权衡深度）</h3>
+<h4 id="4_2">4 种形态的工程权衡</h4>
 <table>
 <thead>
 <tr>
 <th>形态</th>
 <th>描述</th>
 <th>适合</th>
+<th>进程 / 实例数</th>
+<th>横向扩展</th>
+<th>故障隔离</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>嵌入 <a href="services/api-server">api-server</a>（直接 import langgraph）</td>
-<td>LangGraph 当库</td>
-<td><strong>MVP 起步</strong>，最简单</td>
+<td>嵌入 <a href="services/api-server">api-server</a></td>
+<td><code>import langgraph</code> 直接调</td>
+<td><strong>MVP 起步</strong></td>
+<td>与 api-server 同进程</td>
+<td>受 api-server 限制</td>
+<td>弱（智能体爆 → api-server 也爆）</td>
 </tr>
 <tr>
 <td>独立 LangGraph Server 自托管</td>
-<td><code>langgraph up</code> 起服务</td>
+<td><code>langgraph up</code> 起独立服务</td>
 <td>想要 LangGraph 标准 API</td>
+<td>独立进程</td>
+<td>独立扩缩容</td>
+<td><strong>强</strong></td>
 </tr>
 <tr>
 <td>容器化（Docker / k8s）</td>
-<td><code>langgraph build</code> + 部署</td>
-<td>需要独立扩缩容</td>
+<td><code>langgraph build</code> 容器镜像</td>
+<td>需要 k8s 编排</td>
+<td>独立 Pod</td>
+<td>k8s HPA 自动扩</td>
+<td>强</td>
 </tr>
 <tr>
 <td>LangGraph Platform / Cloud</td>
 <td>LangChain 商业托管</td>
 <td>不想运维</td>
+<td>厂商管理</td>
+<td>厂商弹性</td>
+<td>厂商保证</td>
 </tr>
 </tbody>
 </table>
-<h4 id="_170">推荐顺序</h4>
+<h4 id="4_3">4 种形态的权衡矩阵</h4>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>嵌入</th>
+<th>自托管 Server</th>
+<th>容器化</th>
+<th>Cloud</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>实施速度</td>
+<td><strong>快</strong>（1 天）</td>
+<td>中（3 天）</td>
+<td>慢（1 周）</td>
+<td>快（半天）</td>
+</tr>
+<tr>
+<td>运维成本</td>
+<td>与现有服务合并</td>
+<td>中（多一个服务）</td>
+<td>高（k8s + 镜像 + 监控）</td>
+<td>低（厂商承担）</td>
+</tr>
+<tr>
+<td>单实例成本</td>
+<td>0 增量</td>
+<td>+CPU/内存</td>
+<td>+CPU/内存+存储</td>
+<td>按 thread/token 计</td>
+</tr>
+<tr>
+<td>性能隔离</td>
+<td>弱（共享内存 GIL）</td>
+<td><strong>强</strong>（独立进程）</td>
+<td>强</td>
+<td>强</td>
+</tr>
+<tr>
+<td>升级独立性</td>
+<td>与 api-server 绑定</td>
+<td>独立</td>
+<td>独立</td>
+<td>厂商自动</td>
+</tr>
+<tr>
+<td>数据合规</td>
+<td>简单（同库）</td>
+<td>中</td>
+<td>中</td>
+<td><strong>可能违规</strong>（数据出境）</td>
+</tr>
+<tr>
+<td>适合规模</td>
+<td>DAU &lt; 1k</td>
+<td>1k-100k</td>
+<td>100k+</td>
+<td>任意</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_170">关键决策点：什么时候从"嵌入"迁到"独立"</h4>
+<table>
+<thead>
+<tr>
+<th>触发信号</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>api-server CPU &gt; 70% 持续</td>
+<td>智能体推理挤压主接口性能</td>
+</tr>
+<tr>
+<td>单 invoke &gt; 30s</td>
+<td>阻塞 api-server 其他请求</td>
+</tr>
+<tr>
+<td>智能体内存 &gt; api-server 总内存 30%</td>
+<td>内存压力大</td>
+</tr>
+<tr>
+<td>不同业务智能体要不同扩缩容策略</td>
+<td>嵌入做不到独立扩展</td>
+</tr>
+<tr>
+<td>独立部署有合规需求</td>
+<td>例如 ai-runtime 在专属 VPC</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_171">推荐顺序（含触发条件）</h4>
 <ol>
-<li><strong>第 1-3 个月</strong>：嵌入 api-server</li>
-<li><strong>业务起来</strong>：容器化独立部署</li>
-<li><strong>可选</strong>：上 Platform / Cloud（如果数据合规允许）</li>
+<li><strong>第 1-3 个月（嵌入）</strong>：DAU &lt; 1k、单 invoke &lt; 10s 时最快上线</li>
+<li><strong>业务起来（容器化）</strong>：触发上述任一信号后，2 周内迁</li>
+<li><strong>可选（Cloud）</strong>：仅当数据合规允许 + 不想雇运维团队时</li>
 </ol>
-<p><strong>小结一行</strong>：先嵌入最简单，业务起来再独立 —— 别一开始上 Platform / Cloud。</p>
+<p><strong>小结一行</strong>：嵌入是 MVP 的最优解、容器化是规模生产的常态、Cloud 是无运维偷懒选项 —— 不要 day1 就上 k8s。</p>
 <hr />
 <h3 id="87-sessions-thread_id">§8.7 Sessions 与 thread_id 映射设计</h3>
-<h4 id="_171">一对一映射</h4>
+<h4 id="_172">一对一映射</h4>
 <pre><code class="language-python"># 用户发起新对话
 session = create_session(workspace_id=&quot;w1&quot;, user_id=&quot;u1&quot;)
 session.id = &quot;session_abc123&quot;
@@ -14795,7 +14905,7 @@ result = agent.invoke({&quot;messages&quot;: [...]}, config=config)
 </tbody>
 </table>
 <p>灰度发布时只对一部分 session 开。</p>
-<h4 id="_172">历史消息的迁移</h4>
+<h4 id="_173">历史消息的迁移</h4>
 <p>老 Sessions 表里的历史 messages 怎么"接"到 LangGraph？</p>
 <table>
 <thead>
@@ -14883,7 +14993,7 @@ main.add_node(&quot;data_analysis_skill&quot;, build_data_analysis_subgraph())
 <p><strong>小结一行</strong>：Skills 系统是 ToolNode 的天然来源 —— 简单 Skill 转 @tool、复杂 Skill 转子图。</p>
 <hr />
 <h3 id="89-api-restful-langgraph">§8.9 API 兼容层设计：既有 RESTful 接口怎么挂 LangGraph</h3>
-<h4 id="_173">现状（推测）</h4>
+<h4 id="_174">现状（推测）</h4>
 <p><a href="services/api-server/src/api_server/routes/chat.py">routes/chat.py</a> 的接口大概形如：</p>
 <pre><code class="language-python">@router.post(&quot;/chat/sessions/{session_id}/messages&quot;)
 async def send_message(session_id: str, msg: MessageInput):
@@ -14959,7 +15069,7 @@ FOR VALUES WITH (modulus 16, remainder 0);
 namespace = (&quot;user_memories&quot;, workspace_id, user_id)
 store.put(namespace, key, value)
 </code></pre>
-<h4 id="_174">安全检查</h4>
+<h4 id="_175">安全检查</h4>
 <table>
 <thead>
 <tr>
@@ -15015,7 +15125,7 @@ store.put(namespace, key, value)
 </tr>
 </tbody>
 </table>
-<h4 id="_175">推荐先做的事</h4>
+<h4 id="_176">推荐先做的事</h4>
 <ol>
 <li><strong>观测先行</strong>：先接 LangSmith / Langfuse，看清现状</li>
 <li><strong>评估先行</strong>：建 Promptfoo 用例集，量化质量</li>
@@ -15242,7 +15352,7 @@ graph TB
     style N1 fill:#ddd6fe
 </pre>
 
-<h4 id="_176">各类对应基础流程的哪些节点</h4>
+<h4 id="_177">各类对应基础流程的哪些节点</h4>
 <table>
 <thead>
 <tr>
@@ -15313,7 +15423,7 @@ graph TB
 <hr />
 <h3 id="92">§9.2 看图视角：按"功能定位"而非"流量大小"</h3>
 <p>很多生态图按"使用率排版"，热门工具占大块。本手册反其道：<strong>按工程定位排</strong> —— 一个小众工具如果填补了独特的位置（如 MCP），地位等同于 LangChain 这种巨头。</p>
-<h4 id="_177">三个看图原则</h4>
+<h4 id="_178">三个看图原则</h4>
 <table>
 <thead>
 <tr>
@@ -15339,7 +15449,7 @@ graph TB
 <p><strong>小结一行</strong>：先看一个工具属于哪一层 + 影响哪个节点，再看它的市场地位。</p>
 <hr />
 <h3 id="93">§9.3 各类关系：互补 / 替代 / 横切</h3>
-<h4 id="_178">三种关系</h4>
+<h4 id="_179">三种关系</h4>
 <table>
 <thead>
 <tr>
@@ -15362,7 +15472,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_179">关系矩阵</h4>
+<h4 id="_180">关系矩阵</h4>
 <table>
 <thead>
 <tr>
@@ -15638,7 +15748,7 @@ pipe.connect(&quot;retriever&quot;, &quot;generator&quot;)
 </tr>
 </tbody>
 </table>
-<h4 id="_180">三者对比</h4>
+<h4 id="_181">三者对比</h4>
 <table>
 <thead>
 <tr>
@@ -15737,7 +15847,7 @@ app = ApplicationBuilder().with_actions(increment).with_state(counter=0).build()
 </tr>
 </tbody>
 </table>
-<h4 id="_181">三者对比</h4>
+<h4 id="_182">三者对比</h4>
 <table>
 <thead>
 <tr>
@@ -15932,7 +16042,7 @@ result = crew.kickoff()
 </tr>
 </tbody>
 </table>
-<h4 id="_182">五者对比</h4>
+<h4 id="_183">五者对比</h4>
 <table>
 <thead>
 <tr>
@@ -16216,7 +16326,7 @@ graph TB
 <blockquote>
 <p>2024.12 Anthropic 官方博客发布的智能体设计模式 —— <strong>业界最被引用的智能体设计纲领</strong>。详见附录 I。</p>
 </blockquote>
-<h4 id="_183">五大模式总览</h4>
+<h4 id="_184">五大模式总览</h4>
 <table>
 <thead>
 <tr>
@@ -16259,7 +16369,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_184">各模式与三件套的对应</h4>
+<h4 id="_185">各模式与三件套的对应</h4>
 <table>
 <thead>
 <tr>
@@ -16447,9 +16557,9 @@ graph TB
 <p><strong>小结一行</strong>：RAG 专门派以 LlamaIndex 为主流，与 LangGraph 互补；详细 RAG 知识参考用户工程已有文档。</p>
 <hr />
 <h3 id="112_1">§11.2 编程类智能体</h3>
-<h4 id="_185">共同点：端到端产品（不是框架）</h4>
+<h4 id="_186">共同点：端到端产品（不是框架）</h4>
 <p>编程类智能体不卖框架，卖产品。每个产品内部都有自己的智能体编排（自研 / 闭源），不暴露给开发者用。</p>
-<h4 id="_186">代表产品对比</h4>
+<h4 id="_187">代表产品对比</h4>
 <table>
 <thead>
 <tr>
@@ -16589,7 +16699,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_187">编程类智能体自立门户的原因</h4>
+<h4 id="_188">编程类智能体自立门户的原因</h4>
 <table>
 <thead>
 <tr>
@@ -16795,7 +16905,7 @@ graph TB
 <p><strong>小结一行</strong>：语音智能体从"STT + LLM + TTS 串"演化到"端到端模型"（OpenAI Realtime），低延迟和自然度大幅提升。</p>
 <hr />
 <h3 id="116">§11.6 多模态智能体</h3>
-<h4 id="_188">主流多模态模型</h4>
+<h4 id="_189">主流多模态模型</h4>
 <table>
 <thead>
 <tr>
@@ -16822,7 +16932,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_189">多模态智能体的应用</h4>
+<h4 id="_190">多模态智能体的应用</h4>
 <table>
 <thead>
 <tr>
@@ -16852,7 +16962,7 @@ graph TB
 <p><strong>小结一行</strong>：多模态让节点 ① 上下文从"文本"扩展到"图 / 音 / 视频" —— 智能体能处理的任务范围指数级扩大。</p>
 <hr />
 <h3 id="117">§11.7 本章小结 + 反模式 + 术语 + 推荐下一章</h3>
-<h4 id="_190">本章小结</h4>
+<h4 id="_191">本章小结</h4>
 <table>
 <thead>
 <tr>
@@ -16887,7 +16997,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_191">反模式速记</h4>
+<h4 id="_192">反模式速记</h4>
 <table>
 <thead>
 <tr>
@@ -16910,7 +17020,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_192">术语速查</h4>
+<h4 id="_193">术语速查</h4>
 <table>
 <thead>
 <tr>
@@ -16945,7 +17055,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_193">推荐下一章</h4>
+<h4 id="_194">推荐下一章</h4>
 <p>下一章：<a href="#12-javascript-typescript">§12 JavaScript / TypeScript 平行宇宙</a> —— Python 之外的另一个 AI 生态。</p>
 <hr />
 <h2 id="12-javascript-typescript">§12 JavaScript / TypeScript 平行宇宙</h2>
@@ -17113,7 +17223,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tbody>
 </table>
 <h3 id="126">§12.6 双宇宙的技术与组织原因</h3>
-<h4 id="_194">技术原因</h4>
+<h4 id="_195">技术原因</h4>
 <table>
 <thead>
 <tr>
@@ -17136,7 +17246,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tr>
 </tbody>
 </table>
-<h4 id="_195">组织原因</h4>
+<h4 id="_196">组织原因</h4>
 <table>
 <thead>
 <tr>
@@ -17160,7 +17270,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tbody>
 </table>
 <h3 id="127">§12.7 本章小结 + 反模式 + 术语 + 推荐下一章</h3>
-<h4 id="_196">本章小结</h4>
+<h4 id="_197">本章小结</h4>
 <table>
 <thead>
 <tr>
@@ -17187,7 +17297,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tr>
 </tbody>
 </table>
-<h4 id="_197">反模式速记</h4>
+<h4 id="_198">反模式速记</h4>
 <table>
 <thead>
 <tr>
@@ -17210,7 +17320,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tr>
 </tbody>
 </table>
-<h4 id="_198">术语速查</h4>
+<h4 id="_199">术语速查</h4>
 <table>
 <thead>
 <tr>
@@ -17252,7 +17362,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tr>
 </tbody>
 </table>
-<h4 id="_199">推荐下一章</h4>
+<h4 id="_200">推荐下一章</h4>
 <p>下一章：<a href="#13">§13 低代码与可视化</a> —— 不写代码也能做智能体。</p>
 <hr />
 <h2 id="13">§13 低代码与可视化</h2>
@@ -17437,7 +17547,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tr>
 </tbody>
 </table>
-<h4 id="_200">低代码不行的场景</h4>
+<h4 id="_201">低代码不行的场景</h4>
 <table>
 <thead>
 <tr>
@@ -17469,7 +17579,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tbody>
 </table>
 <h3 id="134">§13.4 本章小结 + 反模式 + 术语 + 推荐下一章</h3>
-<h4 id="_201">本章小结</h4>
+<h4 id="_202">本章小结</h4>
 <table>
 <thead>
 <tr>
@@ -17492,7 +17602,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tr>
 </tbody>
 </table>
-<h4 id="_202">反模式速记</h4>
+<h4 id="_203">反模式速记</h4>
 <table>
 <thead>
 <tr>
@@ -17515,7 +17625,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tr>
 </tbody>
 </table>
-<h4 id="_203">术语速查</h4>
+<h4 id="_204">术语速查</h4>
 <table>
 <thead>
 <tr>
@@ -17557,7 +17667,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tr>
 </tbody>
 </table>
-<h4 id="_204">推荐下一章</h4>
+<h4 id="_205">推荐下一章</h4>
 <p>下一章：<a href="#14">§14 云厂商平台</a> —— 三大云的智能体托管方案。</p>
 <hr />
 <h2 id="14">§14 云厂商平台</h2>
@@ -17675,7 +17785,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tbody>
 </table>
 <h3 id="145-vs">§14.5 厂商锁定 vs 开箱即用</h3>
-<h4 id="_205">真实账单举例（粗估）</h4>
+<h4 id="_206">真实账单举例（粗估）</h4>
 <p>任务：每月 100 万次智能体调用，每次平均 5 步、3000 token。</p>
 <table>
 <thead>
@@ -17703,7 +17813,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tr>
 </tbody>
 </table>
-<h4 id="_206">锁定风险</h4>
+<h4 id="_207">锁定风险</h4>
 <table>
 <thead>
 <tr>
@@ -17731,7 +17841,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tbody>
 </table>
 <h3 id="146">§14.6 本章小结 + 反模式 + 术语 + 推荐下一章</h3>
-<h4 id="_207">本章小结</h4>
+<h4 id="_208">本章小结</h4>
 <table>
 <thead>
 <tr>
@@ -17758,7 +17868,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tr>
 </tbody>
 </table>
-<h4 id="_208">反模式速记</h4>
+<h4 id="_209">反模式速记</h4>
 <table>
 <thead>
 <tr>
@@ -17781,7 +17891,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tr>
 </tbody>
 </table>
-<h4 id="_209">术语速查</h4>
+<h4 id="_210">术语速查</h4>
 <table>
 <thead>
 <tr>
@@ -17823,7 +17933,7 @@ const response = await agent.generate(&quot;北京天气？&quot;);
 </tr>
 </tbody>
 </table>
-<h4 id="_210">推荐下一章</h4>
+<h4 id="_211">推荐下一章</h4>
 <p>下一章：<a href="#15-6-8">§15 基础设施层</a> —— 横切的 Sandbox / 评估 / 观测层（被低估）。</p>
 <hr />
 <h2 id="15-6-8">§15 基础设施层（横切节点 ⑥ + ⑧）</h2>
@@ -17901,13 +18011,163 @@ sandbox.close()
 </tr>
 </tbody>
 </table>
-<p><strong>小结一行</strong>：Sandbox 是"代码执行类"智能体的标配 —— 选 E2B（最专精）或 Modal（已用 Modal 时）。</p>
+<h4 id="sandbox_3">Sandbox 的隔离实现机制（深入）</h4>
+<h5 id="4_4">4 层隔离技术</h5>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>技术</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>进程隔离</td>
+<td><code>subprocess</code> / <code>unshare</code></td>
+<td>普通用户进程</td>
+</tr>
+<tr>
+<td>命名空间隔离（Namespace）</td>
+<td>Linux Namespace（PID/Network/Mount/User）</td>
+<td>容器化基础</td>
+</tr>
+<tr>
+<td><strong>资源限制</strong></td>
+<td>cgroups（CPU / 内存 / IO 配额）</td>
+<td>防止 fork bomb / OOM</td>
+</tr>
+<tr>
+<td><strong>强隔离</strong></td>
+<td>gVisor / Firecracker（用户态内核）/ Kata（虚拟机）</td>
+<td>防内核漏洞逃逸</td>
+</tr>
+</tbody>
+</table>
+<h5 id="e2b-firecracker-microvm">E2B 用 Firecracker microVM（隔离最强）</h5>
+<pre><code class="language-text">LLM 生成代码
+   ↓
+E2B API（HTTPS）
+   ↓
+Firecracker microVM（专属 KVM 虚拟机，启动 &lt; 125ms）
+   ↓ 安装 Jupyter kernel
+   ↓ 挂载临时文件系统（隔离）
+   ↓
+执行代码 + 返回结果
+   ↓
+销毁 VM（24h TTL）
+</code></pre>
+<p><strong>为什么用 microVM 而非 Docker</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Docker 容器</th>
+<th>Firecracker microVM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>启动速度</td>
+<td>1-3s</td>
+<td><strong>&lt; 125ms</strong></td>
+</tr>
+<tr>
+<td>隔离强度</td>
+<td>共享内核（容器逃逸风险）</td>
+<td><strong>独立内核</strong></td>
+</tr>
+<tr>
+<td>内存开销</td>
+<td>50-100 MB</td>
+<td>5-15 MB</td>
+</tr>
+<tr>
+<td>适合场景</td>
+<td>一般工作负载</td>
+<td><strong>不可信代码执行</strong></td>
+</tr>
+</tbody>
+</table>
+<h5 id="_212">关键安全防护点</h5>
+<table>
+<thead>
+<tr>
+<th>风险</th>
+<th>防护</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rm -rf /</code></td>
+<td>隔离文件系统（VM 销毁后无影响）</td>
+</tr>
+<tr>
+<td>Fork bomb</td>
+<td>cgroups CPU 限制 + 进程数限制</td>
+</tr>
+<tr>
+<td>网络扫描 / 攻击</td>
+<td>网络命名空间 + 出站 IP 白名单</td>
+</tr>
+<tr>
+<td>信息窃取（读环境变量）</td>
+<td>独立 VM 无敏感环境</td>
+</tr>
+<tr>
+<td>长跑挖矿</td>
+<td>默认超时 30s + 24h VM 销毁</td>
+</tr>
+<tr>
+<td>内核漏洞逃逸</td>
+<td>microVM 独立内核</td>
+</tr>
+</tbody>
+</table>
+<h5 id="vs_4">自部署 vs 云沙箱选型</h5>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>E2B Cloud</th>
+<th>自部署（Firecracker / gVisor）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>启动延迟</td>
+<td>100-300ms</td>
+<td>&lt; 50ms（本地）</td>
+</tr>
+<tr>
+<td>价格</td>
+<td>$0.0001 / 秒</td>
+<td>自购服务器</td>
+</tr>
+<tr>
+<td>安全维护</td>
+<td>厂商承担</td>
+<td><strong>自己 patch 内核</strong></td>
+</tr>
+<tr>
+<td>数据合规</td>
+<td>数据出境</td>
+<td>内部</td>
+</tr>
+<tr>
+<td>启动规模</td>
+<td>可弹性 1k+ 并发</td>
+<td>受限于硬件</td>
+</tr>
+</tbody>
+</table>
+<p><strong>小结一行</strong>：Sandbox 是"代码执行类"智能体的标配 —— 选 E2B（最专精，Firecracker microVM 最安全）或 Modal（已用 Modal 时）；自部署需要懂 Linux 内核安全。</p>
 <hr />
 <h3 id="152-evaluation">§15.2 评估（Evaluation）</h3>
 <blockquote>
 <p><strong>在基础流程中的位置</strong>：横切节点 ⑥⑧，量化智能体输出质量。</p>
 </blockquote>
-<h4 id="_211">主流评估工具</h4>
+<h4 id="_213">主流评估工具</h4>
 <table>
 <thead>
 <tr>
@@ -17967,7 +18227,7 @@ tests:
       - type: llm-rubric
         value: &quot;回答必须准确且简洁&quot;
 </code></pre>
-<h4 id="_212">评估的几种类型</h4>
+<h4 id="_214">评估的几种类型</h4>
 <table>
 <thead>
 <tr>
@@ -18000,7 +18260,7 @@ tests:
 <blockquote>
 <p><strong>在基础流程中的位置</strong>：横切所有节点的运行追踪。</p>
 </blockquote>
-<h4 id="_213">主流观测工具</h4>
+<h4 id="_215">主流观测工具</h4>
 <table>
 <thead>
 <tr>
@@ -18032,7 +18292,7 @@ tests:
 </tr>
 </tbody>
 </table>
-<h4 id="_214">观测能看什么</h4>
+<h4 id="_216">观测能看什么</h4>
 <table>
 <thead>
 <tr>
@@ -18073,7 +18333,7 @@ cd langfuse
 docker compose up -d
 # 访问 http://localhost:3000
 </code></pre>
-<h4 id="_215">观测工具选型</h4>
+<h4 id="_217">观测工具选型</h4>
 <table>
 <thead>
 <tr>
@@ -18176,7 +18436,7 @@ docker compose up -d
 </tr>
 </tbody>
 </table>
-<h4 id="_216">关键指标</h4>
+<h4 id="_218">关键指标</h4>
 <table>
 <thead>
 <tr>
@@ -18245,7 +18505,7 @@ graph TB
     style Cost fill:#fed7aa
 </pre>
 
-<h4 id="_217">独立的好处</h4>
+<h4 id="_219">独立的好处</h4>
 <table>
 <thead>
 <tr>
@@ -18275,7 +18535,7 @@ graph TB
 <p><strong>小结一行</strong>：横切层与框架解耦是关键设计 —— "框架可换，观测和评估永驻"。</p>
 <hr />
 <h3 id="157">§15.7 本章小结 + 反模式 + 术语 + 推荐下一章</h3>
-<h4 id="_218">本章小结</h4>
+<h4 id="_220">本章小结</h4>
 <table>
 <thead>
 <tr>
@@ -18306,7 +18566,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_219">反模式速记</h4>
+<h4 id="_221">反模式速记</h4>
 <table>
 <thead>
 <tr>
@@ -18329,7 +18589,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_220">术语速查</h4>
+<h4 id="_222">术语速查</h4>
 <table>
 <thead>
 <tr>
@@ -18360,7 +18620,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_221">推荐下一章</h4>
+<h4 id="_223">推荐下一章</h4>
 <p>下一章：<a href="#16-4">§16 协议与标准</a> —— MCP 是 2025-2026 最重要的趋势。</p>
 <hr />
 <h2 id="16-4">§16 协议与标准（重做节点 ④ 工具调用）</h2>
@@ -18432,7 +18692,7 @@ graph TB
     style S4 fill:#d1fae5
 </pre>
 
-<h4 id="_222">三层职责</h4>
+<h4 id="_224">三层职责</h4>
 <table>
 <thead>
 <tr>
@@ -18455,27 +18715,223 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_223">通信协议</h4>
-<p>MCP 用 JSON-RPC 2.0：</p>
+<h4 id="json-rpc-20">通信协议（JSON-RPC 2.0 字节级）</h4>
+<h5 id="3_1">3 种传输层</h5>
 <table>
 <thead>
 <tr>
 <th>传输</th>
 <th>用法</th>
+<th>字节流形式</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>stdio</td>
+<td><strong>stdio</strong></td>
 <td>本地进程通信（最常见）</td>
+<td>行分隔的 JSON over stdin/stdout</td>
 </tr>
 <tr>
-<td>SSE / HTTP</td>
+<td><strong>SSE / Streamable HTTP</strong></td>
 <td>远程 server</td>
+<td>HTTP POST 请求 + SSE 流式响应</td>
 </tr>
 <tr>
-<td>WebSocket</td>
-<td>双向通信</td>
+<td><strong>WebSocket</strong></td>
+<td>双向通信（少见）</td>
+<td>WebSocket 双向消息</td>
+</tr>
+</tbody>
+</table>
+<h5 id="mcp_2">MCP 一次完整调用的字节流</h5>
+<pre><code class="language-text">[Client → Server] 初始化
+{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 1,
+  &quot;method&quot;: &quot;initialize&quot;,
+  &quot;params&quot;: {
+    &quot;protocolVersion&quot;: &quot;2025-06-18&quot;,
+    &quot;capabilities&quot;: {&quot;roots&quot;: {&quot;listChanged&quot;: true}},
+    &quot;clientInfo&quot;: {&quot;name&quot;: &quot;Claude Desktop&quot;, &quot;version&quot;: &quot;1.0&quot;}
+  }
+}
+
+[Server → Client] 初始化响应
+{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 1,
+  &quot;result&quot;: {
+    &quot;protocolVersion&quot;: &quot;2025-06-18&quot;,
+    &quot;capabilities&quot;: {&quot;tools&quot;: {}, &quot;resources&quot;: {}},
+    &quot;serverInfo&quot;: {&quot;name&quot;: &quot;my-tools&quot;, &quot;version&quot;: &quot;0.1&quot;}
+  }
+}
+
+[Client → Server] 列出工具
+{&quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 2, &quot;method&quot;: &quot;tools/list&quot;}
+
+[Server → Client] 工具列表
+{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 2,
+  &quot;result&quot;: {
+    &quot;tools&quot;: [{
+      &quot;name&quot;: &quot;search_docs&quot;,
+      &quot;description&quot;: &quot;搜索内部文档&quot;,
+      &quot;inputSchema&quot;: {
+        &quot;type&quot;: &quot;object&quot;,
+        &quot;properties&quot;: {&quot;query&quot;: {&quot;type&quot;: &quot;string&quot;}},
+        &quot;required&quot;: [&quot;query&quot;]
+      }
+    }]
+  }
+}
+
+[Client → Server] 调用工具
+{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 3,
+  &quot;method&quot;: &quot;tools/call&quot;,
+  &quot;params&quot;: {&quot;name&quot;: &quot;search_docs&quot;, &quot;arguments&quot;: {&quot;query&quot;: &quot;退款政策&quot;}}
+}
+
+[Server → Client] 调用结果
+{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 3,
+  &quot;result&quot;: {
+    &quot;content&quot;: [{&quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;找到 3 篇相关文档...&quot;}],
+    &quot;isError&quot;: false
+  }
+}
+</code></pre>
+<h5 id="mcp_3">MCP 协议核心方法</h5>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>含义</th>
+<th>何时调</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>initialize</code></td>
+<td>握手 + 协商协议版本</td>
+<td>连接时 1 次</td>
+</tr>
+<tr>
+<td><code>tools/list</code></td>
+<td>获取工具清单</td>
+<td>启动时 + 用户请求时</td>
+</tr>
+<tr>
+<td><code>tools/call</code></td>
+<td>调用工具</td>
+<td>每次模型用工具时</td>
+</tr>
+<tr>
+<td><code>resources/list</code></td>
+<td>列出资源（文件 / DB 表 / API endpoint）</td>
+<td>资源类 server</td>
+</tr>
+<tr>
+<td><code>resources/read</code></td>
+<td>读取资源</td>
+<td>按需</td>
+</tr>
+<tr>
+<td><code>prompts/list</code></td>
+<td>列出预定义提示模板</td>
+<td>提示模板类 server</td>
+</tr>
+<tr>
+<td><code>prompts/get</code></td>
+<td>取一个模板</td>
+<td>按需</td>
+</tr>
+<tr>
+<td><code>logging/setLevel</code></td>
+<td>设日志级别</td>
+<td>调试</td>
+</tr>
+<tr>
+<td><code>notifications/progress</code></td>
+<td>长任务进度推送</td>
+<td>由 server 主动发</td>
+</tr>
+</tbody>
+</table>
+<h5 id="_225">协议特性</h5>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>异步</td>
+<td>任意时刻 client / server 都可发消息</td>
+</tr>
+<tr>
+<td>双向</td>
+<td>server 可以主动通知（如工具列表变了）</td>
+</tr>
+<tr>
+<td>进度通知</td>
+<td>长任务用 <code>notifications/progress</code> 推送进度</td>
+</tr>
+<tr>
+<td>取消</td>
+<td>用 <code>$/cancelRequest</code> 取消进行中的请求</td>
+</tr>
+<tr>
+<td>错误码</td>
+<td>JSON-RPC 标准（-32000 到 -32099 自定义错误）</td>
+</tr>
+</tbody>
+</table>
+<h5 id="stdio-vs-http">stdio vs HTTP 选型</h5>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>stdio</th>
+<th>Streamable HTTP（SSE）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>启动方式</td>
+<td>本地子进程</td>
+<td>独立服务</td>
+</tr>
+<tr>
+<td>部署</td>
+<td>安装时配置</td>
+<td>网络可达即可</td>
+</tr>
+<tr>
+<td>多实例共享</td>
+<td>否（每客户端一个进程）</td>
+<td><strong>是</strong></td>
+</tr>
+<tr>
+<td>跨网络</td>
+<td>否</td>
+<td><strong>是</strong>（远程 MCP server）</td>
+</tr>
+<tr>
+<td>安全边界</td>
+<td>进程权限</td>
+<td>网络权限 + 鉴权</td>
+</tr>
+<tr>
+<td>适合</td>
+<td>Claude Desktop / Cursor 本地工具</td>
+<td>公司内部 MCP server</td>
 </tr>
 </tbody>
 </table>
@@ -18493,7 +18949,7 @@ async def search_docs(query: str) -&gt; str:
 if __name__ == &quot;__main__&quot;:
     server.run_stdio()
 </code></pre>
-<h4 id="mcp_2">MCP 与现有方案对比</h4>
+<h4 id="mcp_4">MCP 与现有方案对比</h4>
 <table>
 <thead>
 <tr>
@@ -18707,7 +19163,7 @@ if __name__ == &quot;__main__&quot;:
 <p><strong>小结一行</strong>：MCP server 开发简单（Python SDK 几行代码）+ 接入广 —— 高 ROI。</p>
 <hr />
 <h3 id="165">§16.5 本章小结 + 反模式 + 术语 + 推荐下一章</h3>
-<h4 id="_224">本章小结</h4>
+<h4 id="_226">本章小结</h4>
 <table>
 <thead>
 <tr>
@@ -18738,7 +19194,7 @@ if __name__ == &quot;__main__&quot;:
 </tr>
 </tbody>
 </table>
-<h4 id="_225">反模式速记</h4>
+<h4 id="_227">反模式速记</h4>
 <table>
 <thead>
 <tr>
@@ -18757,7 +19213,7 @@ if __name__ == &quot;__main__&quot;:
 </tr>
 </tbody>
 </table>
-<h4 id="_226">术语速查</h4>
+<h4 id="_228">术语速查</h4>
 <table>
 <thead>
 <tr>
@@ -18788,13 +19244,13 @@ if __name__ == &quot;__main__&quot;:
 </tr>
 </tbody>
 </table>
-<h4 id="_227">推荐下一章</h4>
+<h4 id="_229">推荐下一章</h4>
 <p>下一章：<a href="#17-20252026">§17 2025–2026 新兴趋势</a> —— Agent as Code / Ambient Agent / Reasoning Models。</p>
 <hr />
 <h2 id="17-20252026">§17 2025–2026 新兴趋势</h2>
 <h3 id="170">§17.0 本章定位</h3>
 <h3 id="171-agent-as-code">§17.1 智能体即代码（Agent as Code）</h3>
-<h4 id="_228">含义</h4>
+<h4 id="_230">含义</h4>
 <p>把智能体定义当源码 —— 走 GitOps（PR 审核 / CI / CD / 版本化）。</p>
 <table>
 <thead>
@@ -18832,7 +19288,7 @@ if __name__ == &quot;__main__&quot;:
 </tr>
 </tbody>
 </table>
-<h4 id="_229">工程实践</h4>
+<h4 id="_231">工程实践</h4>
 <table>
 <thead>
 <tr>
@@ -18859,10 +19315,122 @@ if __name__ == &quot;__main__&quot;:
 </tr>
 </tbody>
 </table>
+<h4 id="agent-as-code">实现机制：典型 Agent as Code 项目结构</h4>
+<pre><code class="language-text">my-agent/
+├── prompts/                  ← 所有提示词（git 跟踪）
+│   ├── system.txt
+│   ├── react_template.txt
+│   └── few_shot_examples.json
+├── tools/                    ← 工具定义
+│   ├── search.py
+│   └── calculator.py
+├── graph/                    ← 智能体图（LangGraph StateGraph）
+│   └── customer_agent.py
+├── evals/                    ← 评估用例
+│   ├── customer_qa.yaml      ← Promptfoo 配置
+│   └── golden_dataset.jsonl
+├── .github/workflows/
+│   ├── eval.yml              ← PR 时自动跑评估
+│   └── deploy.yml            ← merge 后自动部署
+└── pyproject.toml
+</code></pre>
+<h4 id="ci">CI 准入门槛示例</h4>
+<pre><code class="language-yaml"># .github/workflows/eval.yml
+name: Agent Evaluation
+on:
+  pull_request:
+    paths: ['prompts/**', 'tools/**', 'graph/**']
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          npx promptfoo eval --config evals/customer_qa.yaml --output result.json
+          PASS_RATE=$(jq '.results.stats.successes / .results.stats.total' result.json)
+          # 准入门槛：通过率 &gt;= 90%
+          if [ &quot;$(echo &quot;$PASS_RATE &lt; 0.90&quot; | bc)&quot; = &quot;1&quot; ]; then
+            echo &quot;❌ 评估通过率 $PASS_RATE &lt; 90%，禁止合入&quot;
+            exit 1
+          fi
+
+          # 关键指标无回退
+          OLD_COST=$(cat baseline.json | jq '.cost_per_request')
+          NEW_COST=$(jq '.metrics.cost_per_request' result.json)
+          if [ &quot;$(echo &quot;$NEW_COST &gt; $OLD_COST * 1.2&quot; | bc)&quot; = &quot;1&quot; ]; then
+            echo &quot;❌ 成本上涨 &gt; 20%，需要审查&quot;
+            exit 1
+          fi
+</code></pre>
+<h4 id="agent-as-code_1">Agent as Code 与传统软件工程的核心差异</h4>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>传统软件</th>
+<th>Agent as Code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>测试</td>
+<td>单元测试（输入输出确定）</td>
+<td><strong>概率测试</strong>（同输入可能不同输出，需统计跑多次取均值）</td>
+</tr>
+<tr>
+<td>回归</td>
+<td>diff 一致</td>
+<td>评估指标无回退</td>
+</tr>
+<tr>
+<td>灰度</td>
+<td>流量百分比</td>
+<td>流量 + 模型路由 + 提示词版本</td>
+</tr>
+<tr>
+<td>回滚</td>
+<td>git revert</td>
+<td>git revert + 缓存清理（避免 prompt cache 污染）</td>
+</tr>
+<tr>
+<td>监控</td>
+<td>错误率 / 延迟</td>
+<td>+ token 成本 / 评估通过率 / 幻觉率</td>
+</tr>
+</tbody>
+</table>
+<h4 id="gitops-4">工程基石（GitOps + 评估 + 灰度 + 回滚 4 件套）</h4>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>角色</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Git</td>
+<td>版本管理 + PR 审核</td>
+</tr>
+<tr>
+<td>Promptfoo / Braintrust</td>
+<td>评估 + 准入门槛</td>
+</tr>
+<tr>
+<td>LangSmith / Langfuse</td>
+<td>观测 + 数据飞轮</td>
+</tr>
+<tr>
+<td>特性开关（Flagsmith / Unleash）</td>
+<td>灰度 + 紧急回滚</td>
+</tr>
+</tbody>
+</table>
 <p><strong>小结一行</strong>：Agent as Code 把"智能体工程化"提升到与软件工程同等级别 —— 严肃团队 2026 的方向。</p>
 <hr />
 <h3 id="172-ambient-agent">§17.2 常驻智能体（Ambient Agent）</h3>
-<h4 id="_230">含义</h4>
+<h4 id="_232">含义</h4>
 <p>不是"用户问 → 智能体答"，而是"智能体后台持续工作"。</p>
 <table>
 <thead>
@@ -18922,10 +19490,87 @@ if __name__ == &quot;__main__&quot;:
 </tr>
 </tbody>
 </table>
+<h4 id="4_5">实现机制：4 种触发模式的内部架构</h4>
+<h5 id="1_1">1. 用户驱动（同步请求）</h5>
+<pre><code class="language-text">HTTP Request → API Server → invoke(graph) → 返回 → HTTP Response
+</code></pre>
+<p>普通智能体，不算 Ambient。</p>
+<h5 id="2">2. 事件驱动</h5>
+<pre><code class="language-text">事件源（Webhook / S3 / Kafka）
+   ↓
+事件总线（Redis Stream / Kafka / SNS）
+   ↓
+Worker（消费事件）
+   ↓
+client.runs.create(thread_id=&quot;event-{uuid}&quot;, graph=...)
+   ↓
+后台异步跑 → 写 checkpoint → 完成时通知（Webhook / Slack）
+</code></pre>
+<h5 id="3-cron">3. 时间驱动（Cron）</h5>
+<pre><code class="language-text">LangGraph Server 内置 cron 调度器
+   ↓
+每 5 分钟扫一次 langgraph.json 的 crons 配置
+   ↓
+到点 → client.runs.create(input=cron_input, graph=...)
+   ↓
+后台跑 → checkpoint → 把结果写到通知系统
+</code></pre>
+<p><code>langgraph.json</code> 配置示例：</p>
+<pre><code class="language-json">{
+  &quot;graphs&quot;: {&quot;agent&quot;: &quot;./agent.py:graph&quot;},
+  &quot;crons&quot;: [
+    {
+      &quot;schedule&quot;: &quot;0 9 * * 1&quot;,
+      &quot;graph_id&quot;: &quot;agent&quot;,
+      &quot;input&quot;: {&quot;task&quot;: &quot;weekly_report&quot;}
+    }
+  ]
+}
+</code></pre>
+<h5 id="4_6">4. 监控驱动</h5>
+<pre><code class="language-text">Prometheus 告警 / CloudWatch Alarm
+   ↓ Webhook
+告警接收器 → 提取上下文（错误日志 / 指标）
+   ↓
+client.runs.create(graph=diagnose_agent, input={&quot;alert&quot;: ...})
+   ↓
+后台诊断 → 写工单 / 通知 oncall
+</code></pre>
+<h4 id="_233">关键工程挑战</h4>
+<table>
+<thead>
+<tr>
+<th>挑战</th>
+<th>解决</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>并发控制</td>
+<td>LangGraph Server 用 thread_id 并发上限（同 thread_id 串行）</td>
+</tr>
+<tr>
+<td>失败重试</td>
+<td>失败的 run 加 dead-letter queue，oncall 看</td>
+</tr>
+<tr>
+<td>长任务超时</td>
+<td>Checkpoint 持久化 + worker 死了能换机器续跑</td>
+</tr>
+<tr>
+<td>成本监控</td>
+<td>每个 run 关联 cost tag，超阈值告警</td>
+</tr>
+<tr>
+<td>灰度</td>
+<td>事件驱动用流量百分比 / Cron 用配置开关</td>
+</tr>
+</tbody>
+</table>
 <p><strong>小结一行</strong>：Ambient Agent 把智能体从"被动应答"升级到"主动工作" —— 是 SaaS 智能体产品的演化方向。</p>
 <hr />
 <h3 id="173-mcp">§17.3 MCP 服务器生态爆发</h3>
-<h4 id="_231">数据</h4>
+<h4 id="_234">数据</h4>
 <p>2024.11 MCP 推出至今（约 1.5 年），公开 MCP server 数量增长：</p>
 <table>
 <thead>
@@ -18953,7 +19598,7 @@ if __name__ == &quot;__main__&quot;:
 </tr>
 </tbody>
 </table>
-<h4 id="_232">生态结构</h4>
+<h4 id="_235">生态结构</h4>
 <table>
 <thead>
 <tr>
@@ -19055,7 +19700,7 @@ if __name__ == &quot;__main__&quot;:
 <blockquote>
 <p><strong>节点 ② 省钱神器</strong>。</p>
 </blockquote>
-<h4 id="_233">工作原理</h4>
+<h4 id="_236">工作原理</h4>
 <p>LLM 厂商把 prompt 的"前缀"缓存（比如 system prompt + 大段固定上下文），下次同前缀直接命中缓存，<strong>只算"差异部分"的 token</strong>。</p>
 <table>
 <thead>
@@ -19099,7 +19744,7 @@ response = client.messages.create(
     messages=[{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;...&quot;}],
 )
 </code></pre>
-<h4 id="_234">适用场景</h4>
+<h4 id="_237">适用场景</h4>
 <table>
 <thead>
 <tr>
@@ -19126,12 +19771,12 @@ response = client.messages.create(
 </tr>
 </tbody>
 </table>
-<h4 id="2">节点 ② 的成本影响</h4>
+<h4 id="2_1">节点 ② 的成本影响</h4>
 <p>回到 <a href="#75-token">§7.5</a> 的实测：开 Prompt Caching 后 LangGraph 智能体成本从 \$0.24 降到 \$0.10 —— <strong>省 60%</strong>。</p>
 <p><strong>小结一行</strong>：Prompt Caching 是"白送的钱" —— 2026 任何严肃智能体应用都该开。</p>
 <hr />
 <h3 id="176-reasoning-models">§17.6 延展思考模型（Reasoning Models）对智能体设计的冲击</h3>
-<h4 id="_235">推理模型的特殊</h4>
+<h4 id="_238">推理模型的特殊</h4>
 <table>
 <thead>
 <tr>
@@ -19168,7 +19813,7 @@ response = client.messages.create(
 </tr>
 </tbody>
 </table>
-<h4 id="_236">对智能体设计的冲击</h4>
+<h4 id="_239">对智能体设计的冲击</h4>
 <table>
 <thead>
 <tr>
@@ -19205,7 +19850,7 @@ response = client.messages.create(
 </tr>
 </tbody>
 </table>
-<h4 id="_237">实际效果</h4>
+<h4 id="_240">实际效果</h4>
 <table>
 <thead>
 <tr>
@@ -19227,7 +19872,7 @@ response = client.messages.create(
 </tr>
 </tbody>
 </table>
-<h4 id="_238">设计建议</h4>
+<h4 id="_241">设计建议</h4>
 <table>
 <thead>
 <tr>
@@ -19253,7 +19898,7 @@ response = client.messages.create(
 <p><strong>小结一行</strong>：推理模型让"少而深"的智能体设计成为可能 —— 但需要重新评估循环和流式策略。</p>
 <hr />
 <h3 id="177">§17.7 本章小结 + 反模式 + 术语 + 推荐下一章</h3>
-<h4 id="_239">本章小结</h4>
+<h4 id="_242">本章小结</h4>
 <table>
 <thead>
 <tr>
@@ -19288,7 +19933,7 @@ response = client.messages.create(
 </tr>
 </tbody>
 </table>
-<h4 id="_240">反模式速记</h4>
+<h4 id="_243">反模式速记</h4>
 <table>
 <thead>
 <tr>
@@ -19311,7 +19956,7 @@ response = client.messages.create(
 </tr>
 </tbody>
 </table>
-<h4 id="_241">术语速查</h4>
+<h4 id="_244">术语速查</h4>
 <table>
 <thead>
 <tr>
@@ -19342,7 +19987,7 @@ response = client.messages.create(
 </tr>
 </tbody>
 </table>
-<h4 id="_242">推荐下一章</h4>
+<h4 id="_245">推荐下一章</h4>
 <p>下一章：<a href="#18">§18 选型决策矩阵</a> —— 综合所有维度的选型决策树。</p>
 <hr />
 <h2 id="18">§18 选型决策矩阵</h2>
@@ -19379,7 +20024,7 @@ graph TB
     style SK fill:#fce7f3
 </pre>
 
-<h4 id="_243">混合架构是默认答案</h4>
+<h4 id="_246">混合架构是默认答案</h4>
 <table>
 <thead>
 <tr>
@@ -19497,7 +20142,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_244">投入与产出</h4>
+<h4 id="_247">投入与产出</h4>
 <table>
 <thead>
 <tr>
@@ -19565,10 +20210,10 @@ graph TB
 <p><strong>小结一行</strong>：决策树以"是否需要状态循环中断"为第一分水岭、"语言 + 规模"为第二维 —— LangGraph 是严肃生产 Python 项目的默认。</p>
 <hr />
 <h3 id="186-observability-first">§18.6 以观测为先（observability-first）选型</h3>
-<h4 id="_245">严肃团队的真实决策顺序</h4>
+<h4 id="_248">严肃团队的真实决策顺序</h4>
 <p>老套路：选框架 → 写代码 → 上生产 → 才发现没法监控
 新套路：<strong>先确定能不能监控，再选框架</strong></p>
-<h4 id="_246">检查清单（上生产前必须有）</h4>
+<h4 id="_249">检查清单（上生产前必须有）</h4>
 <table>
 <thead>
 <tr>
@@ -19603,7 +20248,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_247">上述能力的工具组合</h4>
+<h4 id="_250">上述能力的工具组合</h4>
 <table>
 <thead>
 <tr>
@@ -19629,7 +20274,7 @@ graph TB
 <p><strong>小结一行</strong>：observability-first 是严肃团队的 2026 选型纪律 —— "看不见就不上生产"。</p>
 <hr />
 <h3 id="187">§18.7 本章小结 + 反模式 + 术语 + 推荐下一章</h3>
-<h4 id="_248">本章小结</h4>
+<h4 id="_251">本章小结</h4>
 <table>
 <thead>
 <tr>
@@ -19656,7 +20301,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_249">反模式速记</h4>
+<h4 id="_252">反模式速记</h4>
 <table>
 <thead>
 <tr>
@@ -19679,7 +20324,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_250">术语速查</h4>
+<h4 id="_253">术语速查</h4>
 <table>
 <thead>
 <tr>
@@ -19706,7 +20351,7 @@ graph TB
 </tr>
 </tbody>
 </table>
-<h4 id="_251">推荐下一章</h4>
+<h4 id="_254">推荐下一章</h4>
 <p>下一章：<a href="#19-custom_agent">§19 全栈对照 custom_agent</a> —— 把全部生态映射到用户工程，给出一年路线图。</p>
 <hr />
 <h2 id="19-custom_agent">§19 全栈对照 custom_agent（选型视角）</h2>
@@ -19801,7 +20446,7 @@ graph LR
 <p><strong>小结一行</strong>：custom_agent 在节点 ①②④⑤⑥⑧ 已有基础，缺节点 ③⑦（决策路由 + 循环控制）。</p>
 <hr />
 <h3 id="192-mcp">§19.2 缺什么：评估 / 观测 / MCP 接入是优先级最高的三个空白</h3>
-<h4 id="_252">三大空白</h4>
+<h4 id="_255">三大空白</h4>
 <table>
 <thead>
 <tr>
@@ -19843,9 +20488,9 @@ graph LR
 </tr>
 </tbody>
 </table>
-<h4 id="_253">为什么观测和评估是"最高"</h4>
+<h4 id="_256">为什么观测和评估是"最高"</h4>
 <p>观测和评估是其他改进的前提 —— 没有它们就不知道任何改动是否真的"改善了"。</p>
-<h4 id="_254">最小可行实现</h4>
+<h4 id="_257">最小可行实现</h4>
 <table>
 <thead>
 <tr>
@@ -19871,7 +20516,7 @@ graph LR
 <p><strong>小结一行</strong>：三大空白中观测 / 评估是当下就该补的、MCP 是面向未来的战略投入。</p>
 <hr />
 <h3 id="193">§19.3 建议优先级：不动 / 评估 / 立即引入</h3>
-<h4 id="_255">三档分级</h4>
+<h4 id="_258">三档分级</h4>
 <table>
 <thead>
 <tr>
@@ -19898,13 +20543,13 @@ graph LR
 </tr>
 </tbody>
 </table>
-<h4 id="_256">立即引入的具体动作</h4>
+<h4 id="_259">立即引入的具体动作</h4>
 <pre><code class="language-text">Week 1: 部署 Langfuse 自托管 docker compose
 Week 2: 把 LangSmith trace 导出指向 Langfuse
 Week 3: 写 20 个核心 Promptfoo 评估用例
 Week 4: 开 Anthropic Prompt Caching（节省 60% 成本）
 </code></pre>
-<h4 id="_257">评估期的具体动作</h4>
+<h4 id="_260">评估期的具体动作</h4>
 <pre><code class="language-text">Month 2: 用 LangChain v0.3 重写一个核心路由（不全量切）
 Month 3: 评估指标 vs 老路由对比
         如果指标 ≥ 老路由 → 推广
@@ -19934,7 +20579,7 @@ gantt
     接入 Claude Code :d2, after d1, 14d
 </pre>
 
-<h4 id="_258">各季度核心目标</h4>
+<h4 id="_261">各季度核心目标</h4>
 <table>
 <thead>
 <tr>
@@ -19969,9 +20614,9 @@ gantt
 <p><strong>小结一行</strong>：一年路线图按"观测 → LangChain → LangGraph → MCP"四步走。</p>
 <hr />
 <h3 id="195-mcp-claude-code-cursor">§19.5 MCP 接入路径：未来对接 Claude Code / Cursor 客户端</h3>
-<h4 id="_259">接入策略</h4>
+<h4 id="_262">接入策略</h4>
 <p>custom_agent 的 Skills 系统暴露为 MCP server 后，可以让用户在 Claude Code / Cursor / Cline 等客户端里直接调用 —— 这是巨大的获客和黏性机会。</p>
-<h4 id="_260">实现步骤</h4>
+<h4 id="_263">实现步骤</h4>
 <pre><code class="language-text">1. 写 mcp-server-customagent（Python）
    └── 包装现有 Skills API
 2. 用户在 Claude Code 配置：
@@ -19987,7 +20632,7 @@ gantt
 3. 用户在 Claude Code 里直接说&quot;帮我查 X&quot;，
    Claude Code 自动调 customagent server 的工具
 </code></pre>
-<h4 id="_261">价值预估</h4>
+<h4 id="_264">价值预估</h4>
 <table>
 <thead>
 <tr>
@@ -20017,7 +20662,7 @@ gantt
 <p><strong>小结一行</strong>：MCP 是 custom_agent 触达 Claude Code / Cursor 用户的最便宜路径 —— 优先级高于 LangGraph 编排。</p>
 <hr />
 <h3 id="196-promptfoo">§19.6 评估与回归测试基础设施缺口：Promptfoo 最小可行实现</h3>
-<h4 id="_262">最小评估流水线</h4>
+<h4 id="_265">最小评估流水线</h4>
 <pre><code class="language-yaml">description: customagent 核心评估集
 prompts:
   - file://prompts/system.txt
@@ -20048,7 +20693,7 @@ tests:
       - type: contains
         value: &quot;无法&quot;
 </code></pre>
-<h4 id="ci">CI 集成</h4>
+<h4 id="ci_1">CI 集成</h4>
 <pre><code class="language-yaml">name: Promptfoo Evaluation
 on:
   pull_request:
@@ -20067,7 +20712,7 @@ jobs:
 <p><strong>小结一行</strong>：Promptfoo + CI 让 prompt 改动可被自动评估 —— 上线前自动门槛。</p>
 <hr />
 <h3 id="197">§19.7 本章小结 + 反模式 + 术语 + 全书完结语</h3>
-<h4 id="_263">本章小结</h4>
+<h4 id="_266">本章小结</h4>
 <table>
 <thead>
 <tr>
@@ -20098,7 +20743,7 @@ jobs:
 </tr>
 </tbody>
 </table>
-<h4 id="_264">反模式速记</h4>
+<h4 id="_267">反模式速记</h4>
 <table>
 <thead>
 <tr>
@@ -20129,7 +20774,7 @@ jobs:
 </tr>
 </tbody>
 </table>
-<h4 id="_265">术语速查</h4>
+<h4 id="_268">术语速查</h4>
 <table>
 <thead>
 <tr>
@@ -20156,7 +20801,7 @@ jobs:
 </tr>
 </tbody>
 </table>
-<h4 id="_266">全书完结语</h4>
+<h4 id="_269">全书完结语</h4>
 <p>读到这里，你应该形成了完整的智能体心智模型：</p>
 <ol>
 <li><strong>基础流程 8 节点</strong>是全书脊梁 —— 任何智能体都在解决这 8 个节点上的具体问题</li>
@@ -20175,7 +20820,7 @@ jobs:
 <li><a href="#附录-k--openai--anthropic--google-工具调用三家协议对照">附录 K 三家工具调用协议对照</a></li>
 </ul>
 <hr />
-<h1 id="_267">附录</h1>
+<h1 id="_270">附录</h1>
 <h2 id="a">附录 A — 接口速查卡</h2>
 <h3 id="langchain-lcel">LangChain LCEL 速查</h3>
 <pre><code class="language-python"># 创建 LLM
@@ -20273,7 +20918,7 @@ agent = create_react_agent(llm, tools, checkpointer=MemorySaver())
 </code></pre>
 <hr />
 <h2 id="b">附录 B — 参考链接</h2>
-<h3 id="_268">论文</h3>
+<h3 id="_271">论文</h3>
 <ul>
 <li>ReAct: Synergizing Reasoning and Acting in Language Models（Yao et al., 2022）</li>
 <li>Chain-of-Thought Prompting Elicits Reasoning（Wei et al., 2022）</li>
@@ -20281,7 +20926,7 @@ agent = create_react_agent(llm, tools, checkpointer=MemorySaver())
 <li>Tree of Thoughts（Yao et al., 2023）</li>
 <li>Pregel: A System for Large-Scale Graph Processing（Google, 2010）</li>
 </ul>
-<h3 id="_269">官方文档</h3>
+<h3 id="_272">官方文档</h3>
 <ul>
 <li>LangChain：https://python.langchain.com</li>
 <li>LangGraph：https://langchain-ai.github.io/langgraph/</li>
@@ -20289,7 +20934,7 @@ agent = create_react_agent(llm, tools, checkpointer=MemorySaver())
 <li>Anthropic Building Effective Agents：https://www.anthropic.com/research/building-effective-agents</li>
 <li>MCP：https://modelcontextprotocol.io</li>
 </ul>
-<h3 id="_270">业界博客</h3>
+<h3 id="_273">业界博客</h3>
 <ul>
 <li>Klarna: AI assistant handles 2/3 of customer service chats</li>
 <li>Anthropic: How we built Claude Code</li>
@@ -20509,7 +21154,7 @@ agent = create_react_agent(llm, tools, checkpointer=MemorySaver())
 </tr>
 </tbody>
 </table>
-<h3 id="_271">生态里程碑</h3>
+<h3 id="_274">生态里程碑</h3>
 <table>
 <thead>
 <tr>
@@ -20872,8 +21517,8 @@ agent = create_react_agent(llm, tools, checkpointer=MemorySaver())
 </tr>
 <tr>
 <td>28</td>
-<td>（预留）</td>
-<td>—</td>
+<td>§1.10</td>
+<td>Agent 范式 5 代演进总览</td>
 </tr>
 <tr>
 <td>29</td>
@@ -20884,6 +21529,11 @@ agent = create_react_agent(llm, tools, checkpointer=MemorySaver())
 <td>30</td>
 <td>§15.6</td>
 <td>横切层与框架解耦</td>
+</tr>
+<tr>
+<td>31</td>
+<td>§0.5</td>
+<td>6 层 Graph-based Agent 架构（业界 2026 主流蓝图）</td>
 </tr>
 </tbody>
 </table>
@@ -21822,7 +22472,7 @@ agent = create_react_agent(llm, tools, checkpointer=MemorySaver())
 </tr>
 </tbody>
 </table>
-<h3 id="_272">五模式组合</h3>
+<h3 id="_275">五模式组合</h3>
 <p>复杂智能体往往是这五种的组合：</p>
 <table>
 <thead>
@@ -21930,7 +22580,7 @@ agent = create_react_agent(llm, tools, checkpointer=MemorySaver())
 </tr>
 </tbody>
 </table>
-<h3 id="_273">完整迁移示例</h3>
+<h3 id="_276">完整迁移示例</h3>
 <pre><code class="language-python"># === 老 ===
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain.memory import ConversationBufferMemory
@@ -22015,7 +22665,7 @@ result = agent.invoke(
 # response.candidates[0].content.parts[0].function_call =
 #     name=&quot;get_weather&quot;, args={&quot;city&quot;: &quot;北京&quot;}
 </code></pre>
-<h3 id="_274">字段对照表</h3>
+<h3 id="_277">字段对照表</h3>
 <table>
 <thead>
 <tr>
@@ -22070,7 +22720,7 @@ result = agent.invoke(
 </tr>
 </tbody>
 </table>
-<h3 id="_275">跨厂商兼容工具（推荐）</h3>
+<h3 id="_278">跨厂商兼容工具（推荐）</h3>
 <table>
 <thead>
 <tr>

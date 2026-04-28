@@ -7392,22 +7392,46 @@ Step 3: LangGraph + Checkpoint + HITL
 
 ---
 
-### §8.6 部署形态四选一
+### §8.6 部署形态四选一（架构权衡深度）
 
-| 形态 | 描述 | 适合 |
-|---|---|---|
-| 嵌入 [api-server](services/api-server)（直接 import langgraph） | LangGraph 当库 | **MVP 起步**，最简单 |
-| 独立 LangGraph Server 自托管 | `langgraph up` 起服务 | 想要 LangGraph 标准 API |
-| 容器化（Docker / k8s） | `langgraph build` + 部署 | 需要独立扩缩容 |
-| LangGraph Platform / Cloud | LangChain 商业托管 | 不想运维 |
+#### 4 种形态的工程权衡
 
-#### 推荐顺序
+| 形态 | 描述 | 适合 | 进程 / 实例数 | 横向扩展 | 故障隔离 |
+|---|---|---|---|---|---|
+| 嵌入 [api-server](services/api-server) | `import langgraph` 直接调 | **MVP 起步** | 与 api-server 同进程 | 受 api-server 限制 | 弱（智能体爆 → api-server 也爆） |
+| 独立 LangGraph Server 自托管 | `langgraph up` 起独立服务 | 想要 LangGraph 标准 API | 独立进程 | 独立扩缩容 | **强** |
+| 容器化（Docker / k8s） | `langgraph build` 容器镜像 | 需要 k8s 编排 | 独立 Pod | k8s HPA 自动扩 | 强 |
+| LangGraph Platform / Cloud | LangChain 商业托管 | 不想运维 | 厂商管理 | 厂商弹性 | 厂商保证 |
 
-1. **第 1-3 个月**：嵌入 api-server
-2. **业务起来**：容器化独立部署
-3. **可选**：上 Platform / Cloud（如果数据合规允许）
+#### 4 种形态的权衡矩阵
 
-**小结一行**：先嵌入最简单，业务起来再独立 —— 别一开始上 Platform / Cloud。
+| 维度 | 嵌入 | 自托管 Server | 容器化 | Cloud |
+|---|---|---|---|---|
+| 实施速度 | **快**（1 天） | 中（3 天） | 慢（1 周） | 快（半天） |
+| 运维成本 | 与现有服务合并 | 中（多一个服务） | 高（k8s + 镜像 + 监控） | 低（厂商承担） |
+| 单实例成本 | 0 增量 | +CPU/内存 | +CPU/内存+存储 | 按 thread/token 计 |
+| 性能隔离 | 弱（共享内存 GIL） | **强**（独立进程） | 强 | 强 |
+| 升级独立性 | 与 api-server 绑定 | 独立 | 独立 | 厂商自动 |
+| 数据合规 | 简单（同库） | 中 | 中 | **可能违规**（数据出境） |
+| 适合规模 | DAU < 1k | 1k-100k | 100k+ | 任意 |
+
+#### 关键决策点：什么时候从"嵌入"迁到"独立"
+
+| 触发信号 | 含义 |
+|---|---|
+| api-server CPU > 70% 持续 | 智能体推理挤压主接口性能 |
+| 单 invoke > 30s | 阻塞 api-server 其他请求 |
+| 智能体内存 > api-server 总内存 30% | 内存压力大 |
+| 不同业务智能体要不同扩缩容策略 | 嵌入做不到独立扩展 |
+| 独立部署有合规需求 | 例如 ai-runtime 在专属 VPC |
+
+#### 推荐顺序（含触发条件）
+
+1. **第 1-3 个月（嵌入）**：DAU < 1k、单 invoke < 10s 时最快上线
+2. **业务起来（容器化）**：触发上述任一信号后，2 周内迁
+3. **可选（Cloud）**：仅当数据合规允许 + 不想雇运维团队时
+
+**小结一行**：嵌入是 MVP 的最优解、容器化是规模生产的常态、Cloud 是无运维偷懒选项 —— 不要 day1 就上 k8s。
 
 ---
 
@@ -8907,7 +8931,64 @@ sandbox.close()
 | 客服智能体（仅调 API） | 不需要 |
 | 文档分析智能体（仅读文档） | 不需要 |
 
-**小结一行**：Sandbox 是"代码执行类"智能体的标配 —— 选 E2B（最专精）或 Modal（已用 Modal 时）。
+#### Sandbox 的隔离实现机制（深入）
+
+##### 4 层隔离技术
+
+| 层 | 技术 | 用途 |
+|---|---|---|
+| 进程隔离 | `subprocess` / `unshare` | 普通用户进程 |
+| 命名空间隔离（Namespace） | Linux Namespace（PID/Network/Mount/User）| 容器化基础 |
+| **资源限制** | cgroups（CPU / 内存 / IO 配额） | 防止 fork bomb / OOM |
+| **强隔离** | gVisor / Firecracker（用户态内核）/ Kata（虚拟机） | 防内核漏洞逃逸 |
+
+##### E2B 用 Firecracker microVM（隔离最强）
+
+```text
+LLM 生成代码
+   ↓
+E2B API（HTTPS）
+   ↓
+Firecracker microVM（专属 KVM 虚拟机，启动 < 125ms）
+   ↓ 安装 Jupyter kernel
+   ↓ 挂载临时文件系统（隔离）
+   ↓
+执行代码 + 返回结果
+   ↓
+销毁 VM（24h TTL）
+```
+
+**为什么用 microVM 而非 Docker**：
+
+| 维度 | Docker 容器 | Firecracker microVM |
+|---|---|---|
+| 启动速度 | 1-3s | **< 125ms** |
+| 隔离强度 | 共享内核（容器逃逸风险） | **独立内核** |
+| 内存开销 | 50-100 MB | 5-15 MB |
+| 适合场景 | 一般工作负载 | **不可信代码执行** |
+
+##### 关键安全防护点
+
+| 风险 | 防护 |
+|---|---|
+| `rm -rf /` | 隔离文件系统（VM 销毁后无影响） |
+| Fork bomb | cgroups CPU 限制 + 进程数限制 |
+| 网络扫描 / 攻击 | 网络命名空间 + 出站 IP 白名单 |
+| 信息窃取（读环境变量） | 独立 VM 无敏感环境 |
+| 长跑挖矿 | 默认超时 30s + 24h VM 销毁 |
+| 内核漏洞逃逸 | microVM 独立内核 |
+
+##### 自部署 vs 云沙箱选型
+
+| 维度 | E2B Cloud | 自部署（Firecracker / gVisor） |
+|---|---|---|
+| 启动延迟 | 100-300ms | < 50ms（本地） |
+| 价格 | $0.0001 / 秒 | 自购服务器 |
+| 安全维护 | 厂商承担 | **自己 patch 内核** |
+| 数据合规 | 数据出境 | 内部 |
+| 启动规模 | 可弹性 1k+ 并发 | 受限于硬件 |
+
+**小结一行**：Sandbox 是"代码执行类"智能体的标配 —— 选 E2B（最专精，Firecracker microVM 最安全）或 Modal（已用 Modal 时）；自部署需要懂 Linux 内核安全。
 
 ---
 
@@ -9194,15 +9275,115 @@ graph TB
 | **Client** | 内嵌在 Host 里、与 Servers 通信 |
 | **Server** | 独立进程，提供一组工具（与具体 LLM 无关） |
 
-#### 通信协议
+#### 通信协议（JSON-RPC 2.0 字节级）
 
-MCP 用 JSON-RPC 2.0：
+##### 3 种传输层
 
-| 传输 | 用法 |
+| 传输 | 用法 | 字节流形式 |
+|---|---|---|
+| **stdio** | 本地进程通信（最常见） | 行分隔的 JSON over stdin/stdout |
+| **SSE / Streamable HTTP** | 远程 server | HTTP POST 请求 + SSE 流式响应 |
+| **WebSocket** | 双向通信（少见） | WebSocket 双向消息 |
+
+##### MCP 一次完整调用的字节流
+
+```text
+[Client → Server] 初始化
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {"roots": {"listChanged": true}},
+    "clientInfo": {"name": "Claude Desktop", "version": "1.0"}
+  }
+}
+
+[Server → Client] 初始化响应
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {"tools": {}, "resources": {}},
+    "serverInfo": {"name": "my-tools", "version": "0.1"}
+  }
+}
+
+[Client → Server] 列出工具
+{"jsonrpc": "2.0", "id": 2, "method": "tools/list"}
+
+[Server → Client] 工具列表
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "tools": [{
+      "name": "search_docs",
+      "description": "搜索内部文档",
+      "inputSchema": {
+        "type": "object",
+        "properties": {"query": {"type": "string"}},
+        "required": ["query"]
+      }
+    }]
+  }
+}
+
+[Client → Server] 调用工具
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {"name": "search_docs", "arguments": {"query": "退款政策"}}
+}
+
+[Server → Client] 调用结果
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "content": [{"type": "text", "text": "找到 3 篇相关文档..."}],
+    "isError": false
+  }
+}
+```
+
+##### MCP 协议核心方法
+
+| 方法 | 含义 | 何时调 |
+|---|---|---|
+| `initialize` | 握手 + 协商协议版本 | 连接时 1 次 |
+| `tools/list` | 获取工具清单 | 启动时 + 用户请求时 |
+| `tools/call` | 调用工具 | 每次模型用工具时 |
+| `resources/list` | 列出资源（文件 / DB 表 / API endpoint）| 资源类 server |
+| `resources/read` | 读取资源 | 按需 |
+| `prompts/list` | 列出预定义提示模板 | 提示模板类 server |
+| `prompts/get` | 取一个模板 | 按需 |
+| `logging/setLevel` | 设日志级别 | 调试 |
+| `notifications/progress` | 长任务进度推送 | 由 server 主动发 |
+
+##### 协议特性
+
+| 特性 | 含义 |
 |---|---|
-| stdio | 本地进程通信（最常见） |
-| SSE / HTTP | 远程 server |
-| WebSocket | 双向通信 |
+| 异步 | 任意时刻 client / server 都可发消息 |
+| 双向 | server 可以主动通知（如工具列表变了） |
+| 进度通知 | 长任务用 `notifications/progress` 推送进度 |
+| 取消 | 用 `$/cancelRequest` 取消进行中的请求 |
+| 错误码 | JSON-RPC 标准（-32000 到 -32099 自定义错误） |
+
+##### stdio vs HTTP 选型
+
+| 维度 | stdio | Streamable HTTP（SSE）|
+|---|---|---|
+| 启动方式 | 本地子进程 | 独立服务 |
+| 部署 | 安装时配置 | 网络可达即可 |
+| 多实例共享 | 否（每客户端一个进程） | **是** |
+| 跨网络 | 否 | **是**（远程 MCP server） |
+| 安全边界 | 进程权限 | 网络权限 + 鉴权 |
+| 适合 | Claude Desktop / Cursor 本地工具 | 公司内部 MCP server |
 
 #### 一个 MCP server 示例
 
@@ -9407,6 +9588,79 @@ if __name__ == "__main__":
 | Eval 准入 | 评估指标低于阈值不让合 |
 | 灰度发布 | 配合特性开关 |
 
+#### 实现机制：典型 Agent as Code 项目结构
+
+```text
+my-agent/
+├── prompts/                  ← 所有提示词（git 跟踪）
+│   ├── system.txt
+│   ├── react_template.txt
+│   └── few_shot_examples.json
+├── tools/                    ← 工具定义
+│   ├── search.py
+│   └── calculator.py
+├── graph/                    ← 智能体图（LangGraph StateGraph）
+│   └── customer_agent.py
+├── evals/                    ← 评估用例
+│   ├── customer_qa.yaml      ← Promptfoo 配置
+│   └── golden_dataset.jsonl
+├── .github/workflows/
+│   ├── eval.yml              ← PR 时自动跑评估
+│   └── deploy.yml            ← merge 后自动部署
+└── pyproject.toml
+```
+
+#### CI 准入门槛示例
+
+```yaml
+# .github/workflows/eval.yml
+name: Agent Evaluation
+on:
+  pull_request:
+    paths: ['prompts/**', 'tools/**', 'graph/**']
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          npx promptfoo eval --config evals/customer_qa.yaml --output result.json
+          PASS_RATE=$(jq '.results.stats.successes / .results.stats.total' result.json)
+          # 准入门槛：通过率 >= 90%
+          if [ "$(echo "$PASS_RATE < 0.90" | bc)" = "1" ]; then
+            echo "❌ 评估通过率 $PASS_RATE < 90%，禁止合入"
+            exit 1
+          fi
+
+          # 关键指标无回退
+          OLD_COST=$(cat baseline.json | jq '.cost_per_request')
+          NEW_COST=$(jq '.metrics.cost_per_request' result.json)
+          if [ "$(echo "$NEW_COST > $OLD_COST * 1.2" | bc)" = "1" ]; then
+            echo "❌ 成本上涨 > 20%，需要审查"
+            exit 1
+          fi
+```
+
+#### Agent as Code 与传统软件工程的核心差异
+
+| 维度 | 传统软件 | Agent as Code |
+|---|---|---|
+| 测试 | 单元测试（输入输出确定） | **概率测试**（同输入可能不同输出，需统计跑多次取均值） |
+| 回归 | diff 一致 | 评估指标无回退 |
+| 灰度 | 流量百分比 | 流量 + 模型路由 + 提示词版本 |
+| 回滚 | git revert | git revert + 缓存清理（避免 prompt cache 污染） |
+| 监控 | 错误率 / 延迟 | + token 成本 / 评估通过率 / 幻觉率 |
+
+#### 工程基石（GitOps + 评估 + 灰度 + 回滚 4 件套）
+
+| 工具 | 角色 |
+|---|---|
+| Git | 版本管理 + PR 审核 |
+| Promptfoo / Braintrust | 评估 + 准入门槛 |
+| LangSmith / Langfuse | 观测 + 数据飞轮 |
+| 特性开关（Flagsmith / Unleash）| 灰度 + 紧急回滚 |
+
 **小结一行**：Agent as Code 把"智能体工程化"提升到与软件工程同等级别 —— 严肃团队 2026 的方向。
 
 ---
@@ -9432,6 +9686,79 @@ if __name__ == "__main__":
 | Cron | `langgraph.json` crons 字段 |
 | 长会话 | Checkpointer + thread_id |
 | 中断恢复 | `interrupt` |
+
+#### 实现机制：4 种触发模式的内部架构
+
+##### 1. 用户驱动（同步请求）
+
+```text
+HTTP Request → API Server → invoke(graph) → 返回 → HTTP Response
+```
+
+普通智能体，不算 Ambient。
+
+##### 2. 事件驱动
+
+```text
+事件源（Webhook / S3 / Kafka）
+   ↓
+事件总线（Redis Stream / Kafka / SNS）
+   ↓
+Worker（消费事件）
+   ↓
+client.runs.create(thread_id="event-{uuid}", graph=...)
+   ↓
+后台异步跑 → 写 checkpoint → 完成时通知（Webhook / Slack）
+```
+
+##### 3. 时间驱动（Cron）
+
+```text
+LangGraph Server 内置 cron 调度器
+   ↓
+每 5 分钟扫一次 langgraph.json 的 crons 配置
+   ↓
+到点 → client.runs.create(input=cron_input, graph=...)
+   ↓
+后台跑 → checkpoint → 把结果写到通知系统
+```
+
+`langgraph.json` 配置示例：
+
+```json
+{
+  "graphs": {"agent": "./agent.py:graph"},
+  "crons": [
+    {
+      "schedule": "0 9 * * 1",
+      "graph_id": "agent",
+      "input": {"task": "weekly_report"}
+    }
+  ]
+}
+```
+
+##### 4. 监控驱动
+
+```text
+Prometheus 告警 / CloudWatch Alarm
+   ↓ Webhook
+告警接收器 → 提取上下文（错误日志 / 指标）
+   ↓
+client.runs.create(graph=diagnose_agent, input={"alert": ...})
+   ↓
+后台诊断 → 写工单 / 通知 oncall
+```
+
+#### 关键工程挑战
+
+| 挑战 | 解决 |
+|---|---|
+| 并发控制 | LangGraph Server 用 thread_id 并发上限（同 thread_id 串行） |
+| 失败重试 | 失败的 run 加 dead-letter queue，oncall 看 |
+| 长任务超时 | Checkpoint 持久化 + worker 死了能换机器续跑 |
+| 成本监控 | 每个 run 关联 cost tag，超阈值告警 |
+| 灰度 | 事件驱动用流量百分比 / Cron 用配置开关 |
 
 **小结一行**：Ambient Agent 把智能体从"被动应答"升级到"主动工作" —— 是 SaaS 智能体产品的演化方向。
 
@@ -10423,9 +10750,10 @@ agent = create_react_agent(llm, tools, checkpointer=MemorySaver())
 | 25 | §18.5 | 总决策树 |
 | 26 | §19.1 | custom_agent 现状对照 |
 | 27 | §19.4 | 一年路线图 Gantt |
-| 28 | （预留） | — |
+| 28 | §1.10 | Agent 范式 5 代演进总览 |
 | 29 | §10.6 | 各派别在 8 节点上的着力点 |
 | 30 | §15.6 | 横切层与框架解耦 |
+| 31 | §0.5 | 6 层 Graph-based Agent 架构（业界 2026 主流蓝图） |
 
 ---
 
