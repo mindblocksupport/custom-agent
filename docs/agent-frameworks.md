@@ -200,16 +200,221 @@ attention(Q, K, V) = softmax(Q · K^T / √d) · V
 
 详细机制见 [§0.3.2](#032-context-window-kv-cache-prompt-caching)。
 
+#### 多头注意力（Multi-Head Attention）：一个 token 多个角度同时看
+
+##### 单头不够
+
+只用一组 Q/K/V 算 attention 太单调 —— 一个 token 只能从"一个角度"理解上下文。比如读"苹果"时，可能既需要关注它是水果（语义关系），也需要关注它在句子里是宾语（语法关系）。
+
+##### 多头机制
+
+把 Q/K/V 切成 N 个"头"（典型 N = 16-128），每组独立做一次 attention，然后把 N 个结果拼起来：
+
+```text
+单头：    Q × K^T  → 一个 attention 矩阵 → 一个加权融合结果
+多头(8): Q1×K1^T  → attention_1 → 结果_1
+         Q2×K2^T  → attention_2 → 结果_2
+         ...
+         Q8×K8^T  → attention_8 → 结果_8
+         拼接 [结果_1, ..., 结果_8] → 投影回原维度
+```
+
+| 头编号 | 实际可能学到 |
+|---|---|
+| Head 1 | "动作-宾语"语法关系 |
+| Head 2 | "代词指向哪个名词" |
+| Head 3 | "时间词修饰哪个动作" |
+| Head 4 | "数量词修饰哪个名词" |
+| ... | ... |
+
+每个头的"分工"是训练时自动涌现的，不是手工设计。
+
+##### 工程参数
+
+| 模型 | 总维度 d | 头数 | 每头维度 |
+|---|---|---|---|
+| GPT-3 175B | 12288 | 96 | 128 |
+| Llama 3 70B | 8192 | 64 | 128 |
+| Llama 3 8B | 4096 | 32 | 128 |
+
+##### KV Cache 的现代优化（MQA / GQA）
+
+每头都有独立 K/V → KV Cache 也按头数倍增。**多头注意力让 KV Cache 占显存暴增**。
+
+| 优化 | 含义 | 节省 |
+|---|---|---|
+| **多查询注意力（Multi-Query Attention，MQA）** | 多个 Query 头共享 1 组 K/V | KV Cache ÷ 头数 |
+| **分组查询注意力（Grouped-Query Attention，GQA）** | 多个 Query 头分组共享 K/V | KV Cache ÷ 组数（折中方案） |
+
+| 模型 | 用什么 |
+|---|---|
+| Llama 2（旧） | 普通多头 |
+| Llama 3 / Mistral / 多数现代模型 | **GQA**（典型 8 组 → KV Cache 减少 8 倍）|
+| 一些极端优化模型 | MQA（KV Cache 最少但质量略降） |
+
+GQA 是 2024 后几乎所有大模型的"省显存"标配。
+
+#### 位置编码（Positional Encoding）：让模型知道 token 顺序
+
+##### 不加位置编码模型分不清顺序
+
+Self-Attention 本身**对顺序不敏感** —— 不管你把 "我打他" 还是 "他打我"，每个 token 看其他 token 的方式一样。这显然不行。
+
+##### 解决：把"位置信息"也注入进来
+
+每个 token 的 embedding 不只是"含义指纹"，还混入"位置指纹"：
+
+| 阶段 | 输入 | 输出 |
+|---|---|---|
+| 原始 embedding | token 的语义向量 | "这个 token 的含义" |
+| + 位置编码 | + 位置 0/1/2/... 的位置向量 | "这个 token 在第 N 位的含义" |
+
+##### 主流 3 种位置编码
+
+| 方法 | 思路 | 代表模型 |
+|---|---|---|
+| **绝对位置（Sinusoidal / Learned）** | 给位置 0/1/2/... 各一个固定向量 | 原始 Transformer / GPT-2 |
+| **相对位置（RPE）** | 不直接编码位置，而是编码"两个 token 距离" | T5 |
+| **旋转位置编码（RoPE，Rotary Position Embedding）** | 把 Q/K 在每个位置上"旋转"一个特定角度 | **Llama 3 / Qwen / DeepSeek 等几乎全部 2023+ 模型** |
+
+##### RoPE 为什么主流
+
+| 优势 | 说明 |
+|---|---|
+| 自然支持长上下文 | 旋转角度可以外推到训练时未见过的位置 |
+| 数学优雅 | 直接作用在 attention 计算里，不增加 token 数 |
+| 工程友好 | 不增加显存 / 计算量 |
+
+**长上下文（1M token Opus 4.7）的实现关键之一就是 RoPE 的位置外推优化**（如 PI / NTK-aware / YaRN 等技巧）。
+
+#### Transformer 一层结构：N 层堆叠
+
+##### 一层 = "Multi-Head Attention + FFN" + 残差 + 归一化
+
+每一层 Transformer 的计算流：
+
+```text
+输入向量 x
+   ↓
+   ┌──────────────────────┐
+   │ Layer Norm           │  ← 归一化（防止数值爆炸）
+   └────────┬─────────────┘
+            ↓
+   ┌──────────────────────┐
+   │ Multi-Head Attention │  ← 让 token 互相"看"
+   └────────┬─────────────┘
+            ↓
+   x + (上一步结果)            ← 残差连接（避免信息丢失）
+            ↓
+   ┌──────────────────────┐
+   │ Layer Norm           │
+   └────────┬─────────────┘
+            ↓
+   ┌──────────────────────┐
+   │ FFN（前馈网络）       │  ← 两个全连接层 + 激活函数（让模型"思考"）
+   │  W1 → GeLU → W2     │
+   └────────┬─────────────┘
+            ↓
+   x' + (上一步结果)            ← 又一个残差连接
+            ↓
+   输出向量（给下一层）
+```
+
+| 组件 | 作用 |
+|---|---|
+| Multi-Head Attention | token 之间交流信息 |
+| FFN（Feed-Forward Network） | 在每个 token 上独立做"非线性变换"（深思）|
+| 残差连接（Residual） | 让深层模型也能训练 —— 否则信号在多层后会消失 |
+| Layer Norm | 数值稳定性 |
+
+##### 总参数量怎么来的
+
+| 模型 | 层数 | 隐藏维度 d | 头数 | 总参数 |
+|---|---|---|---|---|
+| GPT-2 small | 12 | 768 | 12 | 124M |
+| Llama 3 8B | 32 | 4096 | 32 | 8B |
+| Llama 3 70B | 80 | 8192 | 64 | 70B |
+| GPT-3 175B | 96 | 12288 | 96 | 175B |
+
+**层数 × 每层参数（attention + FFN）≈ 总参数量**。
+
+##### 推理时各层之间是流水线
+
+每个 token 走完 N 层后才输出概率分布。**长 prompt + 多层 + 大维度 = 推理慢**。
+
 #### 输出层 + 采样：概率分布展开
 
-最后一层把向量映射回词表（50k-200k 个 token），输出每个 token 的概率分布。
+##### 输出层（LM Head）
 
-| 采样策略 | 效果 |
-|---|---|
-| `temperature=0` | 总选概率最高（确定性） |
-| `temperature=1` | 按概率采样 |
-| `top_p=0.9` | 只从累积概率 90% 的 token 里选 |
-| `top_k=50` | 只从 top 50 选 |
+最后一层把每个 token 的隐藏向量乘以词表矩阵，得到词表大小的"分数向量"（logits）：
+
+```text
+hidden_vector (d 维) × W_lm_head (d × vocab_size) → logits (vocab_size 维)
+```
+
+##### softmax：分数 → 概率分布
+
+```text
+logits = [3.2, 1.1, -0.5, 4.7, ...]  ← 词表里每个 token 的分数
+softmax(logits) = [0.18, 0.02, 0.005, 0.79, ...]  ← 归一化成概率（加起来 = 1）
+```
+
+##### 采样策略详解
+
+控制下一个 token 怎么从概率分布里挑出来：
+
+| 参数 | 数学含义 | 直觉效果 |
+|---|---|---|
+| `temperature` | logits 除以 T 后再 softmax | T 越小越"确定"、T 越大越"随机" |
+| `top_p`（核采样）| 累积概率到 P 为止的 token 集合内采样 | 动态截断长尾 |
+| `top_k` | 只看概率最高的 K 个 token | 静态截断长尾 |
+| `repetition_penalty` | 重复 token 的 logits 减分 | 避免复读 |
+| `frequency_penalty` | 出现次数越多惩罚越大 | 鼓励词汇多样性 |
+| `presence_penalty` | 出现过的 token 一律减分 | 鼓励引入新概念 |
+
+##### temperature 的真实数学含义
+
+```text
+原 logits: [3.2, 1.1, -0.5, 4.7]
+
+T = 0.5（低温）：
+  logits / 0.5 = [6.4, 2.2, -1.0, 9.4]  ← 拉大差距
+  softmax = [0.05, 0.001, 0.000, 0.949]  ← 几乎只选 token 4 (确定性高)
+
+T = 1.0（默认）：
+  softmax([3.2, 1.1, -0.5, 4.7]) = [0.18, 0.02, 0.005, 0.79]
+
+T = 2.0（高温）：
+  logits / 2.0 = [1.6, 0.55, -0.25, 2.35]  ← 缩小差距
+  softmax = [0.27, 0.10, 0.045, 0.59]  ← 概率更平均（创造性高）
+
+T → 0：等价于 argmax（贪心）
+T → ∞：等价于均匀分布（完全随机）
+```
+
+##### top_p（核采样）的算法
+
+```python
+def top_p_sample(logits, p=0.9):
+    probs = softmax(logits)
+    sorted_probs, sorted_idx = sort_descending(probs)
+
+    # 累积概率
+    cum_probs = cumsum(sorted_probs)
+    # 找到累积刚超 p 的位置
+    cutoff = first_idx_where(cum_probs >= p)
+    # 只在前 cutoff 个 token 里采样
+    return sample_from(sorted_idx[:cutoff], sorted_probs[:cutoff])
+```
+
+##### 实战推荐配置
+
+| 任务 | temperature | top_p | 备注 |
+|---|---|---|---|
+| 工具调用 / 结构化输出 | **0** | 1.0 | 完全确定性 |
+| 客服 / 问答 | 0.3-0.7 | 0.9 | 适度自然 |
+| 创意写作 | 0.8-1.2 | 0.95 | 多样性高 |
+| 代码生成 | 0-0.3 | 0.95 | 倾向确定 |
 
 **关键洞察**：模型本质是"统计下一个 token 的概率分布展开" —— 不是"逻辑推理"。
 
@@ -219,6 +424,49 @@ attention(Q, K, V) = softmax(Q · K^T / √d) · V
 | temperature=0 仍可能错 | 概率分布本身可能错 |
 | 思维链有效 | 多生成几个 token 让分布"展开" |
 | 推理模型有效 | 内部生成几千个"思考 token"再给答案 |
+
+#### 训练 vs 推理：两个完全不同的过程
+
+##### 训练（Training，发生在厂商内部）
+
+| 阶段 | 含义 | 时长 / 成本 |
+|---|---|---|
+| **预训练（Pre-training）** | 用万亿级 token（互联网 + 书 + 代码）训练模型预测下一 token | 数月 / 千万-亿美元（Llama 3 70B 约 $30M） |
+| **监督微调（SFT）** | 用人工标注的"指令-回复"对，让模型学会按指令做事 | 几天 / 数十万美元 |
+| **人类反馈强化学习（RLHF / DPO）** | 用人工对回复排序训练奖励模型，再优化策略 | 几周 / 数百万美元 |
+| **能力扩展（推理 / 工具）** | o1 / Claude Extended Thinking 这种"推理模型"在 SFT/RL 阶段加入"思考 token" | 数月 / 数百万美元 |
+
+**结果**：得到"模型权重文件"（Llama 3 70B 约 140 GB）。
+
+##### 推理（Inference，发生在你调 API 时）
+
+| 阶段 | 含义 | 时长 |
+|---|---|---|
+| 加载权重到 GPU | 模型权重 + KV Cache 占用显存 | 启动一次 |
+| 处理 prompt（prefill） | 算整个 prompt 的 forward + KV cache | 100-2000ms |
+| 生成 token（decode） | 每个 token 重复一次 forward + 采样 | 5-50ms / token |
+
+##### 关键差异
+
+| 维度 | 训练 | 推理 |
+|---|---|---|
+| 谁做 | 厂商（OpenAI / Anthropic / Google） | 你 + 厂商 API |
+| 计算图 | 前向 + 反向（梯度） | 仅前向 |
+| 数据 | 万亿 token 语料 | 你的 prompt |
+| 输出 | 模型权重 | 一段文本 |
+| 成本量级 | 千万-亿美元 | 单次 $0.001-$1 |
+| 可调参数 | 学习率 / 批大小 / 优化器 | temperature / top_p / max_tokens |
+
+##### 为什么这区分重要
+
+| 场景 | 影响 |
+|---|---|
+| 你看到的 token 价格 | 仅推理成本，不含训练分摊 |
+| 模型"知识截止"日期 | 训练数据截止时间 |
+| 模型"擅长什么" | 由训练数据 + RLHF 决定，推理时无法改 |
+| 想让模型"学习新东西" | 不能改权重；只能在 prompt 里给少样本（in-context learning）或微调 |
+
+**调 API 时你只用推理。所有"知识"都在权重里，权重在训练阶段就冻结了**。
 
 #### LLM 的能力与边界
 
@@ -326,6 +574,88 @@ Anthropic 字节级响应：
 ```
 
 详细字节对照见 [附录 K](#附录-k--openai--anthropic--google-工具调用三家协议对照)。
+
+#### 结构化解码内部机制（grammar-constrained decoding 怎么工作）
+
+##### 朴素做法 vs 约束解码
+
+**朴素做法（GPT-3 时代）**：在 prompt 里写"请输出 JSON 格式"，靠模型听话。**失败率 5-30%**（模型经常输出错的 JSON、加多余文字、漏字段）。
+
+**结构化解码（GPT-4 / Claude 现代做法）**：在采样阶段**强制约束**模型只能输出符合 schema 的 token。**失败率 < 0.1%**。
+
+##### 约束解码的字节级工作原理
+
+把 schema 编译成"状态机 + 允许 token 集"，每生成一个 token 时：
+
+```text
+当前状态：刚生成完 {"city":
+   ↓
+查 schema 状态机：下一位置必须是字符串值
+   ↓
+词表 50,000 个 token，但当前合法的只有约 2000 个（带引号开头的字符串 token）
+   ↓
+模型输出 logits（50,000 维）
+   ↓
+把不合法 token 的 logits 设为 -∞
+   ↓
+softmax → 只在合法 token 里采样
+   ↓
+生成下一 token （比如 `"`、`"北`）
+```
+
+##### 实现思路
+
+| 阶段 | 操作 |
+|---|---|
+| 1. Schema → 状态机 | 把 JSON Schema 编译成有限状态自动机（FSA） |
+| 2. 当前状态 → 允许字符集 | 状态机告诉你当前能接受哪些字符 |
+| 3. 字符集 → 允许 token 集 | 用 tokenizer 反推哪些 token 可以"prefix-match"上 |
+| 4. logits 屏蔽 | 不允许的 token logits = -∞ |
+| 5. 重新归一化 + 采样 | softmax + 采样 |
+| 6. 状态机推进 | 根据生成的 token 更新状态 |
+
+##### 主流约束解码引擎
+
+| 引擎 | 出品方 | 强项 |
+|---|---|---|
+| **Outlines**（开源） | Normal Computing | Pythonic，与 vLLM 集成 |
+| **JSON Mode**（OpenAI 2024.06） | OpenAI 内置 | API 透明 |
+| **Structured Outputs**（OpenAI 2024.08）| OpenAI 内置 | 完整 JSON Schema |
+| **lm-format-enforcer** | 开源 | 字段级约束 |
+| **xgrammar** | 开源 | 高性能（支持 LLVM 风格语法） |
+| **vLLM guided decoding** | vLLM | 自部署首选 |
+
+##### 性能开销
+
+| 操作 | 额外成本 |
+|---|---|
+| 状态机查询 | < 1ms / token（缓存后） |
+| token 集合预计算 | 启动一次性（首次 ~100ms） |
+| logits 屏蔽 | 几乎为零（GPU 上 mask 操作） |
+| **总开销** | **生成速度下降 < 5%** |
+
+##### 工具调用 = 特殊 schema 的约束解码
+
+```python
+# 厂商内部把工具描述转成 schema
+schema = {
+  "type": "object",
+  "properties": {
+    "name": {"type": "string", "enum": ["get_weather", "search"]},
+    "arguments": {"type": "object", "properties": {...}}
+  },
+  "required": ["name", "arguments"]
+}
+
+# 在解码时强制约束
+constrained_decode(model, prompt, schema)
+```
+
+这就是 OpenAI Function Calling / Anthropic Tool Use **不会输出格式错乱**的根本原因 —— 不是"prompt 哄好了模型"，是**采样层强制约束**。
+
+##### Anthropic Tool Use 的额外妙处
+
+Claude 的 Tool Use 在训练阶段还把"工具调用 vs 文本回复"作为训练目标，让模型**主动学会**何时调用工具，约束解码只是兜底。这就是为什么 Claude 的工具调用准确率（选对工具 + 填对参数）业界最高。
 
 #### 流式输出：SSE 字节流
 
@@ -677,6 +1007,121 @@ results = db.similarity_search("怎么退款？", k=3)
 | Chroma | 嵌入式 / 单机 | 开发 |
 | **pgvector** | Postgres 扩展 | **已有 Postgres 时首选** |
 | FAISS | 库（Meta 开源） | 单进程嵌入式 |
+
+##### Embedding 模型选型（决定召回质量的根因）
+
+向量检索的召回率上限**完全由 embedding 模型决定**。模型越强、向量越能"理解"语义。
+
+###### 主流模型对比（2026.04）
+
+| 模型 | 维度 | MTEB 分数 | 价格 | 强项 |
+|---|---|---|---|---|
+| **OpenAI text-embedding-3-large** | 3072（可降至 256-1024） | 64.6 | $0.13/M token | 通用、英文强 |
+| **OpenAI text-embedding-3-small** | 1536 | 62.3 | **$0.02/M** | 性价比高 |
+| **Cohere embed-v3** | 1024 | 64.5 | $0.10/M | 多语言强 |
+| **Voyage-3**（Anthropic 推荐）| 1024 | **66.1** | $0.18/M | 长文档强 |
+| **bge-large-en-v1.5**（开源） | 1024 | 64.2 | 0（自部署） | 英文 |
+| **bge-m3**（开源，多语言） | 1024 | 60.2 | 0（自部署） | **中英混合首选** |
+| **multilingual-e5-large**（开源） | 1024 | 60.0 | 0 | 多语言 |
+| **nomic-embed-text** | 768 | 62.3 | 0 | 轻量、本地 |
+
+> MTEB（Massive Text Embedding Benchmark）= 业界主流评估，56 个任务平均分数。
+
+###### 选型决策树
+
+| 场景 | 推荐 |
+|---|---|
+| 英文通用 | `text-embedding-3-small`（性价比） |
+| 长文档（金融/法律）| `voyage-3` 或 `voyage-3-large` |
+| 中英混合 | `bge-m3` 自部署 或 `voyage-3` |
+| 隐私 / 离线 | `bge-m3` 或 `nomic-embed` |
+| 大规模（> 1 亿条） | 自部署开源模型省钱 |
+
+###### Matryoshka Embeddings（俄罗斯套娃嵌入）
+
+OpenAI text-embedding-3 系列支持**降维而几乎不损失精度** —— 训练时把不同维度的子向量都优化得有意义：
+
+```python
+# 全维度（3072）：最高精度
+emb_full = openai.embed("文本", model="text-embedding-3-large")
+
+# 截断到 1024 维：精度仅降 ~2%，存储省 3 倍
+emb_compact = emb_full[:1024]
+```
+
+**工程价值**：高精度场景用 3072 维存底库，低延迟场景用 256 维快查 —— 一份模型支持多档需求。
+
+##### 混合检索（Hybrid Retrieval）：dense + sparse 结合
+
+###### 单纯向量检索的局限
+
+| 问题 | 说明 |
+|---|---|
+| 不擅长"精确匹配" | 查"OAuth 2.0"可能召回"OAuth 1.0"和"SAML 2.0"（语义近但不准）|
+| 不擅长"罕见术语" | 公司内部代号 / 专业缩写 模型没见过 |
+| 不擅长"数字 / 名字" | "GPT-4o" 和 "GPT-3.5" 向量很近 |
+
+###### 关键字检索（Sparse / BM25）的强项
+
+BM25（**B**est **M**atch 25）是经典的关键字检索算法，强在精确匹配（如倒排索引）。
+
+| 维度 | Dense 向量（语义）| Sparse 关键字（BM25）|
+|---|---|---|
+| 强项 | 同义词、近义概念 | 精确词汇、专有名词 |
+| 弱项 | 罕见术语、缩写 | 同义词、改写 |
+| 召回机制 | 余弦相似 | 词频 + 逆文档频率 |
+| 速度 | O(log n) HNSW | O(log n) 倒排索引 |
+
+###### 混合检索的标准做法
+
+```text
+query = "OAuth 2.0 PKCE 安全流程"
+
+并行：
+  ├── Dense 检索（向量库）  → top 30 候选
+  └── Sparse 检索（BM25）  → top 30 候选
+       ↓
+  合并 + 重排（Reciprocal Rank Fusion / RRF）：
+    score(doc) = Σ 1 / (60 + rank_in_each_list)
+       ↓
+  Reranker 模型（可选，最强精度）→ 重新排序 top 30
+       ↓
+  取 top 5 注入 prompt
+```
+
+###### Reciprocal Rank Fusion（RRF）算法
+
+```python
+def rrf(rankings, k=60):
+    """合并多个排序列表（dense + sparse）"""
+    scores = defaultdict(float)
+    for ranking in rankings:
+        for rank, doc_id in enumerate(ranking):
+            scores[doc_id] += 1 / (k + rank + 1)
+    return sorted(scores.items(), key=lambda x: -x[1])
+```
+
+###### Reranker（重排序）模型
+
+进一步提升精度的"压舱石"。
+
+| Reranker | 出品方 | 强项 |
+|---|---|---|
+| **Cohere Rerank v3** | Cohere | 跨语言精度高、API 简单 |
+| **bge-reranker-v2-m3**（开源） | BAAI | 中文强 |
+| **Voyage rerank-v3** | Anthropic | 通用 |
+| **Jina Reranker v2** | Jina | 多语言 |
+
+Reranker 跟 embedding 不同 —— 它**直接读 query + doc 一对**判分，不是预先编码再算相似度。**精度高但速度慢，适合 top 30 → top 5 的精排**。
+
+###### 召回率提升幅度（实测）
+
+| 方案 | 召回率（top 5）|
+|---|---|
+| 纯 dense | 65% |
+| 纯 BM25 | 55% |
+| Dense + BM25 + RRF | 78% |
+| **Dense + BM25 + RRF + Reranker** | **88%** |
 
 ##### LangGraph Store API（详见 [§6.5](#65-store-api-basestore)）
 
@@ -1161,6 +1606,125 @@ ReAct 关键创新：**Observation 文本进入 KV cache**，相当于"把工具
 |---|---|---|
 | "查 A 加 B 的天气差" | 3 步 | **可能 1 步**（内部思考很深） |
 | "规划一周旅行" | 10+ 步 | **1-2 步**给完整计划 |
+
+##### 推理模型是怎么训练出来的（RL + Verifier）
+
+###### 普通 LLM 的训练
+
+回顾 §0.1 训练 vs 推理：普通 LLM 走 **预训练 → SFT → RLHF**。RLHF 的奖励信号是**人类对回复的偏好排序**（"答案 A 比答案 B 好"）。
+
+###### 推理模型的训练增加了什么
+
+OpenAI o1 / DeepSeek-R1 / Anthropic Extended Thinking 在 RLHF 之外，加了一个**新阶段**：
+
+```text
+普通 LLM:        预训练 → SFT → RLHF（人类偏好奖励）
+推理模型:        预训练 → SFT → RLHF → ★ RL with Verifier（可验证奖励）
+```
+
+**核心创新**：奖励不再来自人类偏好，而是来自**自动可验证的信号**：
+
+| 任务类型 | 自动验证信号 |
+|---|---|
+| 数学题 | 答案对不对（精确数字匹配） |
+| 代码题 | 单元测试是否通过 |
+| 形式逻辑 | 推理步骤合不合规则 |
+| 结构化任务 | 输出是否符合 schema |
+
+###### 训练流程（DeepSeek-R1 公开论文为例）
+
+```text
+步骤 1: 给模型一道数学题
+       "解 2x + 5 = 11"
+       ↓
+步骤 2: 让模型生成 N 个不同思考过程 + 答案
+       Sample 1: <think>x = (11-5)/2 = 3</think> 答：3   ✓
+       Sample 2: <think>x = 11/2 - 5 = 0.5</think> 答：0.5  ✗
+       Sample 3: <think>x = 11 - 5 = 6, x = 6/2 = 3</think> 答：3  ✓
+       ...
+       ↓
+步骤 3: Verifier 判分（不是人评，是脚本对照标准答案）
+       Sample 1: +1（答对）
+       Sample 2: -1（答错）
+       Sample 3: +1（答对，且过程合理）
+       ↓
+步骤 4: 用强化学习（PPO / GRPO 算法）
+       让模型更可能生成"答对"那种思考过程
+       ↓
+       重复几十万次 → 模型自动学会"长链思考"
+```
+
+###### 涌现的能力
+
+DeepSeek-R1 训练时**没有显式教模型"该想多久"**，但训练后模型自发学会：
+
+| 涌现行为 | 含义 |
+|---|---|
+| "Wait, let me reconsider..." | **自我反思**（重新审视前面的步骤） |
+| "Let me try a different approach..." | **重新规划**（换思路） |
+| "Let me verify this answer..." | **自我验证**（算完再核对） |
+| 思考长度自适应 | 简单题想几百 token，难题想几万 token |
+
+这是一个**模型涌现现象** —— 不是工程师写规则，而是 RL 训练逼出来的。
+
+###### "Hidden Thinking" 是什么
+
+```text
+用户看到的回复:
+  "答：3"
+
+模型内部生成的完整序列：
+  <think>
+  这道题是 2x + 5 = 11，要解 x。
+  让我先把 5 移到右边：2x = 11 - 5 = 6
+  再除以 2：x = 6 / 2 = 3
+  让我验证：2*3 + 5 = 6 + 5 = 11 ✓
+  </think>
+  答：3
+```
+
+`<think>...</think>` 部分是 hidden thinking，**用户看不到但要付费**（因为占 GPU 计算）。OpenAI o1 把这部分完全隐藏，DeepSeek-R1 / Claude Extended Thinking 给开发者选项可以查看。
+
+###### 推理模型 vs 多步 ReAct 的本质区别
+
+| 维度 | 多步 ReAct（普通 LLM） | 推理模型 |
+|---|---|---|
+| "思考"的位置 | 在多次 API 调用之间（外显） | 在单次 API 调用内部（隐式） |
+| 思考能用什么 | 工具结果（外部信息） | 仅 prompt + 内部参数 |
+| 谁控制思考节奏 | 框架（LangGraph 节点） | 模型自己（自适应） |
+| 单次调用成本 | 普通 token | 推理 token（贵 5-10×） |
+| 适合 | 需要外部数据的任务 | 纯推理任务（数学 / 规划 / 代码） |
+
+###### 什么场景用推理模型才划算
+
+| 任务 | 用推理模型 | 用普通 LLM + ReAct |
+|---|---|---|
+| 数学竞赛题 | **推理模型**（步骤多但不用工具） | 不行 |
+| 复杂规划（旅行 / 项目计划） | **推理模型**（一次出完整计划） | 也行但要多步迭代 |
+| 简单查询（天气 / FAQ） | 用推理模型浪费钱 | **普通模型** |
+| 需要外部数据（订单 / 物流） | 推理模型也得调工具，没特别优势 | **ReAct 可控性更好** |
+| 代码审查（无需运行）| **推理模型** | 普通模型不够深 |
+| 代码生成（要跑测试）| 都行，但要配工具 | **ReAct + 沙箱** |
+
+##### 推理模型的"思考预算"控制（reasoning_effort）
+
+OpenAI o3 等模型支持 `reasoning_effort` 参数：
+
+```python
+response = client.chat.completions.create(
+    model="o3",
+    messages=[...],
+    reasoning_effort="medium"  # low / medium / high
+)
+```
+
+| 等级 | 思考 token 量 | 价格倍数 | 适合 |
+|---|---|---|---|
+| low | 几百-几千 | 2-3× 普通 | 中等复杂 |
+| medium | 几千-万 | 5× | 复杂规划 |
+| high | 几万-几十万 | 10× | 数学竞赛级 |
+
+Claude Extended Thinking 类似：`thinking={"type": "enabled", "budget_tokens": 8000}`。
 
 #### 智能体调用 = N 次 LLM API
 
@@ -1655,6 +2219,25 @@ graph LR
 | Critic | 评估层 | 主流架构第 4 层 |
 | Time Travel | 时间旅行 | get_state_history + 分支重放 |
 | Branching | 分支 | 从历史 checkpoint 创新分支 |
+| Multi-Head Attention | 多头注意力 | 把 Q/K/V 切成 N 头并行 attention，每头学不同关系 |
+| MQA (Multi-Query Attention) | 多查询注意力 | 多个 Query 头共享 1 组 K/V，KV Cache 减小 N 倍 |
+| GQA (Grouped-Query Attention) | 分组查询注意力 | 多个 Query 头分组共享 K/V，2024+ 现代大模型标配 |
+| RoPE (Rotary Position Embedding) | 旋转位置编码 | 把 Q/K 在每个位置上旋转特定角度；Llama 3+ 主流 |
+| Sinusoidal | 正弦位置编码 | 原始 Transformer 用的固定向量位置编码 |
+| FFN (Feed-Forward Network) | 前馈网络 | Transformer 一层里的两个全连接层 + 激活函数 |
+| Layer Norm | 层归一化 | Transformer 每子层前的数值稳定性归一 |
+| Residual | 残差连接 | 让深层模型可训练的"跳层"连接 |
+| FSA | 有限状态自动机 | 把 JSON Schema 编译成的状态机，约束解码用 |
+| Outlines / xgrammar | 约束解码引擎 | 开源 grammar-constrained decoding 实现 |
+| MTEB | 嵌入评测 | Massive Text Embedding Benchmark 业界标准 |
+| Matryoshka Embeddings | 俄罗斯套娃嵌入 | 一份模型可截断到不同维度而不大幅损失精度 |
+| BM25 | 经典关键字检索 | Best Match 25，倒排索引 + 词频 + 逆文档频率 |
+| Hybrid Retrieval | 混合检索 | dense（向量）+ sparse（BM25）并行 + RRF 合并 + Reranker 精排 |
+| RRF (Reciprocal Rank Fusion) | 倒数排名融合 | 合并多个检索排序的算法 |
+| Reranker | 重排序器 | 直接读 query+doc 对判分的精排模型，比 embedding 精度高 |
+| Verifier | 验证器 | 推理模型 RL 训练时的"答案是否正确"自动判分器 |
+| PPO / GRPO | 强化学习算法 | Proximal Policy Optimization / Group Relative Policy Optimization |
+| `reasoning_effort` | 思考预算参数 | OpenAI o3 等推理模型控制 hidden thinking 长度的开关 |
 
 ### §0.10 推荐下一章
 
@@ -9872,6 +10455,7 @@ agent = create_react_agent(llm, tools, checkpointer=MemorySaver())
 | `bind_tools` | 绑定工具 | §2.13 |
 | `BinaryOperatorAggregate` | 二元运算累加通道 | §6.8 |
 | `BaseStore` | 存储基类 | §6.5 |
+| BM25 | 经典关键字检索算法 | §0.3.4 |
 
 ### C
 | 术语 | 中文 | 出现章节 |
@@ -9904,13 +10488,18 @@ agent = create_react_agent(llm, tools, checkpointer=MemorySaver())
 ### F / G / H
 | 术语 | 中文 | 出现章节 |
 |---|---|---|
+| FFN（Feed-Forward Network） | 前馈网络 | §0.1 |
+| FSA | 有限状态自动机 | §0.2 |
 | Function Calling | 函数调用 | §0.4 |
 | Functional API | 函数式接口 | §6.4 |
+| GQA（Grouped-Query Attention） | 分组查询注意力 | §0.1 |
 | `GraphRecursionError` | 图递归错 | §5.6 |
+| GRPO | 组相对策略优化（RL 算法） | §0.4 |
 | Hallucination | 幻觉 | §0.3 |
 | Handoff | 交接 | §10.3 |
 | Haystack | Haystack 框架 | §10.1 |
 | HITL（Human-in-the-Loop） | 人在回路 | §5.4 |
+| Hybrid Retrieval | 混合检索 | §0.3.4 |
 
 ### I / J / L
 | 术语 | 中文 | 出现章节 |
@@ -9928,54 +10517,72 @@ agent = create_react_agent(llm, tools, checkpointer=MemorySaver())
 | 术语 | 中文 | 出现章节 |
 |---|---|---|
 | Map-Reduce | 映射-归约 | §6.2 |
+| Matryoshka Embeddings | 俄罗斯套娃嵌入 | §0.3.4 |
 | Memory | 记忆 | §2.7 |
 | MCP（Model Context Protocol） | 模型上下文协议 | §16.1 |
+| MQA（Multi-Query Attention） | 多查询注意力 | §0.1 |
+| MTEB | 嵌入评测基准 | §0.3.4 |
+| Multi-Head Attention | 多头注意力 | §0.1 |
 | Multimodal | 多模态 | §11.6 |
 | Node | 节点 | §4.3 |
 | `NodeInterrupt` | 动态中断 | §5.4 |
 | Observation | 观察 | §1.2 |
 | Observability | 可观测性 | §15.3 |
 | OpenAI Agents SDK | OpenAI 智能体 SDK | §10.3 |
+| Outlines | 约束解码引擎 | §0.2 |
 | OutputParser | 输出解析器 | §2.9 |
 
 ### P / Q / R
 | 术语 | 中文 | 出现章节 |
 |---|---|---|
 | `PostgresSaver` | Postgres 检查点 | §5.3 |
+| PPO | 近端策略优化（RL 算法） | §0.4 |
 | Pregel | 超步并行模型 | §4.4 |
 | Prompt Caching | 提示词缓存 | §17.5 |
 | Prompt Engineering | 提示词工程 | §0.6 |
 | `PromptTemplate` | 提示词模板 | §2.3 |
 | Promptfoo | Promptfoo 评估工具 | §15.2 |
 | PydanticAI | PydanticAI 框架 | §10.4 |
+| `reasoning_effort` | 思考预算参数 | §0.4 |
 | Reasoning Model | 推理模型 | §17.6 |
 | ReAct | 推理-行动范式 | §1 |
 | `recursion_limit` | 递归上限 | §5.6 |
 | Reducer | 归约器 | §6.1 |
 | Reflexion | 反思范式 | §1.5 |
+| Reranker | 重排序器 | §0.3.4 |
+| Residual Connection | 残差连接 | §0.1 |
 | Retriever | 检索器 | §2.3 |
+| RoPE（Rotary Position Embedding） | 旋转位置编码 | §0.1 |
 | Routing | 路由 | §10.7 |
+| RRF（Reciprocal Rank Fusion） | 倒数排名融合 | §0.3.4 |
 | Runnable | 可运行对象 | §2.6 |
 
 ### S
 | 术语 | 中文 | 出现章节 |
 |---|---|---|
 | Sandbox | 沙箱 | §15.1 |
+| Self-Attention | 自注意力 | §0.1 |
 | Self-Consistency | 自我一致性 | §0.6 |
 | Semantic Kernel | 语义内核 | §10.1 |
 | `Send` | 发送原语 | §6.2 |
+| Sinusoidal | 正弦位置编码 | §0.1 |
 | Skill | 技能 | §16.3 |
 | `SqliteSaver` | SQLite 检查点 | §5.3 |
 | START | 起点常量 | §4.5 |
 | State / StateGraph | 状态 / 状态图 | §4.3 |
 | Store API | 存储接口（跨会话） | §6.5 |
 | Streaming | 流式 | §2.11 |
+| Structured Decoding | 结构化解码 | §0.2 |
 | Subgraph | 子图 | §6.2 |
 | Supervisor | 监督者 | §6.3 |
 | Swarm | 蜂群 | §6.3 |
 
-### T / V / W / Z
+### T / V / W / Z / 其他
 | 术语 | 中文 | 出现章节 |
+|---|---|---|
+| Layer Norm | 层归一化 | §0.1 |
+| Verifier | 验证器（推理模型 RL 用） | §0.4 |
+| xgrammar | 高性能约束解码引擎 | §0.2 |
 |---|---|---|
 | Thought / Action / Observation | 思考 / 行动 / 观察 | §1.2 |
 | Token | 词元 | §0.5 |
