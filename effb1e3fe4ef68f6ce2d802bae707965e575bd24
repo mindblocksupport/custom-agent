@@ -1,0 +1,66 @@
+README.md
+  98ea89bdb61c2bb5 5-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "effb1e3fe4ef68f6ce2d802bae707965e575bd24",
+  "prompts": {
+    "98ea89bdb61c2bb5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "638163d5-3fa8-417f-aa8c-7d688e74feac",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "shaoqiu <shaoqiu.chen@xinfei.cn>",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 0,
+      "accepted_lines": 12,
+      "overriden_lines": 0,
+      "messages_url": "https://codeaiapi.xinfei-inc.cn/cas/34b2f671c50416e5814cd458c7a88fa820e8ba9d788b84fd0daa820446e18a3f"
+    },
+    "cb73be6825dc0746": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "42a1301f-b4b3-460f-be8d-c3dc86d05568",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "shaoqiu <shaoqiu.chen@xinfei.cn>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 8036,
+      "overriden_lines": 0,
+      "messages_url": "https://codeaiapi.xinfei-inc.cn/cas/f6b5473d2627b7d019c4d3075e08fc3e0f50523871352c27a99a1370113e2a7f"
+    },
+    "cf9687615c38e6c1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "98a3500d-b812-4ac5-9617-fe1b88390aa0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "shaoqiu <shaoqiu.chen@xinfei.cn>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 5999,
+      "overriden_lines": 0,
+      "messages_url": "https://codeaiapi.xinfei-inc.cn/cas/9545f190563ccada3d57ef5e0a45d6a3604bfcc27aff7264f68f487a2612bd9c"
+    },
+    "d6a1a62b71d69249": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bad26ecc-2391-4d99-bd18-dc4389aa7e1c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "RAG KMap <rag@mindblock.support>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2170,
+      "overriden_lines": 0,
+      "messages_url": "https://codeaiapi.xinfei-inc.cn/cas/b8a463d1e8153934c03c04fbb976252ea10a7944d0be5553fc71e4dda02dd90e"
+    }
+  }
+}
