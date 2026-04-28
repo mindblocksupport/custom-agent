@@ -93,27 +93,78 @@ export function useKb({
         created_at: new Date().toISOString(), finished_at: null,
       };
       setActiveJobs((prev) => [...prev, placeholder]);
-      for (let i = 0; i < 60; i++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        try {
-          const r = await fetch(`/api/kb/jobs/${jobId}`, {
-            headers: { Authorization: `Bearer ${apiKey}` },
-          });
-          if (!r.ok) continue;
-          const j = (await r.json()) as KbJob;
-          setActiveJobs((prev) =>
-            prev.map((x) => (x.id === jobId ? j : x)),
-          );
-          if (j.status === "done" || j.status === "failed") {
-            setTimeout(() => {
-              setActiveJobs((prev) => prev.filter((x) => x.id !== jobId));
-            }, 3000);
-            await refresh();
-            await refreshCollections();
-            break;
+
+      // 优先 SSE 推送; EventSource 不能带 Authorization header, 走 query 兜底.
+      // 当前代理只接受 Bearer header → fall back to polling if EventSource 不可达.
+      const onFinal = async () => {
+        setTimeout(() => {
+          setActiveJobs((prev) => prev.filter((x) => x.id !== jobId));
+        }, 3000);
+        await refresh();
+        await refreshCollections();
+      };
+
+      // 用 fetch + ReadableStream 解析 SSE — 这样可以带 Authorization header
+      try {
+        const r = await fetch(`/api/kb/jobs/${jobId}/stream`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!r.ok || !r.body) throw new Error(`stream HTTP ${r.status}`);
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        let done = false;
+        while (!done) {
+          const { value, done: d } = await reader.read();
+          done = d;
+          if (value) {
+            buf += decoder.decode(value, { stream: true });
+            // 按 SSE 分帧 (`\n\n`)
+            const frames = buf.split("\n\n");
+            buf = frames.pop() ?? "";
+            for (const f of frames) {
+              const lines = f.split("\n");
+              let event: string | null = null;
+              let data = "";
+              for (const ln of lines) {
+                if (ln.startsWith("event:")) event = ln.slice(6).trim();
+                else if (ln.startsWith("data:")) data += ln.slice(5).trim();
+              }
+              if (event === "progress" && data) {
+                try {
+                  const j = JSON.parse(data) as KbJob;
+                  setActiveJobs((prev) =>
+                    prev.map((x) => (x.id === jobId ? j : x)),
+                  );
+                } catch {/* ignore parse */}
+              } else if (event === "end" || event === "timeout" || event === "error") {
+                done = true;
+                break;
+              }
+            }
           }
-        } catch {
-          /* keep polling */
+        }
+        await onFinal();
+      } catch {
+        // SSE 不可达 → 老 polling 兜底
+        for (let i = 0; i < 60; i++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          try {
+            const r2 = await fetch(`/api/kb/jobs/${jobId}`, {
+              headers: { Authorization: `Bearer ${apiKey}` },
+            });
+            if (!r2.ok) continue;
+            const j = (await r2.json()) as KbJob;
+            setActiveJobs((prev) =>
+              prev.map((x) => (x.id === jobId ? j : x)),
+            );
+            if (j.status === "done" || j.status === "failed") {
+              await onFinal();
+              break;
+            }
+          } catch {
+            /* keep polling */
+          }
         }
       }
     },

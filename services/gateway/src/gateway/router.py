@@ -29,6 +29,31 @@ REASONING_KEYWORDS_RE = re.compile(
 LONG_QUERY_THRESHOLD = 200            # 字符
 
 
+# ============================================================
+# Vision capability registry (manually curated; LiteLLM 不暴露 capabilities)
+# 当前主流 vision-capable model 列表 (substring match, lower-cased)
+# ============================================================
+_VISION_PATTERNS = [
+    "claude-3", "claude-sonnet-4", "claude-opus-4",      # Anthropic
+    "gpt-4o", "gpt-4-turbo", "gpt-4-vision", "gpt-5",    # OpenAI
+    "gemini-1.5", "gemini-2", "gemini-pro-vision",       # Google
+    "qwen-vl", "qwen2-vl", "qwen2.5-vl",                 # Qwen vision
+    "internvl", "minicpm-v", "llava",                    # Open source
+]
+
+
+def is_vision_capable(model: str | None) -> bool:
+    """简单子串匹配判断模型是否支持图像输入.
+
+    auto / 空值 → False (调用方应做兜底; chat route 可在 multimodal
+    且 explicit_model=None 时自动 promote 到 reasoning 模型).
+    """
+    if not model or model == "auto":
+        return False
+    m = model.lower()
+    return any(p in m for p in _VISION_PATTERNS)
+
+
 @dataclass
 class RouteDecision:
     model: str

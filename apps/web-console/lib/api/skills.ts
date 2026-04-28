@@ -61,4 +61,13 @@ export class SkillsApi {
       body: JSON.stringify({ workspace_id: targetWorkspaceId }),
     });
   }
+  listVersions(sid: string): Promise<Skill[]> {
+    return this.req(`/api/skills/${sid}/versions`);
+  }
+  rollback(sid: string, targetVersion: number): Promise<Skill> {
+    return this.req(`/api/skills/${sid}/rollback`, {
+      method: "POST",
+      body: JSON.stringify({ target_version: targetVersion }),
+    });
+  }
 }

@@ -4,6 +4,10 @@
 """
 
 from gateway.client import llm_complete_stream
-from gateway.router import ModelRouter, RouteDecision
+from gateway.router import ModelRouter, RouteDecision, is_vision_capable
 
-__all__ = ["ModelRouter", "RouteDecision", "llm_complete_stream"]
+__all__ = [
+    "ModelRouter", "RouteDecision",
+    "is_vision_capable",
+    "llm_complete_stream",
+]

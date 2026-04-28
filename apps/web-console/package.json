@@ -4,9 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "next dev -p 3000 --turbopack",
+    "dev:webpack": "next dev -p 3000",
     "build": "next build",
+    "build:clean": "rm -rf .next node_modules/.cache && next build",
     "start": "next start -p 3000",
+    "clean": "rm -rf .next node_modules/.cache",
     "lint": "tsc --noEmit -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

@@ -42,6 +42,8 @@ class MemberRow:
     actor_id: str
     role: str
     created_at: datetime
+    budget_daily_usd: float | None = None
+    budget_monthly_usd: float | None = None
 
 
 def _conn():
@@ -69,6 +71,7 @@ def _row(r: dict) -> WorkspaceRow:
 def create(
     *, tenant_id: UUID, name: str, actor_id: str,
     description: str = "", default_model: str = "auto",
+    allowed_models: list[str] | None = None,
     allowed_tools: list[str] | None = None,
     default_collection: str = "default",
     allowed_collections: list[str] | None = None,
@@ -80,14 +83,16 @@ def create(
         cur.execute(
             """
             INSERT INTO workspaces
-              (tenant_id, name, description, default_model, allowed_tools,
+              (tenant_id, name, description, default_model,
+               allowed_models, allowed_tools,
                default_collection, allowed_collections,
                budget_daily_usd, budget_monthly_usd, features, created_by)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
             RETURNING id
             """,
             (
                 str(tenant_id), name, description, default_model,
+                allowed_models or [],
                 allowed_tools or [],
                 default_collection, allowed_collections or ["default"],
                 budget_daily_usd, budget_monthly_usd,
@@ -200,11 +205,12 @@ def delete(*, workspace_id: UUID, tenant_id: UUID) -> bool:
 
 def add_member(
     *, workspace_id: UUID, tenant_id: UUID, actor_id: str, role: str = "viewer",
+    budget_daily_usd: float | None = None,
+    budget_monthly_usd: float | None = None,
 ) -> bool:
     if role not in {"owner", "editor", "viewer"}:
         raise ValueError(f"invalid role: {role}")
     with _conn() as conn, conn.cursor() as cur:
-        # 校验 workspace 属于本 tenant
         cur.execute(
             "SELECT 1 FROM workspaces WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL",
             (str(workspace_id), str(tenant_id)),
@@ -213,14 +219,47 @@ def add_member(
             return False
         cur.execute(
             """
-            INSERT INTO workspace_members (workspace_id, actor_id, role)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (workspace_id, actor_id) DO UPDATE SET role = EXCLUDED.role
+            INSERT INTO workspace_members
+              (workspace_id, actor_id, role, budget_daily_usd, budget_monthly_usd)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (workspace_id, actor_id) DO UPDATE
+              SET role = EXCLUDED.role,
+                  budget_daily_usd = EXCLUDED.budget_daily_usd,
+                  budget_monthly_usd = EXCLUDED.budget_monthly_usd
             """,
-            (str(workspace_id), actor_id, role),
+            (
+                str(workspace_id), actor_id, role,
+                budget_daily_usd, budget_monthly_usd,
+            ),
         )
         conn.commit()
         return True
+
+
+def update_member_budget(
+    *, workspace_id: UUID, tenant_id: UUID, actor_id: str,
+    budget_daily_usd: float | None,
+    budget_monthly_usd: float | None,
+) -> bool:
+    """更新成员 budget. 不影响 role. None = 解除限制."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE workspace_members
+            SET budget_daily_usd = %s, budget_monthly_usd = %s
+            WHERE workspace_id = %s AND actor_id = %s
+              AND workspace_id IN (
+                SELECT id FROM workspaces WHERE tenant_id = %s AND deleted_at IS NULL
+              )
+            """,
+            (
+                budget_daily_usd, budget_monthly_usd,
+                str(workspace_id), actor_id, str(tenant_id),
+            ),
+        )
+        ok = cur.rowcount > 0
+        conn.commit()
+        return ok
 
 
 def remove_member(
@@ -242,11 +281,138 @@ def remove_member(
         return ok
 
 
+@dataclass
+class BudgetUsage:
+    """workspace 当前预算使用快照. 跟 routes/me.py UsageOut 的 today/month 同源."""
+    today_cost_usd: float
+    month_cost_usd: float
+    budget_daily_usd: float | None
+    budget_monthly_usd: float | None
+
+    @property
+    def daily_exceeded(self) -> bool:
+        return (
+            self.budget_daily_usd is not None
+            and self.today_cost_usd >= self.budget_daily_usd
+        )
+
+    @property
+    def monthly_exceeded(self) -> bool:
+        return (
+            self.budget_monthly_usd is not None
+            and self.month_cost_usd >= self.budget_monthly_usd
+        )
+
+    @property
+    def any_exceeded(self) -> bool:
+        return self.daily_exceeded or self.monthly_exceeded
+
+
+def fetch_actor_budget_usage(
+    *, workspace_id: UUID, tenant_id: UUID, actor_id: str,
+) -> BudgetUsage | None:
+    """同 fetch_budget_usage 但只算 actor 自己的 cost.
+
+    workspace_members.budget_* 没设 → 返回 None (调用方应跳过 actor 检查).
+    """
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+              m.budget_daily_usd,
+              m.budget_monthly_usd,
+              coalesce((
+                SELECT sum(msg.cost_usd) FROM chat_messages msg
+                JOIN chat_sessions s ON s.id = msg.session_id
+                WHERE s.workspace_id = m.workspace_id
+                  AND s.tenant_id = w.tenant_id
+                  AND s.actor_id = m.actor_id
+                  AND s.deleted_at IS NULL
+                  AND msg.created_at >= date_trunc('day', now())
+              ), 0)::float AS today_cost,
+              coalesce((
+                SELECT sum(msg.cost_usd) FROM chat_messages msg
+                JOIN chat_sessions s ON s.id = msg.session_id
+                WHERE s.workspace_id = m.workspace_id
+                  AND s.tenant_id = w.tenant_id
+                  AND s.actor_id = m.actor_id
+                  AND s.deleted_at IS NULL
+                  AND msg.created_at >= date_trunc('month', now())
+              ), 0)::float AS month_cost
+            FROM workspace_members m
+            JOIN workspaces w ON w.id = m.workspace_id
+            WHERE m.workspace_id = %s
+              AND m.actor_id = %s
+              AND w.tenant_id = %s
+              AND w.deleted_at IS NULL
+            """,
+            (str(workspace_id), actor_id, str(tenant_id)),
+        )
+        r = cur.fetchone()
+        if r is None:
+            return None
+        return BudgetUsage(
+            today_cost_usd=float(r["today_cost"] or 0),
+            month_cost_usd=float(r["month_cost"] or 0),
+            budget_daily_usd=(
+                float(r["budget_daily_usd"]) if r.get("budget_daily_usd") is not None else None
+            ),
+            budget_monthly_usd=(
+                float(r["budget_monthly_usd"]) if r.get("budget_monthly_usd") is not None else None
+            ),
+        )
+
+
+def fetch_budget_usage(
+    *, workspace_id: UUID, tenant_id: UUID,
+) -> BudgetUsage | None:
+    """单次 SQL 拉今日 + 当月 cost + workspace.budget_*. 找不到 ws → None."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+              w.budget_daily_usd,
+              w.budget_monthly_usd,
+              coalesce((
+                SELECT sum(m.cost_usd) FROM chat_messages m
+                JOIN chat_sessions s ON s.id = m.session_id
+                WHERE s.workspace_id = w.id AND s.tenant_id = w.tenant_id
+                  AND s.deleted_at IS NULL
+                  AND m.created_at >= date_trunc('day', now())
+              ), 0)::float AS today_cost,
+              coalesce((
+                SELECT sum(m.cost_usd) FROM chat_messages m
+                JOIN chat_sessions s ON s.id = m.session_id
+                WHERE s.workspace_id = w.id AND s.tenant_id = w.tenant_id
+                  AND s.deleted_at IS NULL
+                  AND m.created_at >= date_trunc('month', now())
+              ), 0)::float AS month_cost
+            FROM workspaces w
+            WHERE w.id = %s AND w.tenant_id = %s AND w.deleted_at IS NULL
+            """,
+            (str(workspace_id), str(tenant_id)),
+        )
+        r = cur.fetchone()
+        if r is None:
+            return None
+        return BudgetUsage(
+            today_cost_usd=float(r["today_cost"] or 0),
+            month_cost_usd=float(r["month_cost"] or 0),
+            budget_daily_usd=(
+                float(r["budget_daily_usd"]) if r.get("budget_daily_usd") is not None else None
+            ),
+            budget_monthly_usd=(
+                float(r["budget_monthly_usd"]) if r.get("budget_monthly_usd") is not None else None
+            ),
+        )
+
+
 def list_members(*, workspace_id: UUID, tenant_id: UUID) -> list[MemberRow]:
     with _conn() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            SELECT m.workspace_id, m.actor_id, m.role, m.created_at
+            SELECT m.workspace_id, m.actor_id, m.role, m.created_at,
+                   m.budget_daily_usd, m.budget_monthly_usd
             FROM workspace_members m
             JOIN workspaces w ON w.id = m.workspace_id
             WHERE w.id = %s AND w.tenant_id = %s AND w.deleted_at IS NULL
@@ -260,6 +426,14 @@ def list_members(*, workspace_id: UUID, tenant_id: UUID) -> list[MemberRow]:
                 actor_id=r["actor_id"],
                 role=r["role"],
                 created_at=r["created_at"],
+                budget_daily_usd=(
+                    float(r["budget_daily_usd"])
+                    if r.get("budget_daily_usd") is not None else None
+                ),
+                budget_monthly_usd=(
+                    float(r["budget_monthly_usd"])
+                    if r.get("budget_monthly_usd") is not None else None
+                ),
             )
             for r in cur.fetchall()
         ]

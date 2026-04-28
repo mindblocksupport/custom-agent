@@ -26,11 +26,17 @@ function newLocalSession(): Session {
 export function useSessions({
   apiKey,
   workspaceId,
-}: { apiKey: string; workspaceId?: string | null } = { apiKey: "" }) {
+  tagFilter,
+}: {
+  apiKey: string;
+  workspaceId?: string | null;
+  tagFilter?: string | null;
+} = { apiKey: "" }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [online, setOnline] = useState(false);
+  const [allTags, setAllTags] = useState<string[]>([]);
   const apiRef = useRef<SessionsApi | null>(null);
 
   useEffect(() => {
@@ -54,12 +60,16 @@ export function useSessions({
       return;
     }
     try {
-      // v1.5: 按 workspace 过滤
-      const remote = await api.list(workspaceId ?? null, 50);
+      // v1.5: 按 workspace + tag 过滤
+      const remote = await api.list(workspaceId ?? null, 50, tagFilter ?? null);
       setSessions(remote);
       setOnline(true);
       saveSessions(remote);
-      // 切 workspace 时, 旧 active 不在新列表 → 自动选第一个
+      // 同时刷新全部 tag (用于 sidebar chip 自动补全)
+      try {
+        setAllTags(await api.listTags());
+      } catch { /* ignore */ }
+      // 切 workspace/tag 时, 旧 active 不在新列表 → 自动选第一个
       setActiveId((cur) =>
         cur && remote.some((s) => s.id === cur) ? cur : remote[0]?.id ?? null,
       );
@@ -77,13 +87,12 @@ export function useSessions({
         setActiveId((cur) => cur ?? local[0]!.id);
       }
     }
-  }, [workspaceId]);
+  }, [workspaceId, tagFilter]);
 
   // workspace 切换 → 仅清空 sidebar 局部数据 (不动 ready, 不让整页进 Loading)
   useEffect(() => {
     setSessions([]);
     setActiveId(null);
-    // 不要 setReady(false), 否则 page.tsx 会显示整屏 Loading 闪一下
   }, [workspaceId]);
 
   useEffect(() => {
@@ -164,6 +173,29 @@ export function useSessions({
     [online],
   );
 
+  const setTags = useCallback(
+    async (id: string, tags: string[]) => {
+      const api = apiRef.current;
+      if (!api || !online) return;
+      try {
+        const updated = await api.setTags(id, tags);
+        setSessions((prev) => {
+          const next = prev.map((s) =>
+            s.id === id ? { ...s, tags: updated.tags } : s,
+          );
+          saveSessions(next);
+          return next;
+        });
+        // tag 列表也可能变化, 异步刷新
+        try { setAllTags(await api.listTags()); } catch { /* ignore */ }
+      } catch (e) {
+        console.warn("[useSessions] setTags failed:", e);
+        throw e;
+      }
+    },
+    [online],
+  );
+
   const bumpStats = useCallback(
     (id: string, addedMessages: number, addedCostUsd: number) => {
       setSessions((prev) => {
@@ -189,10 +221,12 @@ export function useSessions({
     activeId,
     ready,
     online,
+    allTags,
     setActive: setActiveId,
     create,
     remove,
     rename,
+    setTags,
     bumpStats,
     refresh,
   };

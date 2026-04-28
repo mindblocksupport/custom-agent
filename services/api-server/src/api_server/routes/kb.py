@@ -11,6 +11,7 @@ POST   /v1/kb/test-search            不进 chat, 直接看检索 (调试用)
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import datetime
 from typing import Any
@@ -20,15 +21,29 @@ from fastapi import (
     APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile,
 )
 from pydantic import BaseModel, Field
+from sse_starlette.sse import EventSourceResponse
 
 import psycopg
 from psycopg.rows import dict_row
 
+from fastapi import Request
+
 from api_server.acl import Principal
 from api_server.auth import verify_api_key
+from api_server.db import audit as audit_db
 from api_server.db import kb as kb_db
 from api_server.db.api_keys import _db_url
 from api_server.ingest_worker import run_ingest_job, save_upload_to_tmp
+
+
+def _client_meta(req: Request | None) -> tuple[str | None, str | None]:
+    if not req:
+        return None, None
+    ip = (
+        req.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (req.client.host if req.client else None)
+    )
+    return ip, req.headers.get("user-agent")
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -239,16 +254,75 @@ async def get_doc(
     return _doc_to_out(row)
 
 
+class ChunkOut(BaseModel):
+    id: UUID
+    chunk_seq: int
+    doc_version: int
+    content: str
+    page: int | None = None
+    char_offset_start: int | None = None
+    char_offset_end: int | None = None
+    parent_id: UUID | None = None
+
+
+class ChunkList(BaseModel):
+    doc_id: UUID
+    items: list[ChunkOut]
+    truncated: bool
+
+
+@router.get("/kb/docs/{doc_id}/chunks", response_model=ChunkList)
+async def list_chunks(
+    doc_id: UUID,
+    limit: int = Query(100, ge=1, le=500),
+    principal: Principal = Depends(verify_api_key),
+) -> ChunkList:
+    """看 doc 的全部 chunk 文本 (调试 / 审 KB 质量)."""
+    rows = await asyncio.to_thread(
+        kb_db.list_chunks,
+        doc_id=doc_id, tenant_id=principal.tenant_id, limit=limit + 1,
+    )
+    truncated = len(rows) > limit
+    items = [
+        ChunkOut(
+            id=r.id, chunk_seq=r.chunk_seq, doc_version=r.doc_version,
+            content=r.content, page=r.page,
+            char_offset_start=r.char_offset_start,
+            char_offset_end=r.char_offset_end,
+            parent_id=r.parent_id,
+        )
+        for r in rows[:limit]
+    ]
+    return ChunkList(doc_id=doc_id, items=items, truncated=truncated)
+
+
 @router.delete("/kb/docs/{doc_id}")
 async def delete_doc(
     doc_id: UUID,
+    request: Request,
     principal: Principal = Depends(verify_api_key),
 ) -> dict[str, bool]:
+    # 取一下 doc 信息便于 audit detail
+    doc_row = await asyncio.to_thread(
+        kb_db.get_doc, doc_id=doc_id, tenant_id=principal.tenant_id,
+    )
     ok = await asyncio.to_thread(
         kb_db.delete_doc, doc_id=doc_id, tenant_id=principal.tenant_id,
     )
     if not ok:
         raise HTTPException(404, "doc not found or already deleted")
+    ip, ua = _client_meta(request)
+    audit_db.insert(
+        tenant_id=principal.tenant_id, actor_id=principal.actor_id,
+        action="kb_doc.delete",
+        resource_type="kb_doc", resource_id=str(doc_id),
+        detail={
+            "title": doc_row.title if doc_row else None,
+            "source_uri": doc_row.source_uri if doc_row else None,
+            "collection": doc_row.collection if doc_row else None,
+        },
+        ip=ip, user_agent=ua,
+    )
     return {"deleted": True}
 
 
@@ -263,6 +337,43 @@ async def get_job(
     if row is None:
         raise HTTPException(404, "job not found")
     return _job_to_out(row)
+
+
+@router.get("/kb/jobs/{job_id}/stream")
+async def stream_job(
+    job_id: UUID,
+    principal: Principal = Depends(verify_api_key),
+):
+    """SSE 流: 推送 ingest job 的 progress 变化, 直到 done/failed.
+
+    协议:
+        event: progress  data: <JobOut JSON>     # 状态/progress/stage 任一变化
+        event: end       data: {}                # done / failed
+        event: timeout   data: {}                # 5 分钟内未结束
+
+    替代前端轮询; 同源 EventSource API 直接订阅.
+    """
+    async def gen():
+        last_sig = None
+        for _ in range(300):  # 5 分钟 = 300 × 1s
+            row = await asyncio.to_thread(
+                kb_db.get_job, job_id=job_id, tenant_id=principal.tenant_id,
+            )
+            if row is None:
+                yield {"event": "error", "data": json.dumps({"error": "not found"})}
+                return
+            sig = (row.status, row.progress, row.stage, row.error)
+            if sig != last_sig:
+                last_sig = sig
+                payload = _job_to_out(row).model_dump(mode="json")
+                yield {"event": "progress", "data": json.dumps(payload)}
+            if row.status in ("done", "failed"):
+                yield {"event": "end", "data": "{}"}
+                return
+            await asyncio.sleep(1.0)
+        yield {"event": "timeout", "data": "{}"}
+
+    return EventSourceResponse(gen())
 
 
 @router.post("/kb/test-search")

@@ -2,6 +2,8 @@
 
 存的是 sha256(raw_key), 不是明文; 验证流程:
     raw_key (Bearer header) → sha256 → 查表 → Principal
+
+CRUD (Day n): list/create/revoke 给 console UI 用.
 """
 
 from __future__ import annotations
@@ -9,6 +11,9 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import secrets
+from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 import psycopg
@@ -61,6 +66,120 @@ def lookup_principal(raw_key: str) -> Principal | None:
             actor_id=row["actor_id"],
             principals=list(row["principals"] or []),
         )
+
+
+@dataclass
+class ApiKeyRow:
+    key_hash: str
+    tenant_id: UUID
+    actor_id: str
+    principals: list[str]
+    label: str | None
+    created_at: datetime
+    last_used_at: datetime | None
+    revoked_at: datetime | None
+    role: str = "admin"          # admin / editor / viewer
+
+
+def _row(r: dict) -> ApiKeyRow:
+    return ApiKeyRow(
+        key_hash=r["key_hash"], tenant_id=UUID(str(r["tenant_id"])),
+        actor_id=r["actor_id"],
+        principals=list(r["principals"] or []),
+        label=r["label"],
+        role=r.get("role") or "admin",
+        created_at=r["created_at"], last_used_at=r["last_used_at"],
+        revoked_at=r["revoked_at"],
+    )
+
+
+def list_keys(*, tenant_id: UUID, include_revoked: bool = False) -> list[ApiKeyRow]:
+    sql = """
+        SELECT key_hash, tenant_id, actor_id, principals, label, role,
+               created_at, last_used_at, revoked_at
+        FROM api_keys
+        WHERE tenant_id = %s
+    """
+    params: list = [str(tenant_id)]
+    if not include_revoked:
+        sql += " AND revoked_at IS NULL"
+    sql += " ORDER BY created_at DESC"
+    with psycopg.connect(_db_url(), row_factory=dict_row) as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        return [_row(r) for r in cur.fetchall()]
+
+
+def create_key(
+    *, tenant_id: UUID, actor_id: str, principals: list[str],
+    label: str | None = None, role: str = "admin",
+) -> tuple[str, ApiKeyRow]:
+    """生成 raw key, 写表, 返回 (raw_key, row). raw_key 仅本次返回, 不再可见."""
+    if role not in {"admin", "editor", "viewer"}:
+        raise ValueError(f"invalid role: {role}")
+    raw = "ck_" + secrets.token_urlsafe(32)
+    key_hash = hash_api_key(raw)
+    with psycopg.connect(_db_url(), row_factory=dict_row) as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO api_keys
+              (key_hash, tenant_id, actor_id, principals, label, role)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING key_hash, tenant_id, actor_id, principals, label, role,
+                      created_at, last_used_at, revoked_at
+            """,
+            (key_hash, str(tenant_id), actor_id, principals, label, role),
+        )
+        out = _row(cur.fetchone())
+        conn.commit()
+        return raw, out
+
+
+def revoke_key(*, key_hash: str, tenant_id: UUID) -> bool:
+    with psycopg.connect(_db_url()) as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE api_keys SET revoked_at = now()
+            WHERE key_hash = %s AND tenant_id = %s AND revoked_at IS NULL
+            """,
+            (key_hash, str(tenant_id)),
+        )
+        ok = cur.rowcount > 0
+        conn.commit()
+        return ok
+
+
+def update_label(
+    *, key_hash: str, tenant_id: UUID, label: str,
+) -> bool:
+    with psycopg.connect(_db_url()) as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE api_keys SET label = %s
+            WHERE key_hash = %s AND tenant_id = %s
+            """,
+            (label, key_hash, str(tenant_id)),
+        )
+        ok = cur.rowcount > 0
+        conn.commit()
+        return ok
+
+
+def update_role(
+    *, key_hash: str, tenant_id: UUID, role: str,
+) -> bool:
+    if role not in {"admin", "editor", "viewer"}:
+        raise ValueError(f"invalid role: {role}")
+    with psycopg.connect(_db_url()) as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE api_keys SET role = %s
+            WHERE key_hash = %s AND tenant_id = %s
+            """,
+            (role, key_hash, str(tenant_id)),
+        )
+        ok = cur.rowcount > 0
+        conn.commit()
+        return ok
 
 
 def seed_dev_key() -> None:

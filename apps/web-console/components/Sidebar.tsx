@@ -4,9 +4,10 @@ import { useMemo, useState } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { confirmDialog, toast } from "../lib/ui";
 import { KbPanel } from "./KbPanel";
+import { SessionTagsModal } from "./SessionTagsModal";
 import { SkillsPanel } from "./SkillsPanel";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
-import type { MeProfile } from "../lib/api/me";
+import type { MeProfile, MyBudget } from "../lib/api/me";
 import type { Session, Skill, Workspace } from "../lib/types";
 import type { SkillCreatePayload, SkillUpdatePayload } from "../lib/api/skills";
 
@@ -36,12 +37,23 @@ export function Sidebar({
   collapsed,
   onToggleCollapsed,
   profile,
+  isMobile,
+  allTags,
+  tagFilter,
+  onTagFilter,
+  onSetTags,
+  myBudget,
 }: {
   sessions: Session[];
   activeId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
+  allTags: string[];
+  tagFilter: string | null;
+  onTagFilter: (t: string | null) => void;
+  onSetTags: (id: string, tags: string[]) => Promise<void>;
+  myBudget: MyBudget | null;
   onOpenSettings: () => void;
   onOpenWorkspaceSettings: () => void;
   onOpenCostDashboard: () => void;
@@ -60,10 +72,12 @@ export function Sidebar({
   collapsed: boolean;
   onToggleCollapsed: () => void;
   profile: MeProfile | null;
+  isMobile: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("sessions");
   const [search, setSearch] = useState("");
   const { theme, toggle: toggleTheme } = useTheme();
+  const [editingTagsFor, setEditingTagsFor] = useState<Session | null>(null);
 
   const filteredSessions = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -71,7 +85,12 @@ export function Sidebar({
     return sessions.filter((s) => s.title.toLowerCase().includes(q));
   }, [sessions, search]);
 
-  // Collapsed 模式: 只显示 icon-rail
+  // 移动端 collapsed = 完全隐藏 (左侧用 chat 头部的 ☰ 按钮唤起)
+  if (collapsed && isMobile) {
+    return null;
+  }
+
+  // 桌面 collapsed: 只显示 icon-rail
   if (collapsed) {
     return (
       <aside
@@ -128,14 +147,18 @@ export function Sidebar({
   }
 
   return (
-    <aside
-      className="shrink-0 border-r flex flex-col"
-      style={{
-        width: "var(--sidebar-w)",
-        background: "var(--bg-elev)",
-        borderColor: "var(--border)",
-      }}
-    >
+    <>
+      {isMobile && !collapsed && (
+        <div className="mobile-sidebar-overlay" onClick={onToggleCollapsed} />
+      )}
+      <aside
+        className={`shrink-0 border-r flex flex-col ${isMobile ? "mobile-sidebar is-open" : ""}`}
+        style={{
+          width: "var(--sidebar-w)",
+          background: "var(--bg-elev)",
+          borderColor: "var(--border)",
+        }}
+      >
       {/* Header */}
       <div
         className="px-3 py-3 border-b space-y-2.5"
@@ -197,6 +220,8 @@ export function Sidebar({
           onOpenSettings={onOpenWorkspaceSettings}
         />
 
+        {myBudget && myBudget.has_limit && <MyBudgetBar budget={myBudget} />}
+
         {/* Tab switcher (segmented) */}
         <div
           className="flex gap-0.5 rounded-lg p-0.5"
@@ -252,11 +277,51 @@ export function Sidebar({
       {/* Tab body */}
       {tab === "sessions" && (
         <div className="flex-1 overflow-y-auto py-2">
+          {/* Tag 筛选 chips */}
+          {allTags.length > 0 && (
+            <div
+              className="px-2 pb-2 flex gap-1 flex-wrap border-b mb-1"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <button
+                onClick={() => onTagFilter(null)}
+                className="text-[10px] px-1.5 py-0.5 rounded transition"
+                style={{
+                  background: tagFilter === null ? "var(--primary)" : "var(--bg-elev-2)",
+                  color: tagFilter === null ? "var(--fg-on-primary)" : "var(--fg-muted)",
+                }}
+              >
+                全部
+              </button>
+              {allTags.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => onTagFilter(tagFilter === t ? null : t)}
+                  className="text-[10px] px-1.5 py-0.5 rounded font-mono transition"
+                  style={{
+                    background:
+                      tagFilter === t ? "var(--accent)" : "var(--bg-elev-2)",
+                    color:
+                      tagFilter === t ? "white" : "var(--fg-muted)",
+                  }}
+                >
+                  #{t}
+                </button>
+              ))}
+            </div>
+          )}
+
           {filteredSessions.length === 0 && (
             <EmptyState
               icon="💬"
-              title={search ? "无匹配会话" : "此工作空间无会话"}
-              hint={search ? "换个关键字试试" : "点上方「+ 新会话」开始"}
+              title={
+                search
+                  ? "无匹配会话"
+                  : tagFilter
+                    ? `「#${tagFilter}」下无会话`
+                    : "此工作空间无会话"
+              }
+              hint={search ? "换个关键字试试" : tagFilter ? "试切回 全部" : "点上方「+ 新会话」开始"}
             />
           )}
           {filteredSessions.map((s) => (
@@ -265,6 +330,7 @@ export function Sidebar({
               session={s}
               active={s.id === activeId}
               onSelect={() => onSelect(s.id)}
+              onEditTags={() => setEditingTagsFor(s)}
               onDelete={async () => {
                 const ok = await confirmDialog({
                   title: `删除会话「${s.title}」?`,
@@ -290,6 +356,7 @@ export function Sidebar({
         <SkillsPanel
           skills={skills}
           currentWorkspaceId={activeWorkspaceId}
+          apiKey={apiKey}
           onCreate={onCreateSkill}
           onUpdate={onUpdateSkill}
           onRemove={onRemoveSkill}
@@ -355,7 +422,26 @@ export function Sidebar({
           />
         </div>
       </div>
-    </aside>
+      </aside>
+
+      {editingTagsFor && (
+        <SessionTagsModal
+          open={!!editingTagsFor}
+          onClose={() => setEditingTagsFor(null)}
+          sessionTitle={editingTagsFor.title}
+          initial={editingTagsFor.tags ?? []}
+          knownTags={allTags}
+          onSave={async (tags) => {
+            try {
+              await onSetTags(editingTagsFor.id, tags);
+              toast.success("标签已更新");
+            } catch (e) {
+              toast.fromError(e, "保存标签失败");
+            }
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -462,6 +548,53 @@ function RailButton({
   );
 }
 
+function MyBudgetBar({ budget }: { budget: MyBudget }) {
+  const dayPct =
+    budget.budget_daily_usd && budget.budget_daily_usd > 0
+      ? (budget.today_cost_usd / budget.budget_daily_usd) * 100
+      : null;
+  const monthPct =
+    budget.budget_monthly_usd && budget.budget_monthly_usd > 0
+      ? (budget.month_cost_usd / budget.budget_monthly_usd) * 100
+      : null;
+  const worstPct = Math.max(dayPct ?? 0, monthPct ?? 0);
+  const danger = worstPct >= 80;
+  const critical = worstPct >= 100;
+  const fg = critical
+    ? "var(--danger-soft-fg)"
+    : danger
+      ? "var(--warning-soft-fg)"
+      : "var(--fg-muted)";
+  const bg = critical
+    ? "var(--danger-soft)"
+    : danger
+      ? "var(--warning-soft)"
+      : "var(--bg-elev-2)";
+
+  return (
+    <div
+      className="px-2 py-1 rounded-md text-[10px] font-mono flex items-center gap-1"
+      style={{ background: bg, color: fg }}
+      title={`你 (this user) 在本工作空间的预算 — 实时, 5min 自动刷`}
+    >
+      <span>💵</span>
+      {dayPct !== null && (
+        <span>
+          日 ${budget.today_cost_usd.toFixed(4)}/${budget.budget_daily_usd!.toFixed(2)} (
+          {dayPct.toFixed(0)}%)
+        </span>
+      )}
+      {dayPct !== null && monthPct !== null && <span>·</span>}
+      {monthPct !== null && (
+        <span>
+          月 ${budget.month_cost_usd.toFixed(4)}/${budget.budget_monthly_usd!.toFixed(2)} (
+          {monthPct.toFixed(0)}%)
+        </span>
+      )}
+    </div>
+  );
+}
+
 function EmptyState({
   icon,
   title,
@@ -491,11 +624,13 @@ function SessionRow({
   active,
   onSelect,
   onDelete,
+  onEditTags,
 }: {
   session: Session;
   active: boolean;
   onSelect: () => void;
   onDelete: () => void;
+  onEditTags: () => void;
 }) {
   return (
     <div
@@ -524,20 +659,60 @@ function SessionRow({
               <span title="累计成本">${session.totalCostUsd.toFixed(4)}</span>
             )}
           </div>
+          {session.tags && session.tags.length > 0 && (
+            <div className="flex gap-1 mt-1 flex-wrap">
+              {session.tags.slice(0, 4).map((t) => (
+                <span
+                  key={t}
+                  className="text-[9px] px-1 rounded font-mono"
+                  style={{
+                    background: active
+                      ? "rgba(255,255,255,0.45)"
+                      : "var(--accent-soft)",
+                    color: active
+                      ? "var(--primary-soft-fg)"
+                      : "var(--accent-soft-fg)",
+                  }}
+                >
+                  #{t}
+                </span>
+              ))}
+              {session.tags.length > 4 && (
+                <span className="text-[9px]" style={{ color: "var(--fg-subtle)" }}>
+                  +{session.tags.length - 4}
+                </span>
+              )}
+            </div>
+          )}
         </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="opacity-0 group-hover:opacity-100 text-xs px-1 transition"
-          style={{ color: "var(--fg-subtle)" }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--danger)")}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--fg-subtle)")}
-          title="删除"
-        >
-          ✕
-        </button>
+        <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditTags();
+            }}
+            className="text-xs px-1 transition"
+            style={{ color: "var(--fg-subtle)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--fg-subtle)")}
+            title="编辑标签"
+          >
+            🏷
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="text-xs px-1 transition"
+            style={{ color: "var(--fg-subtle)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--danger)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--fg-subtle)")}
+            title="删除"
+          >
+            ✕
+          </button>
+        </div>
       </div>
     </div>
   );

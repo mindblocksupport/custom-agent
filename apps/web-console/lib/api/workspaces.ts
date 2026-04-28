@@ -5,6 +5,7 @@ export interface WorkspacePatch {
   name?: string;
   description?: string;
   default_model?: string;
+  allowed_models?: string[];
   allowed_tools?: string[];
   default_collection?: string;
   allowed_collections?: string[];
@@ -16,6 +17,8 @@ export interface WorkspaceMember {
   actor_id: string;
   role: "owner" | "editor" | "viewer";
   created_at: string;
+  budget_daily_usd: number | null;
+  budget_monthly_usd: number | null;
 }
 
 export class WorkspacesApi {
@@ -58,15 +61,38 @@ export class WorkspacesApi {
     id: string,
     actorId: string,
     role: "owner" | "editor" | "viewer" = "viewer",
+    budgetDailyUsd?: number | null,
+    budgetMonthlyUsd?: number | null,
   ): Promise<WorkspaceMember> {
     return this.req(`/${id}/members`, {
       method: "POST",
-      body: JSON.stringify({ actor_id: actorId, role }),
+      body: JSON.stringify({
+        actor_id: actorId,
+        role,
+        ...(budgetDailyUsd !== undefined ? { budget_daily_usd: budgetDailyUsd } : {}),
+        ...(budgetMonthlyUsd !== undefined ? { budget_monthly_usd: budgetMonthlyUsd } : {}),
+      }),
     });
   }
   removeMember(id: string, actorId: string): Promise<void> {
     return this.req(`/${id}/members/${encodeURIComponent(actorId)}`, {
       method: "DELETE",
     });
+  }
+  setMemberBudget(
+    id: string, actorId: string,
+    budgetDailyUsd: number | null,
+    budgetMonthlyUsd: number | null,
+  ): Promise<WorkspaceMember> {
+    return this.req(
+      `/${id}/members/${encodeURIComponent(actorId)}/budget`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          budget_daily_usd: budgetDailyUsd,
+          budget_monthly_usd: budgetMonthlyUsd,
+        }),
+      },
+    );
   }
 }

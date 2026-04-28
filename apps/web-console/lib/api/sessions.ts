@@ -13,6 +13,7 @@ interface RemoteSession {
   total_cost_usd: number;
   created_at: string;
   updated_at: string;
+  tags?: string[];
 }
 
 interface ListResp {
@@ -28,6 +29,7 @@ function toSession(r: RemoteSession): Session {
     updatedAt: new Date(r.updated_at).getTime() || Date.now(),
     messageCount: r.message_count,
     totalCostUsd: Number(r.total_cost_usd),
+    tags: r.tags ?? [],
   };
 }
 
@@ -50,12 +52,30 @@ export class SessionsApi {
     return r.json() as Promise<T>;
   }
 
-  async list(workspaceId?: string | null, limit = 50): Promise<Session[]> {
+  async list(
+    workspaceId?: string | null,
+    limit = 50,
+    tag?: string | null,
+  ): Promise<Session[]> {
     const qs = new URLSearchParams();
     qs.set("limit", String(limit));
     if (workspaceId) qs.set("workspace_id", workspaceId);
+    if (tag) qs.set("tag", tag);
     const data = await this.req<ListResp>(`?${qs.toString()}`);
     return data.items.map(toSession);
+  }
+
+  async listTags(): Promise<string[]> {
+    const data = await this.req<{ tags: string[] }>("/tags");
+    return data.tags;
+  }
+
+  async setTags(id: string, tags: string[]): Promise<Session> {
+    const data = await this.req<RemoteSession>(`/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ tags }),
+    });
+    return toSession(data);
   }
 
   async create(

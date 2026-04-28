@@ -114,6 +114,47 @@ def get_doc(*, doc_id: UUID, tenant_id: UUID) -> DocRow | None:
         return DocRow(**r) if r else None
 
 
+@dataclass
+class ChunkRow:
+    id: UUID
+    chunk_seq: int
+    doc_version: int
+    content: str
+    page: int | None
+    char_offset_start: int | None
+    char_offset_end: int | None
+    parent_id: UUID | None
+
+
+def list_chunks(
+    *, doc_id: UUID, tenant_id: UUID, limit: int = 200,
+) -> list[ChunkRow]:
+    """列 doc 的全部 chunk (默认按 chunk_seq 升序). tenant_id 强制过滤."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, chunk_seq, doc_version, content,
+                   page, char_offset_start, char_offset_end, parent_id
+            FROM rag_chunks
+            WHERE doc_id = %s AND tenant_id = %s AND NOT is_deleted
+            ORDER BY chunk_seq ASC
+            LIMIT %s
+            """,
+            (str(doc_id), str(tenant_id), limit),
+        )
+        return [
+            ChunkRow(
+                id=r["id"], chunk_seq=int(r["chunk_seq"]),
+                doc_version=int(r["doc_version"]),
+                content=r["content"], page=r["page"],
+                char_offset_start=r["char_offset_start"],
+                char_offset_end=r["char_offset_end"],
+                parent_id=r["parent_id"],
+            )
+            for r in cur.fetchall()
+        ]
+
+
 def delete_doc(*, doc_id: UUID, tenant_id: UUID) -> bool:
     """软删 doc + chunks (HNSW 索引会自动跳过 is_deleted=True)."""
     with _conn() as conn, conn.cursor() as cur:

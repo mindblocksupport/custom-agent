@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { kbViewer } from "../lib/ui";
 import type { CitationData } from "../lib/types";
 
 export function CitationsCard({
@@ -81,11 +82,25 @@ export function CitationsCard({
           {citations.map((c, i) => (
             <li
               key={`${c.doc_id}-${c.chunk_id}-${i}`}
-              className="rounded p-2"
+              className="rounded p-2 cursor-pointer transition"
               style={{
                 background: "var(--bg-elev)",
                 border: "1px solid var(--success)",
               }}
+              onClick={() =>
+                kbViewer.open({
+                  docId: c.doc_id,
+                  chunkId: c.chunk_id,
+                  hintTitle: c.title ?? null,
+                })
+              }
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = "var(--shadow-md)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = "none";
+              }}
+              title="点击查看原文 chunk"
             >
               <div className="flex items-center justify-between mb-1">
                 <span
@@ -110,6 +125,12 @@ export function CitationsCard({
                     {c.score.toFixed(3)}
                   </span>
                 )}
+                <span
+                  className="text-[10px] ml-2 opacity-60"
+                  style={{ color: "var(--success-soft-fg)" }}
+                >
+                  ↗
+                </span>
               </div>
               <div
                 className="text-[11px] line-clamp-3 leading-snug whitespace-pre-wrap"

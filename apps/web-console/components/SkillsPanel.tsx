@@ -1,15 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { confirmDialog, toast } from "../lib/ui";
+import { applyVars, extractVars } from "../lib/templating";
 import type { Skill } from "../lib/types";
-import type { SkillCreatePayload, SkillUpdatePayload } from "../lib/api/skills";
+import { SkillsApi, type SkillCreatePayload, type SkillUpdatePayload } from "../lib/api/skills";
 
 const TOOLS = ["search_kb", "calculator", "get_time", "web_search"];
 
 export function SkillsPanel({
   skills,
   currentWorkspaceId,
+  apiKey,
   onCreate,
   onUpdate,
   onRemove,
@@ -18,6 +20,7 @@ export function SkillsPanel({
 }: {
   skills: Skill[];
   currentWorkspaceId: string | null;
+  apiKey: string;
   onCreate: (payload: SkillCreatePayload) => Promise<Skill>;
   onUpdate: (sid: string, payload: SkillUpdatePayload) => Promise<Skill>;
   onRemove: (sid: string) => Promise<void>;
@@ -25,6 +28,7 @@ export function SkillsPanel({
   onRefresh: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState<Skill | "new" | null>(null);
+  const [versionsOf, setVersionsOf] = useState<Skill | null>(null);
   const [search, setSearch] = useState("");
   const [installing, setInstalling] = useState<string | null>(null);
 
@@ -133,8 +137,10 @@ export function SkillsPanel({
                 skill={s}
                 showRemove
                 showEdit
+                showHistory
                 onRemove={() => handleRemove(s)}
                 onEdit={() => setEditing(s)}
+                onHistory={() => setVersionsOf(s)}
               />
             ))
           )}
@@ -196,6 +202,211 @@ export function SkillsPanel({
           }}
         />
       )}
+
+      {versionsOf && (
+        <SkillVersionsModal
+          skill={versionsOf}
+          apiKey={apiKey}
+          onClose={() => setVersionsOf(null)}
+          onAfterRollback={async () => {
+            setVersionsOf(null);
+            await onRefresh();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function SkillVersionsModal({
+  skill,
+  apiKey,
+  onClose,
+  onAfterRollback,
+}: {
+  skill: Skill;
+  apiKey: string;
+  onClose: () => void;
+  onAfterRollback: () => void | Promise<void>;
+}) {
+  const [versions, setVersions] = useState<Skill[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [rollingTo, setRollingTo] = useState<number | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    new SkillsApi(apiKey)
+      .listVersions(skill.id)
+      .then(setVersions)
+      .catch((e) => toast.fromError(e, "加载版本失败"))
+      .finally(() => setLoading(false));
+  }, [skill.id, apiKey]);
+
+  // ESC 关闭
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const rollback = async (target: number) => {
+    const ok = await confirmDialog({
+      title: `回滚 「${skill.name}」 到 v${target}?`,
+      description:
+        "回滚 = 把那一版的内容复制成最新版 (历史保留, 不会真删除当前版).",
+      confirmText: "回滚",
+    });
+    if (!ok) return;
+    setRollingTo(target);
+    try {
+      await new SkillsApi(apiKey).rollback(skill.id, target);
+      toast.success(`已回滚到 v${target}, 创建新版本`);
+      await onAfterRollback();
+    } catch (e) {
+      toast.fromError(e, "回滚失败");
+    } finally {
+      setRollingTo(null);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      style={{ background: "var(--bg-overlay)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl p-5 animate-modal"
+        style={{
+          background: "var(--bg-elev)",
+          color: "var(--fg)",
+          boxShadow: "var(--shadow-lg)",
+          border: "1px solid var(--border)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3">
+          <div
+            className="text-[10px] uppercase tracking-wide"
+            style={{ color: "var(--fg-subtle)" }}
+          >
+            版本历史
+          </div>
+          <h3 className="font-semibold text-base">↩ {skill.name}</h3>
+        </div>
+
+        {loading && (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 skeleton rounded-md" />
+            ))}
+          </div>
+        )}
+
+        {!loading && versions && versions.length === 0 && (
+          <div
+            className="text-xs italic py-4 text-center"
+            style={{ color: "var(--fg-subtle)" }}
+          >
+            无历史
+          </div>
+        )}
+
+        {!loading && versions && (
+          <div className="space-y-1.5">
+            {versions.map((v, i) => {
+              const isLatest = i === 0;
+              return (
+                <div
+                  key={v.id}
+                  className="rounded-md p-2.5"
+                  style={{
+                    background: isLatest ? "var(--primary-soft)" : "var(--bg-elev-2)",
+                    border: `1px solid ${isLatest ? "var(--primary)" : "var(--border)"}`,
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="text-xs font-mono px-1.5 py-0.5 rounded"
+                        style={{
+                          background: isLatest ? "var(--primary)" : "var(--bg-elev)",
+                          color: isLatest ? "white" : "var(--fg-muted)",
+                        }}
+                      >
+                        v{v.version}
+                      </span>
+                      {isLatest && (
+                        <span
+                          className="text-[10px]"
+                          style={{ color: "var(--primary-soft-fg)" }}
+                        >
+                          最新
+                        </span>
+                      )}
+                      <span
+                        className="text-[10px]"
+                        style={{ color: "var(--fg-subtle)" }}
+                      >
+                        {new Date(v.updated_at).toLocaleString()}
+                      </span>
+                    </div>
+                    {!isLatest && (
+                      <button
+                        onClick={() => rollback(v.version)}
+                        disabled={rollingTo !== null}
+                        className="text-[10px] px-2 py-0.5 rounded font-medium disabled:opacity-50"
+                        style={{
+                          background: "var(--bg-elev)",
+                          color: "var(--accent-soft-fg)",
+                          border: "1px solid var(--accent)",
+                        }}
+                      >
+                        {rollingTo === v.version ? "回滚中..." : "↩ 回滚到此"}
+                      </button>
+                    )}
+                  </div>
+                  {v.system_prompt && (
+                    <pre
+                      className="text-[10px] font-mono whitespace-pre-wrap leading-snug max-h-24 overflow-y-auto p-1.5 rounded mt-1"
+                      style={{
+                        background: isLatest ? "rgba(255,255,255,0.4)" : "var(--bg-elev)",
+                        color: isLatest ? "var(--primary-soft-fg)" : "var(--fg-muted)",
+                      }}
+                    >
+                      {v.system_prompt.slice(0, 400)}
+                      {v.system_prompt.length > 400 && "..."}
+                    </pre>
+                  )}
+                  <div
+                    className="text-[10px] font-mono mt-1"
+                    style={{
+                      color: isLatest ? "var(--primary-soft-fg)" : "var(--fg-subtle)",
+                    }}
+                  >
+                    tools: {v.allowed_tools.length === 0 ? "全部" : v.allowed_tools.join(", ")}
+                    {v.tags.length > 0 && ` · tags: ${v.tags.join(", ")}`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex justify-end mt-4">
+          <button
+            onClick={onClose}
+            className="px-3.5 py-1.5 rounded-md text-sm transition"
+            style={{ color: "var(--fg-muted)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-hover)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            关闭
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -242,21 +453,25 @@ function SkillRow({
   skill,
   showRemove,
   showEdit,
+  showHistory,
   showInstall,
   installed,
   installing,
   onRemove,
   onEdit,
+  onHistory,
   onInstall,
 }: {
   skill: Skill;
   showRemove?: boolean;
   showEdit?: boolean;
+  showHistory?: boolean;
   showInstall?: boolean;
   installed?: boolean;
   installing?: boolean;
   onRemove?: () => void;
   onEdit?: () => void;
+  onHistory?: () => void;
   onInstall?: () => void;
 }) {
   const visBadge =
@@ -341,6 +556,18 @@ function SkillRow({
             )
           )}
           <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition">
+            {showHistory && onHistory && (
+              <button
+                onClick={onHistory}
+                className="text-xs px-1.5 transition"
+                style={{ color: "var(--fg-subtle)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--fg-subtle)")}
+                title="版本历史"
+              >
+                ↩
+              </button>
+            )}
             {showEdit && onEdit && (
               <button
                 onClick={onEdit}
@@ -476,7 +703,7 @@ function SkillModal({
             <textarea
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="例: 你是数据分析助手, 用 search_kb 找数据, 用 calculator 算指标..."
+              placeholder="例: 你是 {{ role }} 助手, 用 search_kb 在 {{ domain }} 范围找数据..."
               rows={5}
               className="w-full px-2.5 py-1.5 rounded-md text-xs outline-none font-mono resize-y"
               style={{
@@ -485,13 +712,14 @@ function SkillModal({
                 border: "1px solid var(--border)",
               }}
             />
+            <VariablePreview prompt={systemPrompt} starterText={starterText} />
           </Field>
 
-          <Field label="启动示例 (一行一条, 显示在欢迎页)">
+          <Field label="启动示例 (一行一条, 显示在欢迎页; 可用 {{ var }})">
             <textarea
               value={starterText}
               onChange={(e) => setStarterText(e.target.value)}
-              placeholder="例:&#10;帮我生成本周月报&#10;对比上月数据"
+              placeholder="例:&#10;生成本月{{ topic }}月报&#10;对比 {{ topic }} 上月数据"
               rows={3}
               className="w-full px-2.5 py-1.5 rounded-md text-xs outline-none resize-y"
               style={{
@@ -599,6 +827,138 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
         {label}
       </div>
       {children}
+    </div>
+  );
+}
+
+/** 检测 system_prompt + starter_examples 中的 {{var}}, 提供小预览面板:
+ * - chip 列出所有变量
+ * - 试填 → 实时显示 system_prompt 替换效果
+ */
+function VariablePreview({
+  prompt,
+  starterText,
+}: {
+  prompt: string;
+  starterText: string;
+}) {
+  const promptVars = useMemo(() => extractVars(prompt), [prompt]);
+  const starterVars = useMemo(() => {
+    const out = new Set<string>();
+    starterText
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .forEach((s) => extractVars(s).forEach((v) => out.add(v)));
+    return [...out];
+  }, [starterText]);
+
+  const allVars = useMemo(() => {
+    const set = new Set<string>([...promptVars, ...starterVars]);
+    return [...set];
+  }, [promptVars, starterVars]);
+
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [showPreview, setShowPreview] = useState(false);
+
+  if (allVars.length === 0) return null;
+
+  const previewText = applyVars(prompt, values);
+
+  return (
+    <div
+      className="mt-1.5 p-2 rounded-md"
+      style={{
+        background: "var(--accent-soft)",
+        border: "1px dashed var(--accent)",
+      }}
+    >
+      <div
+        className="flex items-center justify-between text-[10px] font-medium mb-1"
+        style={{ color: "var(--accent-soft-fg)" }}
+      >
+        <span>
+          🪄 检测到 {allVars.length} 个变量 (用户启动会话时填)
+        </span>
+        <button
+          type="button"
+          onClick={() => setShowPreview((v) => !v)}
+          className="underline"
+        >
+          {showPreview ? "▾ 收起" : "▸ 试填预览"}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1 mb-1.5">
+        {allVars.map((v) => (
+          <span
+            key={v}
+            className="text-[10px] px-1.5 py-0.5 rounded font-mono"
+            style={{
+              background: "var(--bg-elev)",
+              color: "var(--accent-soft-fg)",
+              border: "1px solid var(--accent)",
+            }}
+            title={
+              promptVars.includes(v) && starterVars.includes(v)
+                ? "在 system_prompt + starter 都使用"
+                : promptVars.includes(v)
+                  ? "仅 system_prompt"
+                  : "仅 starter"
+            }
+          >
+            {`{{ ${v} }}`}
+            {promptVars.includes(v) && starterVars.includes(v) && (
+              <span className="ml-0.5">★</span>
+            )}
+          </span>
+        ))}
+      </div>
+
+      {showPreview && (
+        <div className="space-y-1.5 mt-2">
+          {allVars.map((v) => (
+            <div key={v} className="flex items-center gap-2">
+              <span
+                className="text-[10px] font-mono w-20 text-right shrink-0"
+                style={{ color: "var(--accent-soft-fg)" }}
+              >
+                {v}=
+              </span>
+              <input
+                value={values[v] ?? ""}
+                onChange={(e) => setValues({ ...values, [v]: e.target.value })}
+                placeholder={`填一个 ${v} 试试`}
+                className="flex-1 px-2 py-0.5 rounded text-[11px] outline-none"
+                style={{
+                  background: "var(--bg-elev)",
+                  color: "var(--fg)",
+                  border: "1px solid var(--border)",
+                }}
+              />
+            </div>
+          ))}
+          {prompt && Object.keys(values).length > 0 && (
+            <div>
+              <div
+                className="text-[10px] mb-1 font-medium"
+                style={{ color: "var(--accent-soft-fg)" }}
+              >
+                替换后的 system_prompt:
+              </div>
+              <pre
+                className="text-[10px] font-mono whitespace-pre-wrap p-1.5 rounded max-h-32 overflow-y-auto"
+                style={{
+                  background: "var(--bg-elev)",
+                  color: "var(--fg)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                {previewText}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

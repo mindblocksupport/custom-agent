@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
 from agent_core import AgentConfig, ToolRegistry, run_agent
-from gateway import ModelRouter
+from gateway import ModelRouter, is_vision_capable
 from schemas import (
     CitationData,
     ChatRequest,
@@ -115,11 +115,53 @@ def _build_observability_metadata(request: ChatRequest) -> dict[str, Any]:
 
 
 def _last_user_text(messages: list[dict]) -> str:
+    """从最近一条 user 消息抽出纯文本 (用于 title-gen / persistence)."""
     for m in reversed(messages):
         if m.get("role") == "user":
-            c = m.get("content")
-            return c if isinstance(c, str) else str(c or "")
+            return _content_to_text(m.get("content"))
     return ""
+
+
+def _content_to_text(content: Any) -> str:
+    """把 multimodal content array 拍平成纯文本 (DB persistence + title gen).
+
+    image_url 部分用 [image] 占位; text 部分原样保留.
+    schema: list[{"type": "text"|"image_url", ...}]
+    """
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for p in content:
+            if not isinstance(p, dict):
+                continue
+            t = p.get("type")
+            if t == "text":
+                parts.append(str(p.get("text", "")))
+            elif t == "image_url":
+                # [image] 标记 + (可选) URL 短摘要 (避免 DB 里塞 base64)
+                url = (p.get("image_url") or {}).get("url", "")
+                if url.startswith("data:"):
+                    parts.append("[image:base64]")
+                elif url:
+                    parts.append(f"[image:{url[:60]}]")
+                else:
+                    parts.append("[image]")
+            else:
+                parts.append(f"[{t}]")
+        return "\n".join(p for p in parts if p)
+    return str(content)
+
+
+def _count_image_parts(content: Any) -> int:
+    if not isinstance(content, list):
+        return 0
+    return sum(
+        1 for p in content
+        if isinstance(p, dict) and p.get("type") == "image_url"
+    )
 
 
 async def _resolve_workspace_skill(
@@ -224,17 +266,36 @@ async def _ensure_session(
         return None
 
 
+_SKILL_VAR_RE = re.compile(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}")
+
+
+def _render_skill_prompt(template: str, vars_: dict[str, str]) -> str:
+    """Mustache 子集 — 仅 {{ name }}. 缺失变量保留原文 (前端会提示)."""
+    if not vars_:
+        return template
+
+    def sub(m: re.Match[str]) -> str:
+        key = m.group(1)
+        return vars_.get(key, m.group(0))
+    return _SKILL_VAR_RE.sub(sub, template)
+
+
 def _apply_skill_to_messages(
     messages: list[dict], skill: skill_db.SkillRow | None,
+    skill_vars: dict[str, str] | None = None,
 ) -> list[dict]:
-    """v1.5: 把 skill.system_prompt 作为 system 消息插到对话最前面."""
+    """v1.5: 把 skill.system_prompt 作为 system 消息插到对话最前面.
+
+    skill_vars: 渲染 {{ var }} 模板; 用 client 传过来的值替换.
+    """
     if not skill or not skill.system_prompt.strip():
         return messages
+    rendered = _render_skill_prompt(skill.system_prompt, skill_vars or {})
     # 防重复注入: 已存在 system 消息且内容相同则跳过
     if messages and messages[0].get("role") == "system":
-        if skill.system_prompt in (messages[0].get("content") or ""):
+        if rendered in (messages[0].get("content") or ""):
             return messages
-    return [{"role": "system", "content": skill.system_prompt}] + messages
+    return [{"role": "system", "content": rendered}] + messages
 
 
 def _build_effective_registry(
@@ -279,14 +340,26 @@ async def _persist_user_msg(
 ) -> None:
     if session_id is None:
         return
-    last_user = _last_user_text([m.model_dump() for m in request.messages])
+    msgs = [m.model_dump() for m in request.messages]
+    last_user_msg = next(
+        (m for m in reversed(msgs) if m.get("role") == "user"), None,
+    )
+    if not last_user_msg:
+        return
+    raw_content = last_user_msg.get("content")
+    last_user = _content_to_text(raw_content)
     if not last_user:
         return
+    n_images = _count_image_parts(raw_content)
+    metadata: dict[str, Any] = {}
+    if n_images > 0:
+        metadata["multimodal"] = {"n_images": n_images}
     try:
         await asyncio.to_thread(
             chat_db.append_message,
             session_id=session_id, tenant_id=principal.tenant_id,
             role="user", content=last_user, trace_id=trace_id,
+            metadata=metadata or None,
         )
     except Exception as e:
         logger.warning("persist user msg failed: %s", e)
@@ -342,10 +415,140 @@ async def chat_completions(
 
     # v1.5 沉淀层: workspace + skill 解析 + system_prompt 注入 + 工具白名单过滤
     workspace, skill = await _resolve_workspace_skill(request, principal)
-    messages = _apply_skill_to_messages(messages, skill)
+    messages = _apply_skill_to_messages(messages, skill, request.skill_vars)
     effective_registry, applied_tools = _build_effective_registry(
         registry, workspace, skill,
     )
+
+    # 预算检查 (双层): actor budget (member 维度) → workspace budget (整体)
+    # - >= 100% → 402 拦截 + audit
+    # - >= 80% → 不拦截, X-Budget-Warning header 软警告
+    budget_warning_header: str | None = None
+    if workspace is not None:
+        # 1. actor 维度 (workspace_member.budget_*) — 优先, 因为更具体
+        actor_budget = await asyncio.to_thread(
+            ws_db.fetch_actor_budget_usage,
+            workspace_id=workspace.id,
+            tenant_id=principal.tenant_id,
+            actor_id=principal.actor_id,
+        )
+        if actor_budget and actor_budget.any_exceeded:
+            scope_zh = "actor 日预算" if actor_budget.daily_exceeded else "actor 月预算"
+            limit = (
+                actor_budget.budget_daily_usd if actor_budget.daily_exceeded
+                else actor_budget.budget_monthly_usd
+            )
+            used = (
+                actor_budget.today_cost_usd if actor_budget.daily_exceeded
+                else actor_budget.month_cost_usd
+            )
+            from api_server.db import audit as audit_db
+            audit_db.insert(
+                tenant_id=principal.tenant_id, actor_id=principal.actor_id,
+                action="actor.budget_exceeded",
+                resource_type="workspace_member",
+                resource_id=f"{workspace.id}::{principal.actor_id}",
+                detail={
+                    "scope": "daily" if actor_budget.daily_exceeded else "monthly",
+                    "limit_usd": limit,
+                    "used_usd": used,
+                    "model_about_to_call": request.model or "auto",
+                },
+            )
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "actor_budget_exceeded",
+                    "scope": "daily" if actor_budget.daily_exceeded else "monthly",
+                    "message": (
+                        f"你的 {scope_zh} 已超 (${used:.4f} / ${limit:.2f}). "
+                        "请联系 workspace owner 调高你的限额。"
+                    ),
+                    "limit_usd": limit,
+                    "used_usd": used,
+                },
+            )
+
+        # 2. workspace 整体维度
+        budget = await asyncio.to_thread(
+            ws_db.fetch_budget_usage,
+            workspace_id=workspace.id, tenant_id=principal.tenant_id,
+        )
+        if budget and budget.any_exceeded:
+            scope_zh = "日预算" if budget.daily_exceeded else "月预算"
+            limit = (
+                budget.budget_daily_usd if budget.daily_exceeded
+                else budget.budget_monthly_usd
+            )
+            used = (
+                budget.today_cost_usd if budget.daily_exceeded
+                else budget.month_cost_usd
+            )
+            from api_server.db import audit as audit_db
+            audit_db.insert(
+                tenant_id=principal.tenant_id, actor_id=principal.actor_id,
+                action="workspace.budget_exceeded",
+                resource_type="workspace", resource_id=str(workspace.id),
+                detail={
+                    "scope": "daily" if budget.daily_exceeded else "monthly",
+                    "limit_usd": limit,
+                    "used_usd": used,
+                    "model_about_to_call": request.model or "auto",
+                },
+            )
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "budget_exceeded",
+                    "scope": "daily" if budget.daily_exceeded else "monthly",
+                    "message": (
+                        f"工作空间「{workspace.name}」{scope_zh}已超 "
+                        f"(${used:.4f} / ${limit:.2f}). "
+                        "请在「工作空间设置」调高预算或等下一周期。"
+                    ),
+                    "limit_usd": limit,
+                    "used_usd": used,
+                },
+            )
+        elif budget:
+            # 软警告: workspace 任一维度 >= 80% 即提示, 不拦截
+            warns: list[str] = []
+            if (
+                budget.budget_daily_usd is not None
+                and budget.budget_daily_usd > 0
+                and budget.today_cost_usd / budget.budget_daily_usd >= 0.8
+            ):
+                pct = budget.today_cost_usd / budget.budget_daily_usd * 100
+                warns.append(
+                    f"ws_daily={pct:.0f}%(${budget.today_cost_usd:.4f}/${budget.budget_daily_usd:.2f})"
+                )
+            if (
+                budget.budget_monthly_usd is not None
+                and budget.budget_monthly_usd > 0
+                and budget.month_cost_usd / budget.budget_monthly_usd >= 0.8
+            ):
+                pct = budget.month_cost_usd / budget.budget_monthly_usd * 100
+                warns.append(
+                    f"ws_monthly={pct:.0f}%(${budget.month_cost_usd:.4f}/${budget.budget_monthly_usd:.2f})"
+                )
+            # 也加 actor 软警告 (如果设了 budget 但没超)
+            if actor_budget and not actor_budget.any_exceeded:
+                if (
+                    actor_budget.budget_daily_usd is not None
+                    and actor_budget.budget_daily_usd > 0
+                    and actor_budget.today_cost_usd / actor_budget.budget_daily_usd >= 0.8
+                ):
+                    pct = actor_budget.today_cost_usd / actor_budget.budget_daily_usd * 100
+                    warns.append(f"actor_daily={pct:.0f}%")
+                if (
+                    actor_budget.budget_monthly_usd is not None
+                    and actor_budget.budget_monthly_usd > 0
+                    and actor_budget.month_cost_usd / actor_budget.budget_monthly_usd >= 0.8
+                ):
+                    pct = actor_budget.month_cost_usd / actor_budget.budget_monthly_usd * 100
+                    warns.append(f"actor_monthly={pct:.0f}%")
+            if warns:
+                budget_warning_header = "; ".join(warns)
 
     # Day 13 ModelRouter: model 缺失或显式 'auto' → 启发式路由 (省 ~50% LLM cost)
     # v1.5: 优先级 = 请求显式 > skill > workspace.default_model > router auto
@@ -362,6 +565,40 @@ async def chat_completions(
     else:
         model = raw_model
         route_reason = "explicit"
+
+    # workspace.allowed_models 白名单 enforce (空 = 不限)
+    if workspace and workspace.allowed_models:
+        if model not in workspace.allowed_models:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "model_not_allowed",
+                    "message": (
+                        f"模型 '{model}' 不在工作空间「{workspace.name}」白名单内. "
+                        f"允许的模型: {', '.join(workspace.allowed_models)}"
+                    ),
+                    "model": model,
+                    "allowed": workspace.allowed_models,
+                },
+            )
+
+    # 多模态检查: 任意 user 消息含 image_url? 若 model 不支持 vision —
+    # 显式指定 → 报 400; auto / workspace_default / router → 自动 promote 到默认 vision 模型
+    has_image = any(
+        m.get("role") == "user" and _count_image_parts(m.get("content")) > 0
+        for m in messages
+    )
+    if has_image and not is_vision_capable(model):
+        if route_reason == "explicit":
+            raise HTTPException(
+                400,
+                f"模型 '{model}' 不支持图片输入. 切到 vision-capable 模型 "
+                "(claude-sonnet-4-x / gpt-4o / gemini-1.5+ / qwen-vl 等), "
+                "或移除附件.",
+            )
+        # 自动升级到 reasoning model (默认 sonnet, 已 vision)
+        model = _model_router.reasoning
+        route_reason = f"vision_auto_promote_from_{route_reason}"
     agent_cfg = _agent_config_from_settings()
     obs_metadata = _build_observability_metadata(request)
     if workspace:
@@ -502,17 +739,17 @@ async def chat_completions(
                     "data": json.dumps({"type": "error", "text": str(e)}),
                 }
 
-        return EventSourceResponse(
-            event_generator(),
-            headers={
-                "X-Trace-Id": obs_metadata["trace_id"],
-                "X-Route-Reason": route_reason,
-                "X-Model": model,
-                "X-Session-Id": str(session_id) if session_id else "",
-                "Access-Control-Expose-Headers":
-                    "X-Trace-Id, X-Route-Reason, X-Model, X-Session-Id",
-            },
-        )
+        sse_headers = {
+            "X-Trace-Id": obs_metadata["trace_id"],
+            "X-Route-Reason": route_reason,
+            "X-Model": model,
+            "X-Session-Id": str(session_id) if session_id else "",
+            "Access-Control-Expose-Headers":
+                "X-Trace-Id, X-Route-Reason, X-Model, X-Session-Id, X-Budget-Warning",
+        }
+        if budget_warning_header:
+            sse_headers["X-Budget-Warning"] = budget_warning_header
+        return EventSourceResponse(event_generator(), headers=sse_headers)
 
     # 非流式:聚合 token
     full_text = ""
@@ -546,7 +783,9 @@ async def chat_completions(
         output_tokens=int(nonstream_done.get("output_tokens", 0)) if nonstream_done else 0,
         metadata_extra={"route_reason": route_reason},
     )
-    return {
+    from fastapi.responses import JSONResponse
+    call_cost = float(nonstream_done.get("cost_usd", 0)) if nonstream_done else 0.0
+    body_dict = {
         "model": model,
         "choices": [
             {
@@ -557,4 +796,18 @@ async def chat_completions(
         ],
         "trace_id": obs_metadata["trace_id"],
         "session_id": str(session_id) if session_id else None,
+        "cost_usd": call_cost,
     }
+    headers = {
+        "X-Trace-Id": obs_metadata["trace_id"],
+        "X-Route-Reason": route_reason,
+        "X-Model": model,
+        # 本次调用 cost (仅 non-stream; stream 走 SSE done event)
+        "X-Cost-This-Call": f"{call_cost:.6f}",
+        "Access-Control-Expose-Headers":
+            "X-Trace-Id, X-Route-Reason, X-Model, X-Session-Id, "
+            "X-Budget-Warning, X-Cost-This-Call",
+    }
+    if budget_warning_header:
+        headers["X-Budget-Warning"] = budget_warning_header
+    return JSONResponse(content=body_dict, headers=headers)

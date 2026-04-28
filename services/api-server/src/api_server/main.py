@@ -3,6 +3,7 @@
 对应文档: docs/09-access-layer.md
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -11,10 +12,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 
 from api_server.config import settings
+from api_server.cron import run_audit_cleanup_cron
 from api_server.db.api_keys import seed_dev_key
 from api_server.observability import setup_tracing
 from api_server.registry_bootstrap import ToolBootstrap
-from api_server.routes import chat, feedback, health, kb, me, sessions, skills, workspaces
+from api_server.routes import (
+    audit, chat, feedback, health, kb, keys, me, sessions, skills, workspaces,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,13 +47,23 @@ async def lifespan(app: FastAPI):
                 "Set explicitly in prod (rotate-aware: use _PREV for old secret)."
             )
     bootstrap = ToolBootstrap()
+    cron_task: asyncio.Task | None = None
     try:
         await bootstrap.setup()
         app.state.bootstrap = bootstrap
         app.state.registry = bootstrap.registry
         logger.info(f"Active tools: {bootstrap.registry.names()}")
+        # 后台 audit retention cron — 默认每 24h 跑一次, 删 365 天前
+        # 通过 env 关掉: AUDIT_AUTO_CLEANUP=false
+        cron_task = asyncio.create_task(run_audit_cleanup_cron())
         yield
     finally:
+        if cron_task is not None:
+            cron_task.cancel()
+            try:
+                await cron_task
+            except (asyncio.CancelledError, Exception):
+                pass
         await bootstrap.teardown()
 
 
@@ -96,6 +110,8 @@ def create_app() -> FastAPI:
     app.include_router(workspaces.router, prefix="/v1", tags=["workspaces (v1.5)"])
     app.include_router(skills.router, prefix="/v1", tags=["skills (v1.5)"])
     app.include_router(me.router, prefix="/v1", tags=["me / usage"])
+    app.include_router(keys.router, prefix="/v1", tags=["api keys"])
+    app.include_router(audit.router, prefix="/v1", tags=["audit"])
 
     # 静态前端托管 - 默认 dev 模式开启;生产置 SERVE_WEB_LITE=false 改用 Caddy/CDN
     # 详见 infra/Caddyfile

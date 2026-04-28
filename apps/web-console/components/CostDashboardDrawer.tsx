@@ -60,8 +60,6 @@ export function CostDashboardDrawer({
     [sessions],
   );
 
-  if (!open) return null;
-
   const total = usage
     ? {
         cost: usage.total_cost_usd,
@@ -74,7 +72,7 @@ export function CostDashboardDrawer({
         sessions: sessions.length,
       };
 
-  // Daily 数据补齐 (按选择的 days 对齐)
+  // Daily 数据补齐 (按选择的 days 对齐) — 必须在条件 return 之前调用
   const dailyChart = useMemo(() => {
     const buckets: { day: string; messages: number; cost: number }[] = [];
     if (usage && usage.daily.length > 0) {
@@ -120,6 +118,54 @@ export function CostDashboardDrawer({
     const maxMsg = Math.max(1, ...buckets.map((b) => b.messages));
     return { buckets, maxCost, maxMsg };
   }, [usage, days, sessions]);
+
+  // 每日 × skill 堆叠
+  const dailyStackedBySkill = useMemo(
+    () =>
+      buildStackedDaily(
+        usage?.daily_by_skill?.map((p) => ({
+          day: p.day,
+          key: p.skill_id ?? "_general",
+          name: p.skill_name,
+          cost: p.cost_usd,
+        })) ?? [],
+        days,
+      ),
+    [usage, days],
+  );
+
+  // 每日 × model 堆叠
+  const dailyStackedByModel = useMemo(
+    () =>
+      buildStackedDaily(
+        usage?.daily_by_model?.map((p) => ({
+          day: p.day,
+          key: p.model,
+          name: p.model.split("/").pop() ?? p.model,
+          cost: p.cost_usd,
+        })) ?? [],
+        days,
+      ),
+    [usage, days],
+  );
+
+  // 每日 × actor 堆叠 (谁烧的钱)
+  const dailyStackedByActor = useMemo(
+    () =>
+      buildStackedDaily(
+        usage?.daily_by_actor?.map((p) => ({
+          day: p.day,
+          key: p.actor_id,
+          name: p.actor_id,
+          cost: p.cost_usd,
+        })) ?? [],
+        days,
+      ),
+    [usage, days],
+  );
+
+  // 所有 hooks 已声明 — 安全做条件 return
+  if (!open) return null;
 
   return (
     <div
@@ -290,6 +336,22 @@ export function CostDashboardDrawer({
             </div>
           </div>
 
+          {/* 每日 × skill 堆叠 */}
+          {dailyStackedBySkill && dailyStackedBySkill.buckets.some((b) => b.total > 0) && (
+            <StackedDailyChart
+              title="每日 × 技能 堆叠 (top 8)"
+              data={dailyStackedBySkill}
+            />
+          )}
+
+          {/* 每日 × model 堆叠 */}
+          {dailyStackedByModel && dailyStackedByModel.buckets.some((b) => b.total > 0) && (
+            <StackedDailyChart
+              title="每日 × 模型 堆叠 (top 8)"
+              data={dailyStackedByModel}
+            />
+          )}
+
           {/* 模型成本拆分 */}
           {usage && usage.by_model.length > 0 && (
             <div>
@@ -337,6 +399,130 @@ export function CostDashboardDrawer({
               </div>
             </div>
           )}
+
+          {/* 技能成本拆分 */}
+          {usage && usage.by_skill.length > 0 && (
+            <div>
+              <SectionTitle>按技能拆分</SectionTitle>
+              <div className="space-y-1.5">
+                {usage.by_skill.map((s) => {
+                  const pct = total.cost > 0 ? (s.cost_usd / total.cost) * 100 : 0;
+                  const isGeneral = s.skill_id === null;
+                  return (
+                    <div
+                      key={s.skill_id ?? "general"}
+                      className="rounded-md p-2"
+                      style={{ background: "var(--bg-elev-2)" }}
+                    >
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="truncate flex items-center gap-1" style={{ color: "var(--fg)" }}>
+                          <span>{isGeneral ? "💬" : "🧩"}</span>
+                          <span>{s.skill_name}</span>
+                        </span>
+                        <span className="font-mono" style={{ color: "var(--accent-soft-fg)" }}>
+                          ${s.cost_usd.toFixed(4)}
+                        </span>
+                      </div>
+                      <div
+                        className="h-1 rounded-full overflow-hidden"
+                        style={{ background: "var(--surface-pressed)" }}
+                      >
+                        <div
+                          style={{
+                            width: `${pct}%`,
+                            height: "100%",
+                            background: isGeneral
+                              ? "var(--fg-subtle)"
+                              : "linear-gradient(to right, var(--accent), var(--primary))",
+                            transition: "width 0.3s",
+                          }}
+                        />
+                      </div>
+                      <div
+                        className="flex justify-between text-[10px] font-mono mt-0.5"
+                        style={{ color: "var(--fg-subtle)" }}
+                      >
+                        <span>{s.sessions} 会话 · {s.messages} 消息</span>
+                        <span>{pct.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 按 actor 拆分 (谁烧的钱) */}
+          {usage && usage.by_actor.length > 0 && (
+            <div>
+              <SectionTitle>按 actor 拆分 (谁烧的钱)</SectionTitle>
+              <div className="space-y-1.5">
+                {usage.by_actor.map((a) => {
+                  const pct = total.cost > 0 ? (a.cost_usd / total.cost) * 100 : 0;
+                  return (
+                    <div
+                      key={a.actor_id}
+                      className="rounded-md p-2"
+                      style={{ background: "var(--bg-elev-2)" }}
+                    >
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span
+                          className="truncate flex items-center gap-1.5 min-w-0"
+                          style={{ color: "var(--fg)" }}
+                        >
+                          <span
+                            className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-semibold shrink-0"
+                            style={{
+                              background: "var(--primary-soft)",
+                              color: "var(--primary-soft-fg)",
+                            }}
+                          >
+                            {a.actor_id.slice(0, 2).toUpperCase()}
+                          </span>
+                          <span className="font-mono truncate">{a.actor_id}</span>
+                        </span>
+                        <span
+                          className="font-mono shrink-0"
+                          style={{ color: "var(--accent-soft-fg)" }}
+                        >
+                          ${a.cost_usd.toFixed(4)}
+                        </span>
+                      </div>
+                      <div
+                        className="h-1 rounded-full overflow-hidden"
+                        style={{ background: "var(--surface-pressed)" }}
+                      >
+                        <div
+                          style={{
+                            width: `${pct}%`,
+                            height: "100%",
+                            background: "linear-gradient(to right, var(--accent), var(--primary))",
+                            transition: "width 0.3s",
+                          }}
+                        />
+                      </div>
+                      <div
+                        className="flex justify-between text-[10px] font-mono mt-0.5"
+                        style={{ color: "var(--fg-subtle)" }}
+                      >
+                        <span>{a.sessions} 会话 · {a.messages} 消息</span>
+                        <span>{pct.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 每日 × actor 堆叠 */}
+          {dailyStackedByActor &&
+            dailyStackedByActor.buckets.some((b) => b.total > 0) && (
+              <StackedDailyChart
+                title="每日 × actor 堆叠 (top 8)"
+                data={dailyStackedByActor}
+              />
+            )}
 
           {/* Top 会话 (本地) */}
           <div>
@@ -491,6 +677,178 @@ function BudgetBar({
             transition: "width 0.3s",
           }}
         />
+      </div>
+    </div>
+  );
+}
+
+// =============================================================
+// 堆叠柱状图 — 通用 helper
+// =============================================================
+
+interface StackedRawPoint {
+  day: string;       // ISO date
+  key: string;       // series key (skill_id / model)
+  name: string;      // 显示名
+  cost: number;
+}
+
+interface StackedChartData {
+  buckets: { day: string; total: number; parts: { key: string; cost: number }[] }[];
+  seriesKeys: string[];
+  seriesNames: Map<string, string>;
+  seriesColor: Map<string, string>;
+  maxTotal: number;
+}
+
+const PALETTE = [
+  "var(--primary)",
+  "var(--accent)",
+  "var(--success)",
+  "var(--warning)",
+  "var(--danger)",
+  "#0ea5e9",
+  "#ec4899",
+  "#10b981",
+  "#a855f7",
+];
+
+function buildStackedDaily(
+  rows: StackedRawPoint[],
+  days: number,
+): StackedChartData | null {
+  if (rows.length === 0) return null;
+
+  const totals = new Map<string, { name: string; cost: number }>();
+  for (const r of rows) {
+    const cur = totals.get(r.key) ?? { name: r.name, cost: 0 };
+    cur.cost += r.cost;
+    totals.set(r.key, cur);
+  }
+  const sorted = [...totals.entries()].sort((a, b) => b[1].cost - a[1].cost);
+  const TOP_N = 8;
+  const top = sorted.slice(0, TOP_N);
+  const restCount = sorted.length - top.length;
+  const seriesKeys = top.map(([k]) => k);
+  if (restCount > 0) seriesKeys.push("_rest");
+  const seriesNames = new Map<string, string>(
+    top.map(([k, v]) => [k, v.name]),
+  );
+  if (restCount > 0) {
+    seriesNames.set("_rest", `其他 ${restCount} 个`);
+  }
+  const seriesColor = new Map<string, string>(
+    seriesKeys.map((k, i) => [k, PALETTE[i % PALETTE.length]!]),
+  );
+
+  const buckets: StackedChartData["buckets"] = [];
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() - i);
+    buckets.push({
+      day: `${d.getMonth() + 1}/${d.getDate()}`,
+      total: 0,
+      parts: seriesKeys.map((k) => ({ key: k, cost: 0 })),
+    });
+  }
+
+  for (const r of rows) {
+    const dayObj = new Date(r.day);
+    const ago = Math.floor((now.getTime() - dayObj.getTime()) / 86400000);
+    if (ago < 0 || ago >= days) continue;
+    const idx = days - 1 - ago;
+    const bucket = buckets[idx];
+    if (!bucket) continue;
+    const seriesKey = seriesNames.has(r.key) ? r.key : "_rest";
+    const part = bucket.parts.find((p) => p.key === seriesKey);
+    if (part) part.cost += r.cost;
+    bucket.total += r.cost;
+  }
+  const maxTotal = Math.max(0.000001, ...buckets.map((b) => b.total));
+  return { buckets, seriesKeys, seriesNames, seriesColor, maxTotal };
+}
+
+function StackedDailyChart({
+  title,
+  data,
+}: {
+  title: string;
+  data: StackedChartData;
+}) {
+  return (
+    <div>
+      <SectionTitle>{title}</SectionTitle>
+      <div
+        className="flex items-end gap-0.5 h-32 px-1 py-2 rounded-md"
+        style={{ background: "var(--bg-elev-2)" }}
+      >
+        {data.buckets.map((b, bi) => {
+          const totalH = (b.total / data.maxTotal) * 100;
+          return (
+            <div
+              key={bi}
+              className="flex-1 flex flex-col-reverse gap-px min-w-0"
+              style={{ height: "100%" }}
+              title={`${b.day} · 合计 $${b.total.toFixed(4)}`}
+            >
+              <div
+                className="w-full flex flex-col-reverse rounded-t overflow-hidden"
+                style={{
+                  height: `${totalH}%`,
+                  minHeight: b.total > 0 ? "3px" : "1px",
+                }}
+              >
+                {b.parts
+                  .filter((p) => p.cost > 0)
+                  .map((p) => {
+                    const h = (p.cost / b.total) * 100;
+                    return (
+                      <div
+                        key={p.key}
+                        style={{
+                          height: `${h}%`,
+                          background: data.seriesColor.get(p.key),
+                        }}
+                        title={`${data.seriesNames.get(p.key)}: $${p.cost.toFixed(4)}`}
+                      />
+                    );
+                  })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div
+        className="flex justify-between text-[9px] font-mono mt-1 px-1"
+        style={{ color: "var(--fg-subtle)" }}
+      >
+        {data.buckets
+          .filter(
+            (_, i, arr) =>
+              i === 0 || i === arr.length - 1 || i === Math.floor(arr.length / 2),
+          )
+          .map((b, i) => (
+            <span key={i}>{b.day}</span>
+          ))}
+      </div>
+      <div className="flex flex-wrap gap-1.5 mt-2">
+        {data.seriesKeys.map((k) => (
+          <span
+            key={k}
+            className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded"
+            style={{
+              background: "var(--bg-elev-2)",
+              color: "var(--fg-muted)",
+            }}
+          >
+            <span
+              className="inline-block w-2 h-2 rounded"
+              style={{ background: data.seriesColor.get(k) }}
+            />
+            {data.seriesNames.get(k)}
+          </span>
+        ))}
       </div>
     </div>
   );

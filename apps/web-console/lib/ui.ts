@@ -109,3 +109,33 @@ export const toast = {
 };
 
 export const confirmDialog = (opts: ConfirmOptions) => ui.confirm(opts);
+
+
+// ============================================================
+// kbViewer: 全局事件 — "请求查看 KB 文档(可选高亮某 chunk)"
+// CitationsCard 触发, page.tsx 订阅, 用 KbDocDrawer 渲染.
+// ============================================================
+export interface KbViewerRequest {
+  docId: string;
+  chunkId?: string | null;
+  /** 兜底: doc 已知信息, 减少一次 fetch */
+  hintTitle?: string | null;
+  hintCollection?: string | null;
+}
+
+type KbViewerListener = (req: KbViewerRequest | null) => void;
+
+class KbViewerBus {
+  private listener: KbViewerListener | null = null;
+  subscribe(fn: KbViewerListener) {
+    this.listener = fn;
+    return () => {
+      if (this.listener === fn) this.listener = null;
+    };
+  }
+  open(req: KbViewerRequest) {
+    this.listener?.(req);
+  }
+}
+
+export const kbViewer = new KbViewerBus();

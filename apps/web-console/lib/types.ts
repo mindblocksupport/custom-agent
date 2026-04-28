@@ -6,9 +6,29 @@ export type Role = "system" | "user" | "assistant" | "tool";
 
 export interface ApiMessage {
   role: Role;
-  content?: string | null;
+  /**
+   * - string: 纯文本 (主路径)
+   * - ContentPart[]: multimodal — 文本 + 图片混排 (vision-capable model)
+   * - null: tool 消息
+   */
+  content?: string | ContentPart[] | null;
   tool_calls?: Array<Record<string, unknown>> | null;
   tool_call_id?: string | null;
+}
+
+export type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+/** 用户附件 (本地未发送 / 已发送两种状态都用此结构) */
+export interface UserAttachment {
+  id: string;
+  /** 直接 base64 data URL 或 http(s) URL */
+  dataUrl: string;
+  filename: string;
+  /** bytes (估算) */
+  size: number;
+  mime: string;
 }
 
 export interface StartData {
@@ -146,6 +166,8 @@ export interface UiMessage {
   >;
   /** 仅 user 消息用 */
   text?: string;
+  /** 仅 user 消息: 附件 (图片) */
+  attachments?: UserAttachment[];
   /** 完成后的统计 */
   done?: DoneData;
   /** error 信息 */
@@ -165,6 +187,7 @@ export interface Session {
   updatedAt: number;
   messageCount: number;
   totalCostUsd: number;
+  tags?: string[];
 }
 
 export interface Settings {
@@ -212,6 +235,7 @@ export interface Workspace {
   name: string;
   description: string;
   default_model: string;
+  allowed_models: string[];
   allowed_tools: string[];
   default_collection: string;
   allowed_collections: string[];

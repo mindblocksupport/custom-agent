@@ -15,12 +15,23 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from api_server.acl import Principal
 from api_server.auth import verify_api_key
+from api_server.db import audit as audit_db
 from api_server.db import skills as skill_db
+
+
+def _client_meta(req: Request | None) -> tuple[str | None, str | None]:
+    if not req:
+        return None, None
+    ip = (
+        req.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (req.client.host if req.client else None)
+    )
+    return ip, req.headers.get("user-agent")
 
 router = APIRouter()
 
@@ -93,6 +104,7 @@ def _to_out(r: skill_db.SkillRow) -> SkillOut:
 async def create_skill(
     wid: UUID,
     payload: SkillCreate,
+    request: Request,
     principal: Principal = Depends(verify_api_key),
 ) -> SkillOut:
     sid = await asyncio.to_thread(
@@ -115,6 +127,15 @@ async def create_skill(
     )
     if row is None:
         raise HTTPException(500, "created but not retrievable")
+    ip, ua = _client_meta(request)
+    audit_db.insert(
+        tenant_id=principal.tenant_id, actor_id=principal.actor_id,
+        action="skill.create",
+        resource_type="skill", resource_id=str(sid),
+        detail={"name": payload.name, "workspace_id": str(wid),
+                "visibility": payload.visibility},
+        ip=ip, user_agent=ua,
+    )
     return _to_out(row)
 
 
@@ -171,6 +192,7 @@ async def get_skill(
 async def patch_skill(
     sid: UUID,
     payload: SkillPatch,
+    request: Request,
     principal: Principal = Depends(verify_api_key),
 ) -> SkillOut:
     fields = payload.model_dump(exclude_none=True)
@@ -185,12 +207,21 @@ async def patch_skill(
     row = await asyncio.to_thread(
         skill_db.get, skill_id=sid, tenant_id=principal.tenant_id,
     )
+    ip, ua = _client_meta(request)
+    audit_db.insert(
+        tenant_id=principal.tenant_id, actor_id=principal.actor_id,
+        action="skill.patch",
+        resource_type="skill", resource_id=str(sid),
+        detail={"fields_changed": list(fields.keys())},
+        ip=ip, user_agent=ua,
+    )
     return _to_out(row)  # type: ignore[arg-type]
 
 
 @router.delete("/skills/{sid}")
 async def delete_skill(
     sid: UUID,
+    request: Request,
     principal: Principal = Depends(verify_api_key),
 ) -> dict[str, bool]:
     ok = await asyncio.to_thread(
@@ -198,6 +229,13 @@ async def delete_skill(
     )
     if not ok:
         raise HTTPException(404, "skill not found")
+    ip, ua = _client_meta(request)
+    audit_db.insert(
+        tenant_id=principal.tenant_id, actor_id=principal.actor_id,
+        action="skill.delete",
+        resource_type="skill", resource_id=str(sid),
+        ip=ip, user_agent=ua,
+    )
     return {"deleted": True}
 
 
@@ -209,6 +247,7 @@ class InstallRequest(BaseModel):
 async def install_skill(
     sid: UUID,
     payload: InstallRequest,
+    request: Request,
     principal: Principal = Depends(verify_api_key),
 ) -> SkillOut:
     """v1.5 Skill 市场: 把 visibility=public 的 skill 安装到 target workspace (复制).
@@ -231,6 +270,65 @@ async def install_skill(
         )
     row = await asyncio.to_thread(
         skill_db.get, skill_id=new_id, tenant_id=principal.tenant_id,
+    )
+    ip, ua = _client_meta(request)
+    audit_db.insert(
+        tenant_id=principal.tenant_id, actor_id=principal.actor_id,
+        action="skill.install",
+        resource_type="skill", resource_id=str(new_id),
+        detail={"source_skill_id": str(sid),
+                "target_workspace_id": str(payload.workspace_id)},
+        ip=ip, user_agent=ua,
+    )
+    return _to_out(row)  # type: ignore[arg-type]
+
+
+@router.get("/skills/{sid}/versions", response_model=list[SkillOut])
+async def list_skill_versions(
+    sid: UUID,
+    principal: Principal = Depends(verify_api_key),
+) -> list[SkillOut]:
+    """同 (workspace, name) 下的全部历史版本, version DESC."""
+    rows = await asyncio.to_thread(
+        skill_db.list_versions, skill_id=sid, tenant_id=principal.tenant_id,
+    )
+    if not rows:
+        raise HTTPException(404, "skill not found")
+    return [_to_out(r) for r in rows]
+
+
+class RollbackRequest(BaseModel):
+    target_version: int = Field(..., ge=1)
+
+
+@router.post("/skills/{sid}/rollback", response_model=SkillOut)
+async def rollback_skill(
+    sid: UUID,
+    payload: RollbackRequest,
+    request: Request,
+    principal: Principal = Depends(verify_api_key),
+) -> SkillOut:
+    """回滚到指定 version: 把那一版 内容复制成最新版 (历史保留)."""
+    new_id = await asyncio.to_thread(
+        skill_db.rollback_to,
+        skill_id=sid, tenant_id=principal.tenant_id,
+        target_version=payload.target_version,
+    )
+    if new_id is None:
+        raise HTTPException(404, "skill not found or target_version not found")
+    row = await asyncio.to_thread(
+        skill_db.get, skill_id=new_id, tenant_id=principal.tenant_id,
+    )
+    ip, ua = _client_meta(request)
+    audit_db.insert(
+        tenant_id=principal.tenant_id, actor_id=principal.actor_id,
+        action="skill.rollback",
+        resource_type="skill", resource_id=str(new_id),
+        detail={
+            "from_skill_id": str(sid),
+            "rolled_back_to_version": payload.target_version,
+        },
+        ip=ip, user_agent=ua,
     )
     return _to_out(row)  # type: ignore[arg-type]
 

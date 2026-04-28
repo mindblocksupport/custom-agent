@@ -1,6 +1,62 @@
-/** 会话导出 helpers (Markdown). */
+/** 会话导出 helpers (Markdown / JSON). */
 
 import type { Session, UiMessage } from "./types";
+
+export function messagesToJson(session: Session, messages: UiMessage[]): string {
+  // Strip transient UI 字段 (e.g. local IDs, hover state); 保留语义数据.
+  const out = {
+    session: {
+      id: session.id,
+      title: session.title,
+      created_at: new Date(session.createdAt).toISOString(),
+      updated_at: new Date(session.updatedAt).toISOString(),
+      message_count: session.messageCount,
+      total_cost_usd: session.totalCostUsd,
+    },
+    messages: messages.map((m) => ({
+      id: m.id,
+      role: m.role,
+      created_at: new Date(m.createdAt).toISOString(),
+      ...(m.text !== undefined ? { text: m.text } : {}),
+      blocks: m.blocks.map((b) => {
+        if (b.kind === "text") return { kind: "text", text: b.text };
+        const inv = b.invocation;
+        return {
+          kind: "tool",
+          name: inv.name,
+          arguments_raw: inv.argumentsRaw,
+          status: inv.status,
+          result: inv.result,
+          error: inv.error,
+          elapsed_ms: inv.elapsedMs,
+          retrieval: inv.citations
+            ? {
+                query: inv.retrievalQuery,
+                refused: inv.refused,
+                refusal_reason: inv.refusalReason,
+                n_dense: inv.nDense,
+                n_bm25: inv.nBm25,
+                n_rerank_in: inv.nRerankIn,
+                citations: inv.citations,
+              }
+            : undefined,
+        };
+      }),
+      ...(m.error ? { error: m.error } : {}),
+      ...(m.done
+        ? {
+            done: m.done,
+            model: m.model,
+            route_reason: m.routeReason,
+            trace_id: m.traceId,
+          }
+        : {}),
+    })),
+    exported_at: new Date().toISOString(),
+    schema_version: 1,
+  };
+  return JSON.stringify(out, null, 2);
+}
 
 export function messagesToMarkdown(session: Session, messages: UiMessage[]): string {
   const lines: string[] = [];

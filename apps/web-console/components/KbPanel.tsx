@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { useKb } from "../hooks/useKb";
 import { confirmDialog, toast } from "../lib/ui";
 import type { KbDoc, KbJob } from "../lib/types";
+import { KbDocDrawer } from "./KbDocDrawer";
 
 const STATUS_BADGE: Record<KbJob["status"], { bg: string; fg: string }> = {
   pending: { bg: "var(--bg-elev-2)", fg: "var(--fg-muted)" },
@@ -39,6 +40,7 @@ export function KbPanel({
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [search, setSearch] = useState("");
+  const [previewDoc, setPreviewDoc] = useState<KbDoc | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -214,6 +216,7 @@ export function KbPanel({
           <DocRow
             key={d.id}
             doc={d}
+            onPreview={() => setPreviewDoc(d)}
             onDelete={async () => {
               const ok = await confirmDialog({
                 title: `删除「${d.title ?? d.source_uri}」?`,
@@ -246,6 +249,12 @@ export function KbPanel({
           ⟳ 刷新 ({docs.length})
         </button>
       </div>
+
+      <KbDocDrawer
+        doc={previewDoc}
+        apiKey={apiKey}
+        onClose={() => setPreviewDoc(null)}
+      />
     </div>
   );
 }
@@ -299,12 +308,16 @@ function JobRow({ job }: { job: KbJob }) {
   );
 }
 
-function DocRow({ doc, onDelete }: { doc: KbDoc; onDelete: () => void }) {
+function DocRow({
+  doc, onDelete, onPreview,
+}: { doc: KbDoc; onDelete: () => void; onPreview: () => void }) {
   return (
     <div
-      className="group mx-2 px-2.5 py-2 rounded-lg transition"
+      onClick={onPreview}
+      className="group mx-2 px-2.5 py-2 rounded-lg transition cursor-pointer"
       onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-hover)")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      title="点击查看 chunks"
     >
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0">
@@ -339,7 +352,10 @@ function DocRow({ doc, onDelete }: { doc: KbDoc; onDelete: () => void }) {
           </div>
         </div>
         <button
-          onClick={onDelete}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
           className="opacity-0 group-hover:opacity-100 text-xs px-1 transition"
           style={{ color: "var(--fg-subtle)" }}
           onMouseEnter={(e) => (e.currentTarget.style.color = "var(--danger)")}

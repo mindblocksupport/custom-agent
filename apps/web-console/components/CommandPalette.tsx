@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MeApi, type SessionSearchHit } from "../lib/api/me";
 import type { Session, Skill, Workspace } from "../lib/types";
 
 export interface CommandAction {
   id: string;
-  group: string;          // 分组标题 (会话 / 工作空间 / 技能 / 操作)
-  label: string;          // 主显示
-  hint?: string;          // 副 (右对齐 monospace)
+  group: string;
+  label: string;
+  hint?: string;
   icon?: string;
-  keywords?: string;      // 额外搜索关键字
-  shortcut?: string;      // 显示在右侧的 ⌘K 提示
+  keywords?: string;
+  shortcut?: string;
   perform: () => void | Promise<void>;
 }
 
@@ -21,6 +22,7 @@ export function CommandPalette({
   workspaces,
   skills,
   activeWorkspaceId,
+  apiKey,
   onSelectSession,
   onSelectWorkspace,
   onSelectSkill,
@@ -37,6 +39,7 @@ export function CommandPalette({
   workspaces: Workspace[];
   skills: Skill[];
   activeWorkspaceId: string | null;
+  apiKey: string;
   onSelectSession: (id: string) => void;
   onSelectWorkspace: (id: string) => void;
   onSelectSkill: (id: string | null) => void;
@@ -49,16 +52,50 @@ export function CommandPalette({
 }) {
   const [q, setQ] = useState("");
   const [hover, setHover] = useState(0);
+  const [remoteHits, setRemoteHits] = useState<SessionSearchHit[]>([]);
+  const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (open) {
       setQ("");
       setHover(0);
+      setRemoteHits([]);
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);
+
+  // 全文搜后端 (debounce 250ms, 仅 query 长度 ≥ 2)
+  useEffect(() => {
+    if (debounceRef.current) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    const query = q.trim();
+    if (query.length < 2 || !apiKey) {
+      setRemoteHits([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    debounceRef.current = window.setTimeout(async () => {
+      try {
+        const r = await new MeApi(apiKey).searchSessions(query, {
+          workspaceId: activeWorkspaceId, limit: 8,
+        });
+        setRemoteHits(r.items);
+      } catch {
+        setRemoteHits([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+    return () => {
+      if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    };
+  }, [q, apiKey, activeWorkspaceId]);
 
   const actions: CommandAction[] = useMemo(() => {
     const out: CommandAction[] = [];
@@ -168,6 +205,21 @@ export function CommandPalette({
       }),
     );
 
+    // 全文搜命中 (后端) — 高亮 snippet
+    remoteHits.forEach((h) => {
+      out.push({
+        id: `hit:${h.session.id}`,
+        group: "搜索命中",
+        icon: "🔎",
+        label: h.session.title,
+        hint: h.snippet ? truncate(h.snippet, 40) : `${h.session.message_count} 条`,
+        perform: () => {
+          onClose();
+          onSelectSession(h.session.id);
+        },
+      });
+    });
+
     sessions.slice(0, 30).forEach((s) =>
       out.push({
         id: `sess:${s.id}`,
@@ -183,7 +235,7 @@ export function CommandPalette({
     );
     return out;
   }, [
-    workspaces, skills, sessions, activeWorkspaceId,
+    workspaces, skills, sessions, activeWorkspaceId, remoteHits,
     onClose, onSelectSession, onSelectWorkspace, onSelectSkill,
     onNewSession, onOpenSettings, onOpenCostDashboard, onOpenWorkspaceSettings,
     onToggleTheme, onToggleSidebar,
@@ -199,9 +251,9 @@ export function CommandPalette({
     });
   }, [q, actions]);
 
-  // 分组渲染顺序
+  // 分组渲染顺序 (搜索命中放最前)
   const grouped = useMemo(() => {
-    const order = ["操作", "工作空间", "技能", "会话"];
+    const order = ["搜索命中", "操作", "工作空间", "技能", "会话"];
     const map = new Map<string, CommandAction[]>();
     filtered.forEach((a) => {
       if (!map.has(a.group)) map.set(a.group, []);
@@ -277,10 +329,18 @@ export function CommandPalette({
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="跳转 / 命令... (会话名 / 技能 / 工作空间 / 设置)"
+            placeholder="跳转 / 搜索 / 命令... (会话名 / 消息内容 / 技能 / 设置)"
             className="flex-1 bg-transparent outline-none text-sm py-1"
             style={{ color: "var(--fg)" }}
           />
+          {searching && (
+            <span
+              className="text-[10px] animate-pulse-soft"
+              style={{ color: "var(--fg-subtle)" }}
+            >
+              搜索中
+            </span>
+          )}
           <span
             className="text-[10px] font-mono px-1.5 py-0.5 rounded"
             style={{
@@ -386,6 +446,10 @@ export function CommandPalette({
       </div>
     </div>
   );
+}
+
+function truncate(s: string, n: number): string {
+  return s.length > n ? s.slice(0, n) + "..." : s;
 }
 
 function Kbd({ children }: { children: React.ReactNode }) {

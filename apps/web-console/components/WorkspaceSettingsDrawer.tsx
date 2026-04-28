@@ -36,6 +36,7 @@ export function WorkspaceSettingsDrawer({
         name: workspace.name,
         description: workspace.description,
         default_model: workspace.default_model,
+        allowed_models: workspace.allowed_models ?? [],
         allowed_tools: workspace.allowed_tools,
         default_collection: workspace.default_collection,
         allowed_collections: workspace.allowed_collections,
@@ -204,6 +205,18 @@ export function WorkspaceSettingsDrawer({
                   <option value="anthropic/claude-sonnet-4-6" />
                 </datalist>
               </Field>
+
+              <Field
+                label="允许的模型 (空 = 不限)"
+                hint="白名单 enforce: 不在列表的 model 调用 → 403. 留空 = 不限制 (默认)"
+              >
+                <ModelChipEditor
+                  values={draft.allowed_models ?? []}
+                  onChange={(next) =>
+                    setDraft({ ...draft, allowed_models: next })
+                  }
+                />
+              </Field>
               <Field
                 label="允许的工具 (空 = 全部允许)"
                 hint="工作空间级白名单, skill 还可在此基础上再过滤"
@@ -242,18 +255,19 @@ export function WorkspaceSettingsDrawer({
                 </div>
               </Field>
               <Field
-                label="默认 collection"
-                hint="search_kb 默认查的命名空间"
+                label="允许的 collections (KB 命名空间, 第一项 = 默认)"
+                hint="search_kb 只能查这些 collection; 上传新文档默认放第一项"
               >
-                <input
-                  value={draft.default_collection ?? ""}
-                  onChange={(e) => setDraft({ ...draft, default_collection: e.target.value })}
-                  className="w-full px-2.5 py-1.5 rounded-md text-sm outline-none font-mono"
-                  style={{
-                    background: "var(--bg-elev-2)",
-                    color: "var(--fg)",
-                    border: "1px solid var(--border)",
-                  }}
+                <CollectionChipEditor
+                  values={draft.allowed_collections ?? []}
+                  defaultValue={draft.default_collection ?? "default"}
+                  onChange={(allowed, def) =>
+                    setDraft({
+                      ...draft,
+                      allowed_collections: allowed,
+                      default_collection: def,
+                    })
+                  }
                 />
               </Field>
               <div className="grid grid-cols-2 gap-3">
@@ -322,32 +336,25 @@ export function WorkspaceSettingsDrawer({
                   </div>
                 )}
                 {members.map((m) => (
-                  <div
+                  <MemberRow
                     key={m.actor_id}
-                    className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-md"
-                    style={{ background: "var(--bg-elev-2)" }}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-medium truncate" style={{ color: "var(--fg)" }}>
-                        {m.actor_id}
-                      </div>
-                      <div className="text-[10px]" style={{ color: "var(--fg-subtle)" }}>
-                        {m.role} · 加入于 {new Date(m.created_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => removeMember(m.actor_id)}
-                      className="text-xs px-2 py-1 rounded transition"
-                      style={{
-                        color: "var(--danger-soft-fg)",
-                        background: "transparent",
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--danger-soft)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                    >
-                      移除
-                    </button>
-                  </div>
+                    member={m}
+                    onRemove={() => removeMember(m.actor_id)}
+                    onSaveBudget={async (daily, monthly) => {
+                      if (!api) return;
+                      try {
+                        const updated = await api.setMemberBudget(
+                          workspace.id, m.actor_id, daily, monthly,
+                        );
+                        setMembers((prev) =>
+                          prev.map((x) => (x.actor_id === m.actor_id ? updated : x)),
+                        );
+                        toast.success("成员预算已更新");
+                      } catch (e) {
+                        toast.fromError(e, "保存失败");
+                      }
+                    }}
+                  />
                 ))}
               </div>
 
@@ -495,6 +502,364 @@ function TabPill({
     >
       {children}
     </button>
+  );
+}
+
+function MemberRow({
+  member,
+  onRemove,
+  onSaveBudget,
+}: {
+  member: WorkspaceMember;
+  onRemove: () => void;
+  onSaveBudget: (daily: number | null, monthly: number | null) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [daily, setDaily] = useState<string>(
+    member.budget_daily_usd != null ? String(member.budget_daily_usd) : "",
+  );
+  const [monthly, setMonthly] = useState<string>(
+    member.budget_monthly_usd != null ? String(member.budget_monthly_usd) : "",
+  );
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <div
+      className="px-2.5 py-2 rounded-md"
+      style={{ background: "var(--bg-elev-2)" }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-medium truncate" style={{ color: "var(--fg)" }}>
+            {member.actor_id}
+          </div>
+          <div
+            className="text-[10px] flex flex-wrap gap-1.5"
+            style={{ color: "var(--fg-subtle)" }}
+          >
+            <span>{member.role}</span>
+            <span>·</span>
+            <span>加入 {new Date(member.created_at).toLocaleDateString()}</span>
+            {(member.budget_daily_usd != null || member.budget_monthly_usd != null) && (
+              <>
+                <span>·</span>
+                <span style={{ color: "var(--accent-soft-fg)" }} className="font-mono">
+                  💵
+                  {member.budget_daily_usd != null && ` ${member.budget_daily_usd}/日`}
+                  {member.budget_monthly_usd != null && ` ${member.budget_monthly_usd}/月`}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={() => setEditing((v) => !v)}
+          className="text-xs px-2 py-0.5 rounded transition"
+          style={{
+            color: editing ? "var(--primary-soft-fg)" : "var(--fg-muted)",
+            background: editing ? "var(--primary-soft)" : "transparent",
+          }}
+          title="改此成员的预算"
+        >
+          {editing ? "▾" : "💵"}
+        </button>
+        <button
+          onClick={onRemove}
+          className="text-xs px-2 py-0.5 rounded transition"
+          style={{ color: "var(--danger-soft-fg)" }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--danger-soft)")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+        >
+          移除
+        </button>
+      </div>
+
+      {editing && (
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <div>
+            <label className="text-[10px] block mb-0.5" style={{ color: "var(--fg-subtle)" }}>
+              日预算 ($, 留空 = 不限)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={daily}
+              onChange={(e) => setDaily(e.target.value)}
+              placeholder="不限"
+              className="w-full px-2 py-1 rounded text-xs outline-none font-mono"
+              style={{
+                background: "var(--bg-elev)",
+                color: "var(--fg)",
+                border: "1px solid var(--border)",
+              }}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] block mb-0.5" style={{ color: "var(--fg-subtle)" }}>
+              月预算 ($, 留空 = 不限)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={monthly}
+              onChange={(e) => setMonthly(e.target.value)}
+              placeholder="不限"
+              className="w-full px-2 py-1 rounded text-xs outline-none font-mono"
+              style={{
+                background: "var(--bg-elev)",
+                color: "var(--fg)",
+                border: "1px solid var(--border)",
+              }}
+            />
+          </div>
+          <div className="col-span-2 flex justify-end gap-1">
+            <button
+              onClick={() => {
+                setDaily(member.budget_daily_usd != null ? String(member.budget_daily_usd) : "");
+                setMonthly(member.budget_monthly_usd != null ? String(member.budget_monthly_usd) : "");
+                setEditing(false);
+              }}
+              className="text-[11px] px-2 py-0.5"
+              style={{ color: "var(--fg-muted)" }}
+              disabled={saving}
+            >
+              取消
+            </button>
+            <button
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  const d = daily.trim() ? Number(daily) : null;
+                  const m = monthly.trim() ? Number(monthly) : null;
+                  await onSaveBudget(d, m);
+                  setEditing(false);
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              disabled={saving}
+              className="text-[11px] px-2.5 py-0.5 rounded text-white font-medium disabled:opacity-50"
+              style={{ background: "var(--primary)" }}
+            >
+              {saving ? "..." : "保存"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 通用 chip 编辑器, 复用给 allowed_models. 跟 CollectionChipEditor 区别:
+ * 没有 "default" 概念, chip 字符串保持原样 (model id 含 / 不能 lower).
+ */
+function ModelChipEditor({
+  values,
+  onChange,
+}: {
+  values: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const SUGGESTIONS = [
+    "auto",
+    "deepseek/deepseek-chat",
+    "deepseek/deepseek-reasoner",
+    "anthropic/claude-sonnet-4-6",
+    "openai/gpt-4o-mini",
+    "gemini/gemini-2.0-flash-exp",
+    "qwen/qwen-vl-max",
+  ];
+
+  const remove = (v: string) => onChange(values.filter((x) => x !== v));
+  const add = () => {
+    const v = draft.trim();
+    if (!v || values.includes(v)) {
+      setDraft("");
+      return;
+    }
+    onChange([...values, v]);
+    setDraft("");
+  };
+
+  return (
+    <div className="space-y-2">
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {values.map((v) => (
+            <span
+              key={v}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-mono"
+              style={{
+                background: "var(--bg-elev-2)",
+                color: "var(--fg)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <span>{v}</span>
+              <button
+                type="button"
+                onClick={() => remove(v)}
+                className="opacity-60 hover:opacity-100"
+                style={{ color: "var(--fg-subtle)" }}
+                title="移除"
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-1">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          list="ws-allowed-models-list"
+          placeholder="加 model id (Enter 添加)"
+          className="flex-1 px-2 py-1 rounded-md text-xs outline-none font-mono"
+          style={{
+            background: "var(--bg-elev-2)",
+            color: "var(--fg)",
+            border: "1px solid var(--border)",
+          }}
+        />
+        <datalist id="ws-allowed-models-list">
+          {SUGGESTIONS.filter((s) => !values.includes(s)).map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+        <button
+          type="button"
+          onClick={add}
+          disabled={!draft.trim()}
+          className="px-2 rounded-md text-xs disabled:opacity-40"
+          style={{ background: "var(--primary)", color: "white" }}
+        >
+          ＋
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CollectionChipEditor({
+  values,
+  defaultValue,
+  onChange,
+}: {
+  values: string[];
+  defaultValue: string;
+  onChange: (allowed: string[], def: string) => void;
+}) {
+  const [draft, setDraft] = useState("");
+
+  const list = values.length > 0 ? values : ["default"];
+
+  const remove = (v: string) => {
+    if (list.length <= 1) return; // 至少保留一个
+    const next = list.filter((x) => x !== v);
+    const nextDef = next.includes(defaultValue) ? defaultValue : next[0]!;
+    onChange(next, nextDef);
+  };
+
+  const add = () => {
+    const v = draft.trim().toLowerCase().replace(/\s+/g, "_");
+    if (!v) return;
+    if (list.includes(v)) {
+      setDraft("");
+      return;
+    }
+    onChange([...list, v], defaultValue || v);
+    setDraft("");
+  };
+
+  const setAsDefault = (v: string) => {
+    onChange(list, v);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {list.map((v) => {
+          const isDefault = v === defaultValue;
+          return (
+            <span
+              key={v}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-mono"
+              style={{
+                background: isDefault ? "var(--primary-soft)" : "var(--bg-elev-2)",
+                color: isDefault ? "var(--primary-soft-fg)" : "var(--fg)",
+                border: `1px solid ${isDefault ? "var(--primary)" : "var(--border)"}`,
+              }}
+            >
+              <span>{v}</span>
+              {isDefault && <span className="text-[9px]">★ 默认</span>}
+              {!isDefault && (
+                <button
+                  type="button"
+                  onClick={() => setAsDefault(v)}
+                  className="text-[9px] opacity-60 hover:opacity-100"
+                  title="设为默认"
+                >
+                  ★
+                </button>
+              )}
+              {list.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => remove(v)}
+                  className="text-xs opacity-60 hover:opacity-100"
+                  style={{ color: isDefault ? "var(--primary-soft-fg)" : "var(--fg-subtle)" }}
+                  title={isDefault ? "默认 collection 不能删, 先设别的为默认" : "移除"}
+                  disabled={isDefault && list.length <= 1}
+                >
+                  ✕
+                </button>
+              )}
+            </span>
+          );
+        })}
+      </div>
+      <div className="flex gap-1">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder="新 collection (Enter 添加)"
+          className="flex-1 px-2 py-1 rounded-md text-xs outline-none font-mono"
+          style={{
+            background: "var(--bg-elev-2)",
+            color: "var(--fg)",
+            border: "1px solid var(--border)",
+          }}
+        />
+        <button
+          type="button"
+          onClick={add}
+          disabled={!draft.trim()}
+          className="px-2 rounded-md text-xs disabled:opacity-40"
+          style={{
+            background: "var(--primary)",
+            color: "white",
+          }}
+        >
+          ＋
+        </button>
+      </div>
+    </div>
   );
 }
 

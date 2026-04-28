@@ -1,5 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { applyVars, collectStarterVars } from "../lib/templating";
+
 const CATEGORIES = [
   {
     title: "基础对话",
@@ -50,6 +53,14 @@ export function Welcome({
 }) {
   const showSkillStarters = starterExamples && starterExamples.length > 0;
 
+  // 检测 skill starters 中的 {{var}}
+  const requiredVars = useMemo(
+    () => (starterExamples ? collectStarterVars(starterExamples) : []),
+    [starterExamples],
+  );
+  const [vars, setVars] = useState<Record<string, string>>({});
+  const allFilled = requiredVars.every((v) => (vars[v] ?? "").trim().length > 0);
+
   return (
     <div className="max-w-3xl mx-auto py-10 space-y-6 animate-in">
       <div className="text-center">
@@ -75,9 +86,7 @@ export function Welcome({
         >
           带引用 · 可审计 · 成本可控
         </div>
-        <div
-          className="flex justify-center gap-1.5 mt-3"
-        >
+        <div className="flex justify-center gap-1.5 mt-3">
           {["🔍 RAG", "🔒 ACL", "📊 路由", "📈 可观测"].map((t) => (
             <span
               key={t}
@@ -107,25 +116,78 @@ export function Welcome({
             style={{ color: "var(--accent-soft-fg)" }}
           >
             🧩 Skill「{skillName}」 推荐问法
-          </div>
-          <div className="space-y-1">
-            {starterExamples!.map((ex) => (
-              <button
-                key={ex}
-                onClick={() => onPick(ex)}
-                className="block w-full text-left text-xs px-2.5 py-1.5 rounded-md truncate transition"
-                style={{ color: "var(--accent-soft-fg)" }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "rgba(255,255,255,0.4)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "transparent")
-                }
-                title={ex}
+            {requiredVars.length > 0 && (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded ml-1"
+                style={{
+                  background: "rgba(255,255,255,0.5)",
+                  color: "var(--accent-soft-fg)",
+                }}
               >
-                → {ex}
-              </button>
-            ))}
+                变量模板
+              </span>
+            )}
+          </div>
+
+          {requiredVars.length > 0 && (
+            <div
+              className="space-y-1.5 mb-3 p-2 rounded-md"
+              style={{ background: "rgba(255,255,255,0.3)" }}
+            >
+              <div
+                className="text-[10px] font-medium"
+                style={{ color: "var(--accent-soft-fg)" }}
+              >
+                填一下变量, 下方示例自动套入:
+              </div>
+              {requiredVars.map((v) => (
+                <div key={v} className="flex items-center gap-2">
+                  <span
+                    className="text-[10px] font-mono shrink-0 w-24 text-right"
+                    style={{ color: "var(--accent-soft-fg)" }}
+                  >
+                    {`{{ ${v} }}`}
+                  </span>
+                  <input
+                    value={vars[v] ?? ""}
+                    onChange={(e) => setVars({ ...vars, [v]: e.target.value })}
+                    placeholder={`输入 ${v}`}
+                    className="flex-1 px-2 py-1 rounded text-xs outline-none"
+                    style={{
+                      background: "var(--bg-elev)",
+                      color: "var(--fg)",
+                      border: "1px solid var(--border)",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-1">
+            {starterExamples!.map((ex) => {
+              const rendered = applyVars(ex, vars);
+              const ready = !ex.includes("{{") || allFilled;
+              return (
+                <button
+                  key={ex}
+                  onClick={() => onPick(rendered)}
+                  disabled={!ready}
+                  className="block w-full text-left text-xs px-2.5 py-1.5 rounded-md truncate transition disabled:opacity-50"
+                  style={{ color: "var(--accent-soft-fg)" }}
+                  onMouseEnter={(e) => {
+                    if (ready)
+                      e.currentTarget.style.background = "rgba(255,255,255,0.4)";
+                  }}
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = "transparent")
+                  }
+                  title={ready ? rendered : "请先填上方变量"}
+                >
+                  → {rendered}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

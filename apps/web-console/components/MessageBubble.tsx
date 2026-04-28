@@ -20,27 +20,57 @@ export function MessageBubble({
   isLast,
   onRegenerate,
   onInspect,
+  onFork,
 }: {
   msg: UiMessage;
   isLast?: boolean;
   onRegenerate?: () => void;
   onInspect?: () => void;
+  onFork?: () => void;
 }) {
   if (msg.role === "user") {
+    const hasAttachments = !!(msg.attachments && msg.attachments.length > 0);
     return (
       <div className="flex justify-end gap-2 group animate-in">
         <div className="flex flex-col items-end max-w-[80%]">
-          <div
-            className="px-3.5 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words leading-relaxed"
-            style={{
-              background: "var(--primary)",
-              color: "var(--fg-on-primary)",
-              borderTopRightRadius: "6px",
-              boxShadow: "var(--shadow-sm)",
-            }}
-          >
-            {msg.text}
-          </div>
+          {hasAttachments && (
+            <div className="flex gap-1.5 mb-1.5 flex-wrap justify-end">
+              {msg.attachments!.map((a) => (
+                <a
+                  key={a.id}
+                  href={a.dataUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-lg overflow-hidden transition"
+                  style={{
+                    border: "1px solid var(--border)",
+                    boxShadow: "var(--shadow-sm)",
+                  }}
+                  title={`${a.filename} · 点击查看大图`}
+                >
+                  <img
+                    src={a.dataUrl}
+                    alt={a.filename}
+                    className="block object-cover hover:opacity-90 transition"
+                    style={{ maxWidth: 220, maxHeight: 220 }}
+                  />
+                </a>
+              ))}
+            </div>
+          )}
+          {(msg.text || !hasAttachments) && (
+            <div
+              className="px-3.5 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words leading-relaxed"
+              style={{
+                background: "var(--primary)",
+                color: "var(--fg-on-primary)",
+                borderTopRightRadius: "6px",
+                boxShadow: "var(--shadow-sm)",
+              }}
+            >
+              {msg.text || (hasAttachments ? "(图片)" : "")}
+            </div>
+          )}
           <UserActions text={msg.text ?? ""} />
         </div>
         <Avatar role="user" />
@@ -102,6 +132,7 @@ export function MessageBubble({
           isLast={isLast}
           onRegenerate={onRegenerate}
           onInspect={onInspect}
+          onFork={onFork}
         />
         {msg.done && <MessageMeta msg={msg} />}
       </div>
@@ -163,11 +194,13 @@ function AssistantActions({
   isLast,
   onRegenerate,
   onInspect,
+  onFork,
 }: {
   msg: UiMessage;
   isLast?: boolean;
   onRegenerate?: () => void;
   onInspect?: () => void;
+  onFork?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const text = msg.blocks
@@ -202,6 +235,14 @@ function AssistantActions({
       {onInspect && msg.done && (
         <ActionBtn onClick={onInspect} title="查看本响应的工具/检索时间线">
           🔍 查看 trace
+        </ActionBtn>
+      )}
+      {onFork && (
+        <ActionBtn
+          onClick={onFork}
+          title="从这条消息分叉出一个新会话, 截止到此条的历史复制过去"
+        >
+          🌿 从此分叉
         </ActionBtn>
       )}
     </div>

@@ -234,6 +234,89 @@ def delete(*, skill_id: UUID, tenant_id: UUID) -> bool:
         return ok
 
 
+def rollback_to(
+    *, skill_id: UUID, tenant_id: UUID, target_version: int,
+) -> UUID | None:
+    """把 (workspace_id, name) 下的 target_version 拷贝成最新版.
+
+    - 不真正删除新版 (历史保留, 审计可追溯)
+    - 等价于 new_version + override 全字段 = target_version 内容
+    - 返回新建 row id; 找不到 / target_version 不存在 → None
+    """
+    src = get(skill_id=skill_id, tenant_id=tenant_id)
+    if src is None:
+        return None
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT * FROM skills
+            WHERE workspace_id = %s AND name = %s AND version = %s
+              AND deleted_at IS NULL
+            """,
+            (str(src.workspace_id), src.name, target_version),
+        )
+        target_raw = cur.fetchone()
+        if target_raw is None:
+            return None
+        target = _row(target_raw)
+        # 找下一个 version no
+        cur.execute(
+            """
+            SELECT coalesce(max(version), 0) + 1 AS next_v
+            FROM skills
+            WHERE workspace_id = %s AND name = %s
+            """,
+            (str(src.workspace_id), src.name),
+        )
+        next_v = int(cur.fetchone()["next_v"])
+        cur.execute(
+            """
+            INSERT INTO skills
+              (workspace_id, name, description, version, system_prompt,
+               allowed_tools, default_collections, starter_examples,
+               visibility, budget_per_call_usd, tags, created_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+            """,
+            (
+                str(target.workspace_id), target.name,
+                target.description, next_v,
+                target.system_prompt,
+                target.allowed_tools, target.default_collections,
+                target.starter_examples,
+                target.visibility, target.budget_per_call_usd,
+                target.tags, target.created_by,
+            ),
+        )
+        new_id = cur.fetchone()["id"]
+        conn.commit()
+        return new_id
+
+
+def list_versions(
+    *, skill_id: UUID, tenant_id: UUID,
+) -> list[SkillRow]:
+    """给定一个 skill_id, 返回同 workspace+name 的所有历史版本 (含本身), version DESC."""
+    cur_skill = get(skill_id=skill_id, tenant_id=tenant_id)
+    if cur_skill is None:
+        return []
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT s.* FROM skills s
+            JOIN workspaces w ON w.id = s.workspace_id
+            WHERE s.workspace_id = %s
+              AND s.name = %s
+              AND w.tenant_id = %s
+              AND s.deleted_at IS NULL
+              AND w.deleted_at IS NULL
+            ORDER BY s.version DESC
+            """,
+            (str(cur_skill.workspace_id), cur_skill.name, str(tenant_id)),
+        )
+        return [_row(r) for r in cur.fetchall()]
+
+
 def new_version(
     *, skill_id: UUID, tenant_id: UUID, **overrides: Any,
 ) -> UUID | None:

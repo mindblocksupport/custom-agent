@@ -16,12 +16,23 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from api_server.acl import Principal
 from api_server.auth import verify_api_key
+from api_server.db import audit as audit_db
 from api_server.db import chat as chat_db
+
+
+def _client_meta(req: Request | None) -> tuple[str | None, str | None]:
+    if not req:
+        return None, None
+    ip = (
+        req.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (req.client.host if req.client else None)
+    )
+    return ip, req.headers.get("user-agent")
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -34,7 +45,8 @@ class SessionCreate(BaseModel):
 
 
 class SessionPatch(BaseModel):
-    title: str = Field(..., min_length=1, max_length=200)
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    tags: list[str] | None = None
 
 
 class SessionOut(BaseModel):
@@ -46,6 +58,7 @@ class SessionOut(BaseModel):
     updated_at: datetime
     workspace_id: UUID | None = None
     skill_id: UUID | None = None
+    tags: list[str] = Field(default_factory=list)
 
 
 class SessionList(BaseModel):
@@ -74,6 +87,7 @@ def _row_to_out(row: chat_db.SessionRow) -> SessionOut:
         total_cost_usd=float(row.total_cost_usd),
         created_at=row.created_at, updated_at=row.updated_at,
         workspace_id=row.workspace_id, skill_id=row.skill_id,
+        tags=list(row.tags or []),
     )
 
 
@@ -110,6 +124,7 @@ async def create_session(
 @router.get("/sessions", response_model=SessionList)
 async def list_sessions(
     workspace_id: UUID | None = Query(None, description="只列本 workspace 的 session"),
+    tag: str | None = Query(None, description="按 tag 筛选"),
     limit: int = Query(20, ge=1, le=100),
     before: datetime | None = None,
     principal: Principal = Depends(verify_api_key),
@@ -119,11 +134,56 @@ async def list_sessions(
         tenant_id=principal.tenant_id,
         actor_id=principal.actor_id,
         workspace_id=workspace_id,
+        tag=tag,
         limit=limit, before=before,
     )
     return SessionList(
         items=[_row_to_out(r) for r in rows],
         next_cursor=next_cursor,
+    )
+
+
+@router.get("/sessions/tags")
+async def list_session_tags(
+    principal: Principal = Depends(verify_api_key),
+) -> dict[str, list[str]]:
+    """全部唯一 tag, 用于前端 chip 自动补全."""
+    tags = await asyncio.to_thread(
+        chat_db.list_distinct_tags,
+        tenant_id=principal.tenant_id, actor_id=principal.actor_id,
+    )
+    return {"tags": tags}
+
+
+class SearchHit(BaseModel):
+    session: SessionOut
+    snippet: str | None = None
+
+
+class SearchOut(BaseModel):
+    items: list[SearchHit]
+    query: str
+
+
+@router.get("/sessions/search", response_model=SearchOut)
+async def search_sessions_route(
+    q: str = Query(..., min_length=1, max_length=200),
+    workspace_id: UUID | None = Query(None),
+    limit: int = Query(30, ge=1, le=100),
+    principal: Principal = Depends(verify_api_key),
+) -> SearchOut:
+    """全文搜会话: 标题 + 消息内容. 返回带 snippet 的命中列表."""
+    rows = await asyncio.to_thread(
+        chat_db.search_sessions,
+        tenant_id=principal.tenant_id,
+        actor_id=principal.actor_id,
+        q=q.strip(),
+        workspace_id=workspace_id,
+        limit=limit,
+    )
+    return SearchOut(
+        items=[SearchHit(session=_row_to_out(r), snippet=sn) for (r, sn) in rows],
+        query=q,
     )
 
 
@@ -171,14 +231,32 @@ async def list_messages(
 @router.delete("/sessions/{session_id}")
 async def delete_session(
     session_id: UUID,
+    request: Request,
     principal: Principal = Depends(verify_api_key),
 ) -> dict[str, bool]:
+    sess = await asyncio.to_thread(
+        chat_db.get_session,
+        session_id=session_id, tenant_id=principal.tenant_id,
+    )
     ok = await asyncio.to_thread(
         chat_db.delete_session,
         session_id=session_id, tenant_id=principal.tenant_id,
     )
     if not ok:
         raise HTTPException(404, "session not found or already deleted")
+    ip, ua = _client_meta(request)
+    audit_db.insert(
+        tenant_id=principal.tenant_id, actor_id=principal.actor_id,
+        action="session.delete",
+        resource_type="session", resource_id=str(session_id),
+        detail={
+            "title": sess.title if sess else None,
+            "message_count": sess.message_count if sess else None,
+            "total_cost_usd": float(sess.total_cost_usd) if sess else None,
+            "workspace_id": str(sess.workspace_id) if sess and sess.workspace_id else None,
+        },
+        ip=ip, user_agent=ua,
+    )
     return {"deleted": True}
 
 
@@ -188,13 +266,24 @@ async def patch_session(
     payload: SessionPatch,
     principal: Principal = Depends(verify_api_key),
 ) -> SessionOut:
-    ok = await asyncio.to_thread(
-        chat_db.update_session_title,
-        session_id=session_id, tenant_id=principal.tenant_id,
-        title=payload.title,
-    )
-    if not ok:
-        raise HTTPException(404, "session not found")
+    if payload.title is None and payload.tags is None:
+        raise HTTPException(400, "nothing to update")
+    if payload.title is not None:
+        ok = await asyncio.to_thread(
+            chat_db.update_session_title,
+            session_id=session_id, tenant_id=principal.tenant_id,
+            title=payload.title,
+        )
+        if not ok:
+            raise HTTPException(404, "session not found")
+    if payload.tags is not None:
+        ok = await asyncio.to_thread(
+            chat_db.update_session_tags,
+            session_id=session_id, tenant_id=principal.tenant_id,
+            tags=payload.tags,
+        )
+        if not ok:
+            raise HTTPException(404, "session not found")
     row = await asyncio.to_thread(
         chat_db.get_session,
         session_id=session_id, tenant_id=principal.tenant_id,

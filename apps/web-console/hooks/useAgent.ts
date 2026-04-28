@@ -5,9 +5,11 @@ import { parseSseStream } from "../lib/sse";
 import { loadMessages, saveMessages } from "../lib/storage";
 import type {
   ApiMessage,
+  ContentPart,
   Settings,
   ToolInvocation,
   UiMessage,
+  UserAttachment,
 } from "../lib/types";
 
 interface SendResult {
@@ -15,22 +17,37 @@ interface SendResult {
   newMessages: number;
 }
 
+export interface SendErrorInfo {
+  message: string;
+  code?: string;
+  detail?: unknown;
+}
+
 export function useAgent({
   sessionId,
   settings,
   workspaceId,
   skillId,
+  skillVars,
   onSessionStats,
+  onSendError,
+  onBudgetWarn,
 }: {
   sessionId: string | null;
   settings: Settings;
   workspaceId?: string | null;
   skillId?: string | null;
+  /** {{ var }} → 替换值; 后端在注入 skill.system_prompt 前应用 */
+  skillVars?: Record<string, string>;
   onSessionStats?: (r: SendResult) => void;
+  /** 发送失败 (含业务 code, e.g. budget_exceeded) 时回调, 让上层弹 CTA */
+  onSendError?: (info: SendErrorInfo) => void;
+  /** 软警告: 后端 X-Budget-Warning header 存在时触发, 让上层 toast 友情提醒 */
+  onBudgetWarn?: (warning: string) => void;
 }): {
   messages: UiMessage[];
   streaming: boolean;
-  send: (text: string) => Promise<void>;
+  send: (text: string, attachments?: UserAttachment[]) => Promise<void>;
   stop: () => void;
   reset: () => void;
   regenerate: () => Promise<void>;
@@ -61,16 +78,24 @@ export function useAgent({
   }, []);
 
   const send = useCallback(
-    async (text: string, historyOverride?: UiMessage[]) => {
-      if (!sessionId || !text.trim() || streaming) return;
+    async (
+      text: string,
+      attachments?: UserAttachment[],
+      historyOverride?: UiMessage[],
+    ) => {
+      const trimmed = text.trim();
+      const hasAttachments = !!(attachments && attachments.length > 0);
+      if (!sessionId || streaming) return;
+      if (!trimmed && !hasAttachments) return;
 
       const baseHistory = historyOverride ?? messages;
 
       const userMsg: UiMessage = {
         id: crypto.randomUUID(),
         role: "user",
-        text: text.trim(),
-        blocks: [{ kind: "text", text: text.trim() }],
+        text: trimmed,
+        blocks: [{ kind: "text", text: trimmed }],
+        attachments: hasAttachments ? attachments : undefined,
         createdAt: Date.now(),
       };
 
@@ -78,6 +103,15 @@ export function useAgent({
         .filter((m) => m.role === "user" || m.role === "assistant")
         .map((m): ApiMessage => {
           if (m.role === "user") {
+            // 历史消息: 如果有附件, 也按 multimodal 还原
+            if (m.attachments && m.attachments.length > 0) {
+              const parts: ContentPart[] = [];
+              if (m.text) parts.push({ type: "text", text: m.text });
+              for (const a of m.attachments) {
+                parts.push({ type: "image_url", image_url: { url: a.dataUrl } });
+              }
+              return { role: "user", content: parts };
+            }
             return { role: "user", content: m.text ?? "" };
           }
           const txt = m.blocks
@@ -86,7 +120,18 @@ export function useAgent({
             .join("");
           return { role: "assistant", content: txt };
         });
-      apiMessages.push({ role: "user", content: text.trim() });
+
+      // 当前轮 user 消息
+      if (hasAttachments) {
+        const parts: ContentPart[] = [];
+        if (trimmed) parts.push({ type: "text", text: trimmed });
+        for (const a of attachments!) {
+          parts.push({ type: "image_url", image_url: { url: a.dataUrl } });
+        }
+        apiMessages.push({ role: "user", content: parts });
+      } else {
+        apiMessages.push({ role: "user", content: trimmed });
+      }
 
       const assistantMsg: UiMessage = {
         id: crypto.randomUUID(),
@@ -121,13 +166,40 @@ export function useAgent({
             // v1.5: 让后端按 workspace + skill 路由 (system_prompt + 默认模型)
             ...(workspaceId ? { workspace_id: workspaceId } : {}),
             ...(skillId ? { skill_id: skillId } : {}),
+            ...(skillVars && Object.keys(skillVars).length > 0
+              ? { skill_vars: skillVars }
+              : {}),
           }),
           signal: ctrl.signal,
         });
 
         if (!res.ok || !res.body) {
           const txt = await res.text().catch(() => "");
-          throw new Error(`HTTP ${res.status}: ${txt.slice(0, 120)}`);
+          // 后端用 detail dict 形式 → 优先抽 message
+          let nice = txt.slice(0, 200);
+          try {
+            const j = JSON.parse(txt);
+            if (j && typeof j === "object") {
+              if (j.detail && typeof j.detail === "object" && j.detail.message) {
+                nice = j.detail.message;
+                // 把 detail.code 也透传出去, 让上层 UI 能区分 (e.g. budget_exceeded)
+                const e: Error & { code?: string; detail?: unknown } = new Error(
+                  `HTTP ${res.status}: ${nice}`,
+                );
+                e.code = j.detail.code;
+                e.detail = j.detail;
+                throw e;
+              }
+              if (typeof j.detail === "string") nice = j.detail;
+            }
+          } catch (parseErr) {
+            // 如果是我们刚刚 throw 的扩展 Error, 重抛
+            if (parseErr instanceof Error && (parseErr as { code?: string }).code) {
+              throw parseErr;
+            }
+            // 否则忽略 JSON parse 错误, 用文本兜底
+          }
+          throw new Error(`HTTP ${res.status}: ${nice}`);
         }
 
         // Day 8: 从响应头吃 chat 元信息
@@ -135,6 +207,10 @@ export function useAgent({
         const routeReason = res.headers.get("x-route-reason") || undefined;
         const model = res.headers.get("x-model") || undefined;
         const sessionIdResp = res.headers.get("x-session-id") || undefined;
+        const budgetWarn = res.headers.get("x-budget-warning") || undefined;
+        if (budgetWarn && onBudgetWarn) {
+          onBudgetWarn(budgetWarn);
+        }
 
         const tools = new Map<string, ToolInvocation>();
         const activeAssistantId = assistantMsg.id;
@@ -296,6 +372,7 @@ export function useAgent({
         if ((e as { name?: string }).name === "AbortError") {
           // stop() called
         } else {
+          const errObj = e as { code?: string; detail?: unknown; message?: string };
           const msg = e instanceof Error ? e.message : String(e);
           setMessages((prev) => {
             const next = prev.map((m) =>
@@ -304,6 +381,13 @@ export function useAgent({
             persist(next);
             return next;
           });
+          if (onSendError) {
+            onSendError({
+              message: msg,
+              code: errObj.code,
+              detail: errObj.detail,
+            });
+          }
         }
       } finally {
         setStreaming(false);
@@ -319,8 +403,11 @@ export function useAgent({
       settings.model,
       workspaceId,
       skillId,
+      skillVars,
       streaming,
       onSessionStats,
+      onSendError,
+      onBudgetWarn,
     ],
   );
 
@@ -342,12 +429,12 @@ export function useAgent({
     const lastUserMsg = messages[lastUserIdx];
     if (!lastUserMsg) return;
     const lastUserText = lastUserMsg.text ?? "";
-    if (!lastUserText.trim()) return;
+    if (!lastUserText.trim() && !lastUserMsg.attachments?.length) return;
     // 截断: 把 lastUser 及之后全部移除 (send 会把 user 重新加上)
     const truncated = messages.slice(0, lastUserIdx);
     setMessages(truncated);
     persist(truncated);
-    await send(lastUserText, truncated);
+    await send(lastUserText, lastUserMsg.attachments, truncated);
   }, [messages, persist, send, streaming]);
 
   return { messages, streaming, send, stop, reset, regenerate };

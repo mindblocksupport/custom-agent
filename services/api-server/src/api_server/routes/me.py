@@ -38,6 +38,45 @@ class MeOut(BaseModel):
     api_version: str = "v1.5"
 
 
+class MyBudgetOut(BaseModel):
+    workspace_id: UUID
+    today_cost_usd: float
+    month_cost_usd: float
+    budget_daily_usd: float | None
+    budget_monthly_usd: float | None
+    has_limit: bool
+
+
+@router.get("/workspaces/{wid}/me/budget", response_model=MyBudgetOut)
+async def my_budget(
+    wid: UUID,
+    principal: Principal = Depends(verify_api_key),
+) -> MyBudgetOut:
+    """当前 actor 在指定 workspace 的预算与已用. 用于 sidebar 实时反馈.
+
+    没设 budget → has_limit=false (前端不显示 pill).
+    """
+    b = await asyncio.to_thread(
+        ws_db.fetch_actor_budget_usage,
+        workspace_id=wid,
+        tenant_id=principal.tenant_id,
+        actor_id=principal.actor_id,
+    )
+    if b is None:
+        # 不是 member 或 workspace 不存在
+        raise HTTPException(404, "not a member of this workspace")
+    return MyBudgetOut(
+        workspace_id=wid,
+        today_cost_usd=b.today_cost_usd,
+        month_cost_usd=b.month_cost_usd,
+        budget_daily_usd=b.budget_daily_usd,
+        budget_monthly_usd=b.budget_monthly_usd,
+        has_limit=(
+            b.budget_daily_usd is not None or b.budget_monthly_usd is not None
+        ),
+    )
+
+
 @router.get("/me", response_model=MeOut)
 async def me(principal: Principal = Depends(verify_api_key)) -> MeOut:
     def _do() -> tuple[int, int]:
@@ -52,13 +91,22 @@ async def me(principal: Principal = Depends(verify_api_key)) -> MeOut:
                 (str(principal.tenant_id), principal.actor_id),
             )
             ws_n = int(cur.fetchone()["n"])
+            # skills 没有 tenant_id 列, 通过 workspaces JOIN 算
             cur.execute(
                 """
-                SELECT count(*) AS n FROM skills
-                WHERE tenant_id = %s AND deleted_at IS NULL
-                  AND (visibility = 'public' OR workspace_id IN (
-                    SELECT workspace_id FROM workspace_members WHERE actor_id = %s
-                  ))
+                SELECT count(*) AS n
+                FROM skills s
+                JOIN workspaces w ON w.id = s.workspace_id
+                WHERE w.tenant_id = %s
+                  AND s.deleted_at IS NULL
+                  AND w.deleted_at IS NULL
+                  AND (
+                    s.visibility = 'public'
+                    OR s.workspace_id IN (
+                      SELECT workspace_id FROM workspace_members
+                      WHERE actor_id = %s
+                    )
+                  )
                 """,
                 (str(principal.tenant_id), principal.actor_id),
             )
@@ -92,6 +140,47 @@ class UsageByModelPoint(BaseModel):
     output_tokens: int
 
 
+class UsageBySkillPoint(BaseModel):
+    skill_id: UUID | None
+    skill_name: str          # "(通用对话)" if skill_id is null
+    sessions: int
+    messages: int
+    cost_usd: float
+
+
+class UsageDailyBySkillPoint(BaseModel):
+    """每天 × 每 skill 的成本/消息. 用来画 stacked bar chart."""
+    day: date
+    skill_id: UUID | None
+    skill_name: str
+    cost_usd: float
+    messages: int
+
+
+class UsageDailyByModelPoint(BaseModel):
+    """每天 × 每 model 的成本/消息. 用来对比模型成本结构."""
+    day: date
+    model: str
+    cost_usd: float
+    messages: int
+
+
+class UsageByActorPoint(BaseModel):
+    """每 actor 总成本 + 会话数 (谁烧的预算)."""
+    actor_id: str
+    sessions: int
+    messages: int
+    cost_usd: float
+
+
+class UsageDailyByActorPoint(BaseModel):
+    """每天 × 每 actor 的成本 (堆叠图)."""
+    day: date
+    actor_id: str
+    cost_usd: float
+    messages: int
+
+
 class UsageOut(BaseModel):
     workspace_id: UUID
     workspace_name: str
@@ -103,6 +192,11 @@ class UsageOut(BaseModel):
     total_output_tokens: int
     daily: list[UsageDayPoint]
     by_model: list[UsageByModelPoint]
+    by_skill: list[UsageBySkillPoint]
+    daily_by_skill: list[UsageDailyBySkillPoint]
+    daily_by_model: list[UsageDailyByModelPoint]
+    by_actor: list[UsageByActorPoint]
+    daily_by_actor: list[UsageDailyByActorPoint]
     budget_daily_usd: float | None
     budget_monthly_usd: float | None
     today_cost_usd: float
@@ -169,6 +263,111 @@ async def workspace_usage(
             )
             model_rows = cur.fetchall()
 
+            # 按 skill 聚合 (LEFT JOIN, NULL = 通用对话)
+            cur.execute(
+                """
+                SELECT s.skill_id,
+                       coalesce(sk.name, '(通用对话)') AS skill_name,
+                       count(DISTINCT s.id) AS sessions,
+                       count(m.id) AS messages,
+                       coalesce(sum(m.cost_usd), 0)::float AS cost_usd
+                FROM chat_messages m
+                JOIN chat_sessions s ON s.id = m.session_id
+                LEFT JOIN skills sk ON sk.id = s.skill_id
+                WHERE s.workspace_id = %s
+                  AND s.tenant_id = %s
+                  AND s.deleted_at IS NULL
+                  AND m.created_at >= %s
+                GROUP BY s.skill_id, sk.name
+                ORDER BY cost_usd DESC
+                """,
+                (str(wid), str(principal.tenant_id), cutoff),
+            )
+            skill_rows = cur.fetchall()
+
+            # 每日 × skill 堆叠 (用于 stacked chart)
+            cur.execute(
+                """
+                SELECT date_trunc('day', m.created_at)::date AS day,
+                       s.skill_id,
+                       coalesce(sk.name, '(通用对话)') AS skill_name,
+                       count(m.id) AS messages,
+                       coalesce(sum(m.cost_usd), 0)::float AS cost_usd
+                FROM chat_messages m
+                JOIN chat_sessions s ON s.id = m.session_id
+                LEFT JOIN skills sk ON sk.id = s.skill_id
+                WHERE s.workspace_id = %s
+                  AND s.tenant_id = %s
+                  AND s.deleted_at IS NULL
+                  AND m.created_at >= %s
+                GROUP BY day, s.skill_id, sk.name
+                ORDER BY day ASC, cost_usd DESC
+                """,
+                (str(wid), str(principal.tenant_id), cutoff),
+            )
+            daily_skill_rows = cur.fetchall()
+
+            # 每日 × model
+            cur.execute(
+                """
+                SELECT date_trunc('day', m.created_at)::date AS day,
+                       coalesce(m.model, 'unknown') AS model,
+                       count(m.id) AS messages,
+                       coalesce(sum(m.cost_usd), 0)::float AS cost_usd
+                FROM chat_messages m
+                JOIN chat_sessions s ON s.id = m.session_id
+                WHERE s.workspace_id = %s
+                  AND s.tenant_id = %s
+                  AND s.deleted_at IS NULL
+                  AND m.created_at >= %s
+                  AND m.role = 'assistant'
+                GROUP BY day, model
+                ORDER BY day ASC, cost_usd DESC
+                """,
+                (str(wid), str(principal.tenant_id), cutoff),
+            )
+            daily_model_rows = cur.fetchall()
+
+            # 按 actor 聚合 — "谁烧的预算"
+            cur.execute(
+                """
+                SELECT s.actor_id,
+                       count(DISTINCT s.id) AS sessions,
+                       count(m.id) AS messages,
+                       coalesce(sum(m.cost_usd), 0)::float AS cost_usd
+                FROM chat_messages m
+                JOIN chat_sessions s ON s.id = m.session_id
+                WHERE s.workspace_id = %s
+                  AND s.tenant_id = %s
+                  AND s.deleted_at IS NULL
+                  AND m.created_at >= %s
+                GROUP BY s.actor_id
+                ORDER BY cost_usd DESC
+                """,
+                (str(wid), str(principal.tenant_id), cutoff),
+            )
+            actor_rows = cur.fetchall()
+
+            # 每日 × actor 堆叠
+            cur.execute(
+                """
+                SELECT date_trunc('day', m.created_at)::date AS day,
+                       s.actor_id,
+                       count(m.id) AS messages,
+                       coalesce(sum(m.cost_usd), 0)::float AS cost_usd
+                FROM chat_messages m
+                JOIN chat_sessions s ON s.id = m.session_id
+                WHERE s.workspace_id = %s
+                  AND s.tenant_id = %s
+                  AND s.deleted_at IS NULL
+                  AND m.created_at >= %s
+                GROUP BY day, s.actor_id
+                ORDER BY day ASC, cost_usd DESC
+                """,
+                (str(wid), str(principal.tenant_id), cutoff),
+            )
+            daily_actor_rows = cur.fetchall()
+
             # 总计
             cur.execute(
                 """
@@ -219,6 +418,11 @@ async def workspace_usage(
 
         return {
             "day_rows": day_rows, "model_rows": model_rows,
+            "skill_rows": skill_rows,
+            "daily_skill_rows": daily_skill_rows,
+            "daily_model_rows": daily_model_rows,
+            "actor_rows": actor_rows,
+            "daily_actor_rows": daily_actor_rows,
             "tot": tot, "today": today, "month": month,
         }
 
@@ -239,6 +443,53 @@ async def workspace_usage(
         )
         for r in res["model_rows"]
     ]
+    by_skill = [
+        UsageBySkillPoint(
+            skill_id=r["skill_id"],
+            skill_name=r["skill_name"],
+            sessions=int(r["sessions"]),
+            messages=int(r["messages"]),
+            cost_usd=float(r["cost_usd"]),
+        )
+        for r in res["skill_rows"]
+    ]
+    daily_by_skill = [
+        UsageDailyBySkillPoint(
+            day=r["day"],
+            skill_id=r["skill_id"],
+            skill_name=r["skill_name"],
+            cost_usd=float(r["cost_usd"]),
+            messages=int(r["messages"]),
+        )
+        for r in res["daily_skill_rows"]
+    ]
+    daily_by_model = [
+        UsageDailyByModelPoint(
+            day=r["day"],
+            model=r["model"],
+            cost_usd=float(r["cost_usd"]),
+            messages=int(r["messages"]),
+        )
+        for r in res["daily_model_rows"]
+    ]
+    by_actor = [
+        UsageByActorPoint(
+            actor_id=r["actor_id"],
+            sessions=int(r["sessions"]),
+            messages=int(r["messages"]),
+            cost_usd=float(r["cost_usd"]),
+        )
+        for r in res["actor_rows"]
+    ]
+    daily_by_actor = [
+        UsageDailyByActorPoint(
+            day=r["day"],
+            actor_id=r["actor_id"],
+            cost_usd=float(r["cost_usd"]),
+            messages=int(r["messages"]),
+        )
+        for r in res["daily_actor_rows"]
+    ]
     tot = res["tot"]
     return UsageOut(
         workspace_id=wid,
@@ -251,6 +502,11 @@ async def workspace_usage(
         total_output_tokens=int(tot["output_tokens"] or 0),
         daily=daily,
         by_model=by_model,
+        by_skill=by_skill,
+        daily_by_skill=daily_by_skill,
+        daily_by_model=daily_by_model,
+        by_actor=by_actor,
+        daily_by_actor=daily_by_actor,
         budget_daily_usd=ws.budget_daily_usd,
         budget_monthly_usd=ws.budget_monthly_usd,
         today_cost_usd=res["today"],
