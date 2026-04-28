@@ -1,0 +1,24 @@
+docs/agent-frameworks.md
+  98ea89bdb61c2bb5 7395,7397,7399-7404,7406,7408-7418,7420-7428,7430-7432,7434,8934-8991,9278,9280,9282-9332,9334-9369,9371-9386,9591-9663,9690-9762,10753,10756
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "185c39b1a25db76eecd64a17491f4f5c0b8aab78",
+  "prompts": {
+    "98ea89bdb61c2bb5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "638163d5-3fa8-417f-aa8c-7d688e74feac",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "shaoqiu <shaoqiu.chen@xinfei.cn>",
+      "messages": [],
+      "total_additions": 356,
+      "total_deletions": 28,
+      "accepted_lines": 349,
+      "overriden_lines": 0,
+      "messages_url": "https://codeaiapi.xinfei-inc.cn/cas/a2bb9059fb271ef24bbd8d54b21c6457a10a0f6fa4348836a7bcb4e7968e4d02"
+    }
+  }
+}
